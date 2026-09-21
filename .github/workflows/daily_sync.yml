@@ -1,0 +1,41 @@
+name: Daily Analytics Sync
+
+on:
+  schedule:
+    # Runs at 06:00 UTC every day
+    - cron: "0 6 * * *"
+  # Manual trigger for testing
+  workflow_dispatch:
+
+jobs:
+  sync:
+    name: Sync Standings, Odds & Analytics
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: "pip"
+          cache-dependency-path: scripts/requirements.txt
+
+      - name: Install dependencies
+        run: pip install -r scripts/requirements.txt
+
+      - name: Run daily sync
+        env:
+          RAPIDAPI_KEY:              ${{ secrets.RAPIDAPI_KEY }}
+          SUPABASE_URL:              ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+        run: |
+          cd scripts
+          python sync_daily.py
+
+      - name: Log completion
+        if: always()
+        run: echo "Daily sync completed at $(date -u)"

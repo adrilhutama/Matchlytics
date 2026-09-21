@@ -1,0 +1,104 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ============================================================
+   Global design tokens
+   ENERGY 2 / RHYTHM 2 / MOTION 1
+   Palette: pitch-dark base + amber accent (single deliberate accent)
+   ============================================================ */
+
+@layer base {
+  *, *::before, *::after {
+    box-sizing: border-box;
+  }
+
+  html {
+    -webkit-text-size-adjust: 100%;
+    scroll-behavior: smooth;
+  }
+
+  body {
+    @apply bg-pitch-950 text-slate-300 font-sans antialiased;
+    min-height: 100dvh;
+  }
+
+  /* Accessible focus ring — visible, not the default outline */
+  :focus-visible {
+    outline: 2px solid theme('colors.amber.500');
+    outline-offset: 3px;
+    border-radius: 4px;
+  }
+
+  /* Scrollbar styling — matches dark palette */
+  ::-webkit-scrollbar        { width: 6px; height: 6px; }
+  ::-webkit-scrollbar-track  { background: theme('colors.pitch.900'); }
+  ::-webkit-scrollbar-thumb  { background: theme('colors.pitch.600'); border-radius: 3px; }
+  ::-webkit-scrollbar-thumb:hover { background: theme('colors.slate.500'); }
+}
+
+@layer components {
+  /* Shimmer animation used by skeleton loaders */
+  .shimmer {
+    background: linear-gradient(
+      90deg,
+      theme('colors.pitch.800') 0%,
+      theme('colors.pitch.700') 50%,
+      theme('colors.pitch.800') 100%
+    );
+    background-size: 600px 100%;
+    animation: shimmer 1.6s ease-in-out infinite;
+  }
+
+  /* Probability bar track */
+  .prob-track {
+    @apply relative h-1.5 rounded-full bg-pitch-700 overflow-hidden;
+  }
+
+  /* The amber glow is reserved solely for the +EV value badge.
+     This is the one element where glow is justified: it is the
+     single most important signal on the dashboard. (R-13) */
+  .value-glow {
+    box-shadow: 0 0 12px 2px rgba(245, 158, 11, 0.35);
+  }
+
+  /* Glass treatment — used only on the filter bar header (1 element, dose cap) (R-10) */
+  .glass-filter {
+    background: rgba(14, 17, 23, 0.75);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+  }
+
+  /* Card base — solid surface, no float shadow by default */
+  .match-card {
+    @apply bg-pitch-800 border border-pitch-700 rounded-xl;
+    transition: border-color 0.2s ease, transform 0.15s ease;
+  }
+
+  .match-card:hover {
+    @apply border-pitch-600;
+    transform: translateY(-1px);
+  }
+
+  /* Value card gets a subtle amber border to signal it without glow overload */
+  .match-card--value {
+    border-color: rgba(245, 158, 11, 0.35);
+  }
+
+  .match-card--value:hover {
+    border-color: rgba(245, 158, 11, 0.6);
+  }
+}
+
+@layer utilities {
+  .text-balance {
+    text-wrap: balance;
+  }
+
+  /* Number columns — monospace for tabular alignment */
+  .tabular-nums {
+    font-family: theme('fontFamily.mono');
+    font-variant-numeric: tabular-nums;
+  }
+}

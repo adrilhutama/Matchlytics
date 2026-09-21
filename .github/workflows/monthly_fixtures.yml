@@ -1,0 +1,41 @@
+name: Monthly Fixture Sync
+
+on:
+  schedule:
+    # Runs on the 1st of every month at 05:00 UTC
+    - cron: "0 5 1 * *"
+  # Manual trigger to backfill or update
+  workflow_dispatch:
+
+jobs:
+  monthly-sync:
+    name: Pull Next 30 Days of Fixtures
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: "pip"
+          cache-dependency-path: scripts/requirements.txt
+
+      - name: Install dependencies
+        run: pip install -r scripts/requirements.txt
+
+      - name: Run monthly fixture sync
+        env:
+          RAPIDAPI_KEY:              ${{ secrets.RAPIDAPI_KEY }}
+          SUPABASE_URL:              ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+        run: |
+          cd scripts
+          python sync_monthly_fixtures.py
+
+      - name: Log completion
+        if: always()
+        run: echo "Monthly fixture sync completed at $(date -u)"

@@ -1,0 +1,24 @@
+# Normalize line endings across operating systems
+* text=auto eol=lf
+
+# Force these to stay LF even on Windows checkouts
+*.py    text eol=lf
+*.js    text eol=lf
+*.jsx   text eol=lf
+*.ts    text eol=lf
+*.tsx   text eol=lf
+*.css   text eol=lf
+*.json  text eol=lf
+*.yml   text eol=lf
+*.yaml  text eol=lf
+*.md    text eol=lf
+*.sql   text eol=lf
+*.txt   text eol=lf
+*.sh    text eol=lf
+
+# Binaries — do not touch
+*.png  binary
+*.jpg  binary
+*.ico  binary
+*.woff binary
+*.woff2 binary
