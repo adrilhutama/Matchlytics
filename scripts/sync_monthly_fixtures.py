@@ -15,8 +15,9 @@ from datetime import date, timedelta
 import requests
 
 from config import (
-    RAPIDAPI_BASE,
-    RAPIDAPI_HEADERS,
+    API_HOST,
+    BASE_URL,
+    HEADERS,
     REQUEST_DELAY,
     SEASON,
     LEAGUES,
@@ -26,7 +27,7 @@ from config import (
 
 def fetch_fixtures_range(league_id: int, from_date: str, to_date: str) -> list[dict]:
     """Fetch fixtures from API-Football for a league within a date range."""
-    url = f"{RAPIDAPI_BASE}/fixtures"
+    url = f"{BASE_URL}/fixtures"
     params = {
         "league":  league_id,
         "season":  SEASON,
@@ -35,9 +36,12 @@ def fetch_fixtures_range(league_id: int, from_date: str, to_date: str) -> list[d
         "status":  "NS",           # Not Started only
         "timezone": "UTC",
     }
-    resp = requests.get(url, headers=RAPIDAPI_HEADERS, params=params, timeout=15)
+    resp = requests.get(url, headers=HEADERS, params=params, timeout=15)
     resp.raise_for_status()
     data = resp.json()
+    errors = data.get("errors")
+    if errors:
+        print(f"    [API-Sports Error] League {league_id}: {errors}")
     return data.get("response", [])
 
 
@@ -92,7 +96,7 @@ def main() -> None:
             print(f"    HTTP error for {league_name}: {exc}")
         except Exception as exc:
             print(f"    Unexpected error for {league_name}: {exc}")
-        time.sleep(REQUEST_DELAY)
+        time.sleep(2)
 
     print(f"\nDone. Total fixtures synced: {total}")
 

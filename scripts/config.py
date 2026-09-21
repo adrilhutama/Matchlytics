@@ -34,13 +34,20 @@ def _require_env(primary: str, *fallbacks: str) -> str:
 
 
 # ---- API credentials ----------------------------------------
-RAPIDAPI_KEY: str = _require_env("RAPIDAPI_KEY")
-RAPIDAPI_HOST: str = "api-football-v1.p.rapidapi.com"
-RAPIDAPI_BASE: str = "https://api-football-v1.p.rapidapi.com/v3"
-RAPIDAPI_HEADERS: dict = {
-    "X-RapidAPI-Key": RAPIDAPI_KEY,
-    "X-RapidAPI-Host": RAPIDAPI_HOST,
+# Accept either APISPORTS_KEY or RAPIDAPI_KEY for seamless transition
+API_KEY = os.getenv("APISPORTS_KEY") or os.getenv("RAPIDAPI_KEY")
+
+API_HOST = "v3.football.api-sports.io"
+HEADERS = {
+    "x-apisports-key": API_KEY
 }
+BASE_URL = f"https://{API_HOST}"
+
+# Backward compatibility aliases
+RAPIDAPI_KEY = API_KEY
+RAPIDAPI_HOST = API_HOST
+RAPIDAPI_BASE = BASE_URL
+RAPIDAPI_HEADERS = HEADERS
 
 # ---- Supabase (service role — bypasses RLS) -----------------
 # Accept both naming conventions so the module works regardless
@@ -77,4 +84,4 @@ HOME_ADVANTAGE: float = 1.10
 EV_THRESHOLD: float = 0.05
 
 # API rate limit: seconds to sleep between requests
-REQUEST_DELAY: float = 0.5
+REQUEST_DELAY: float = 2.0

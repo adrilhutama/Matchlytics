@@ -34,7 +34,8 @@ jobs:
 
       - name: Run monthly fixture sync
         env:
-          RAPIDAPI_KEY:              ${{ secrets.RAPIDAPI_KEY }}
+          APISPORTS_KEY:             ${{ secrets.APISPORTS_KEY || secrets.RAPIDAPI_KEY }}
+          RAPIDAPI_KEY:              ${{ secrets.APISPORTS_KEY || secrets.RAPIDAPI_KEY }}
           SUPABASE_URL:              ${{ secrets.SUPABASE_URL }}
           # Support both secret naming conventions.
           # config.py checks SUPABASE_SERVICE_ROLE_KEY first, then SUPABASE_SERVICE_KEY.

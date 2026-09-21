@@ -18,8 +18,9 @@ from datetime import date, datetime, timezone
 import requests
 
 from config import (
-    RAPIDAPI_BASE,
-    RAPIDAPI_HEADERS,
+    API_HOST,
+    BASE_URL,
+    HEADERS,
     REQUEST_DELAY,
     SEASON,
     LEAGUES,
@@ -38,11 +39,14 @@ from engine import (
 
 def fetch_standings(league_id: int) -> list[dict]:
     """Fetch league standings from API-Football."""
-    url    = f"{RAPIDAPI_BASE}/standings"
+    url    = f"{BASE_URL}/standings"
     params = {"league": league_id, "season": SEASON}
-    resp   = requests.get(url, headers=RAPIDAPI_HEADERS, params=params, timeout=15)
+    resp   = requests.get(url, headers=HEADERS, params=params, timeout=15)
     resp.raise_for_status()
     data   = resp.json()
+    errors = data.get("errors")
+    if errors:
+        print(f"    [API-Sports Error] Standings for league {league_id}: {errors}")
     try:
         return data["response"][0]["league"]["standings"][0]
     except (IndexError, KeyError):
@@ -91,16 +95,19 @@ def fetch_odds(fixture_id: int) -> tuple[float | None, float | None, float | Non
     Fetch Bet365 1X2 odds for a fixture.
     Returns (odds_home, odds_draw, odds_away) or (None, None, None) if unavailable.
     """
-    url    = f"{RAPIDAPI_BASE}/odds"
+    url    = f"{BASE_URL}/odds"
     params = {
         "fixture":    fixture_id,
         "bookmaker":  BET365_BOOKMAKER_ID,
         "bet":        1,           # Bet ID 1 = "Match Winner" (1X2)
     }
     try:
-        resp = requests.get(url, headers=RAPIDAPI_HEADERS, params=params, timeout=15)
+        resp = requests.get(url, headers=HEADERS, params=params, timeout=15)
         resp.raise_for_status()
         data = resp.json()
+        errors = data.get("errors")
+        if errors:
+            print(f"    [API-Sports Error] Odds for fixture {fixture_id}: {errors}")
 
         bookmakers = data.get("response", [])
         if not bookmakers:
@@ -235,6 +242,7 @@ def main() -> None:
     total_updated = 0
     for league_name, league_id in LEAGUES.items():
         total_updated += sync_league(league_name, league_id, todays_fixtures)
+        time.sleep(2)
 
     print(f"\nDone. Total fixtures updated: {total_updated}")
 
