@@ -9,12 +9,13 @@ import ErrorState from './components/ErrorState'
 
 // ---- League metadata ----------------------------------------
 export const LEAGUES = [
-  { id: 'all',  label: 'All Leagues',    country: null },
-  { id: 39,     label: 'Premier League', country: 'England' },
-  { id: 140,    label: 'La Liga',        country: 'Spain' },
-  { id: 135,    label: 'Serie A',        country: 'Italy' },
-  { id: 78,     label: 'Bundesliga',     country: 'Germany' },
-  { id: 61,     label: 'Ligue 1',        country: 'France' },
+  { id: 'all',  label: 'All Leagues',            country: null },
+  { id: 2021,   label: 'Premier League',         country: 'England' },
+  { id: 2014,   label: 'La Liga',                country: 'Spain' },
+  { id: 2019,   label: 'Serie A',                country: 'Italy' },
+  { id: 2002,   label: 'Bundesliga',             country: 'Germany' },
+  { id: 2015,   label: 'Ligue 1',                country: 'France' },
+  { id: 2001,   label: 'UEFA Champions League',  country: 'Europe' },
 ]
 
 // Upcoming window: fixtures in the next 7 days

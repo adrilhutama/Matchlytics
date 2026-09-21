@@ -33,21 +33,17 @@ def _require_env(primary: str, *fallbacks: str) -> str:
     )
 
 
-# ---- API credentials ----------------------------------------
-# Accept either APISPORTS_KEY or RAPIDAPI_KEY for seamless transition
-API_KEY = os.getenv("APISPORTS_KEY") or os.getenv("RAPIDAPI_KEY")
+# ---- Football-Data.org API credentials -----------------------
+FOOTBALL_DATA_TOKEN = os.getenv("FOOTBALL_DATA_TOKEN")
 
-API_HOST = "v3.football.api-sports.io"
+API_HOST = "api.football-data.org"
+BASE_URL = "https://api.football-data.org/v4"
 HEADERS = {
-    "x-apisports-key": API_KEY
+    "X-Auth-Token": FOOTBALL_DATA_TOKEN or ""
 }
-BASE_URL = f"https://{API_HOST}"
 
-# Backward compatibility aliases
-RAPIDAPI_KEY = API_KEY
-RAPIDAPI_HOST = API_HOST
-RAPIDAPI_BASE = BASE_URL
-RAPIDAPI_HEADERS = HEADERS
+# Backward-compatibility alias
+API_KEY = FOOTBALL_DATA_TOKEN
 
 # ---- Supabase (service role — bypasses RLS) -----------------
 # Accept both naming conventions so the module works regardless
@@ -61,21 +57,21 @@ SUPABASE_SERVICE_KEY: str = _require_env(
 
 supabase: Client = create_client(SUPABASE_URL, SUPABASE_SERVICE_KEY)
 
-# ---- Active leagues -----------------------------------------
-# Format: display_name -> API-Football league ID
-LEAGUES: dict[str, int] = {
-    "Premier League": 39,
-    "La Liga":        140,
-    "Serie A":        135,
-    "Bundesliga":     78,
-    "Ligue 1":        61,
-}
+# ---- Active competitions / leagues --------------------------
+ACTIVE_LEAGUES: list[dict] = [
+    {"code": "PL",  "name": "Premier League",         "id": 2021},
+    {"code": "PD",  "name": "La Liga",                "id": 2014},
+    {"code": "SA",  "name": "Serie A",                "id": 2019},
+    {"code": "BL1", "name": "Bundesliga",             "id": 2002},
+    {"code": "FL1", "name": "Ligue 1",                "id": 2015},
+    {"code": "CL",  "name": "UEFA Champions League",  "id": 2001},
+]
+
+# Backward-compatibility mapping: display_name -> league ID
+LEAGUES: dict[str, int] = {item["name"]: item["id"] for item in ACTIVE_LEAGUES}
 
 # Current season
 SEASON: int = 2025
-
-# Bet365 bookmaker ID in API-Football
-BET365_BOOKMAKER_ID: int = 8
 
 # Home advantage factor applied to expected goals
 HOME_ADVANTAGE: float = 1.10
@@ -83,5 +79,5 @@ HOME_ADVANTAGE: float = 1.10
 # Minimum EV threshold to flag a value bet (5%)
 EV_THRESHOLD: float = 0.05
 
-# API rate limit: seconds to sleep between requests
-REQUEST_DELAY: float = 2.0
+# API rate limit: 6.5s sleep delay to stay strictly under 10 req/min free tier cap
+REQUEST_DELAY: float = 6.5

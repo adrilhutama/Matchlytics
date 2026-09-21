@@ -1,13 +1,10 @@
 # ============================================================
 # scripts/sync_daily.py
-# Daily job: compute Poisson lambdas from standings, fetch
-# Bet365 odds, run analytics engine, update Supabase fixtures.
+# Daily job: compute Poisson lambdas from standings, calculate
+# probabilities, retain fair odds, and update Supabase fixtures.
 #
 # Scheduled via GitHub Actions at 06:00 UTC daily.
-# Designed to stay within the 100 req/day free-tier quota:
-#   - 5 leagues * 1 standings req = 5 requests
-#   - Up to ~15 fixtures/day * 1 odds req each = ~15 requests
-#   - Total: ~20 requests/day (well within quota)
+# Uses football-data.org v4 API with 6.5s delay between calls.
 # ============================================================
 
 from __future__ import annotations
@@ -18,13 +15,10 @@ from datetime import date, datetime, timezone
 import requests
 
 from config import (
-    API_HOST,
     BASE_URL,
     HEADERS,
     REQUEST_DELAY,
-    SEASON,
-    LEAGUES,
-    BET365_BOOKMAKER_ID,
+    ACTIVE_LEAGUES,
     HOME_ADVANTAGE,
     supabase,
 )
@@ -37,30 +31,62 @@ from engine import (
 
 # ---- Standings / strength computation ----------------------
 
-def fetch_standings(league_id: int) -> list[dict]:
-    """Fetch league standings from API-Football."""
-    url    = f"{BASE_URL}/standings"
-    params = {"league": league_id, "season": SEASON}
-    resp   = requests.get(url, headers=HEADERS, params=params, timeout=15)
-    resp.raise_for_status()
-    data   = resp.json()
-    errors = data.get("errors")
-    if errors:
-        print(f"    [API-Sports Error] Standings for league {league_id}: {errors}")
+def fetch_standings(competition_code: str) -> list[dict]:
+    """
+    Fetch standings table from football-data.org.
+    Safely handles regular leagues, UCL league phase, and UCL group stage tables.
+    Returns: list of dicts with keys: { team_id, team_name, played, goals_for, goals_against }
+    """
+    url = f"{BASE_URL}/competitions/{competition_code}/standings"
     try:
-        return data["response"][0]["league"]["standings"][0]
-    except (IndexError, KeyError):
+        resp = requests.get(url, headers=HEADERS, timeout=15)
+        if resp.status_code != 200:
+            error_msg = resp.text
+            try:
+                error_msg = resp.json().get("message", error_msg)
+            except Exception:
+                pass
+            print(f"    [football-data.org Error] Standings for {competition_code}: {resp.status_code} - {error_msg}")
+            return []
+
+        data = resp.json()
+        standings_list = data.get("standings", [])
+        if not standings_list:
+            return []
+
+        # Find TOTAL tables across all stages/groups (e.g. Regular Season, League Phase, or Group Stage).
+        total_tables = [s for s in standings_list if s.get("type") == "TOTAL"]
+        if not total_tables:
+            total_tables = [standings_list[0]]
+
+        table_rows: list[dict] = []
+        for s in total_tables:
+            for row in s.get("table", []):
+                team = row.get("team", {})
+                tid = team.get("id")
+                if not tid:
+                    continue
+                table_rows.append({
+                    "team_id":       tid,
+                    "team_name":     team.get("name"),
+                    "played":        row.get("playedGames", 0),
+                    "goals_for":     row.get("goalsFor", 0),
+                    "goals_against": row.get("goalsAgainst", 0),
+                })
+        return table_rows
+    except Exception as exc:
+        print(f"    Error fetching standings for {competition_code}: {exc}")
         return []
 
 
-def build_strength_table(standings: list[dict]) -> dict[int, dict]:
+def build_strength_table(table_rows: list[dict]) -> dict[int, dict]:
     """
     Parse standings into per-team attack/defense strength ratios.
-    Returns: { team_id: { attack, defense, avg_goals_for, avg_goals_against } }
+    Returns: { team_id: { attack, defense, league_avg_for, league_avg_against } }
     """
-    totals_for     = sum(t["all"]["goals"]["for"]     for t in standings)
-    totals_against = sum(t["all"]["goals"]["against"] for t in standings)
-    total_games    = sum(t["all"]["played"]            for t in standings)
+    totals_for     = sum(t["goals_for"]     for t in table_rows)
+    totals_against = sum(t["goals_against"] for t in table_rows)
+    total_games    = sum(t["played"]        for t in table_rows)
 
     if total_games == 0:
         return {}
@@ -69,62 +95,23 @@ def build_strength_table(standings: list[dict]) -> dict[int, dict]:
     league_avg_against = totals_against / total_games
 
     strength_table: dict[int, dict] = {}
-    for team in standings:
-        team_id  = team["team"]["id"]
-        played   = team["all"]["played"]
-        gf       = team["all"]["goals"]["for"]
-        ga       = team["all"]["goals"]["against"]
+    for team in table_rows:
+        team_id = team["team_id"]
+        played  = team["played"]
+        gf      = team["goals_for"]
+        ga      = team["goals_against"]
 
         attack, defense = compute_attack_defense_strength(
             gf, ga, played, league_avg_for, league_avg_against
         )
         strength_table[team_id] = {
-            "attack":            attack,
-            "defense":           defense,
-            "league_avg_for":    league_avg_for,
+            "attack":             attack,
+            "defense":            defense,
+            "league_avg_for":     league_avg_for,
             "league_avg_against": league_avg_against,
         }
 
     return strength_table
-
-
-# ---- Odds fetching -----------------------------------------
-
-def fetch_odds(fixture_id: int) -> tuple[float | None, float | None, float | None]:
-    """
-    Fetch Bet365 1X2 odds for a fixture.
-    Returns (odds_home, odds_draw, odds_away) or (None, None, None) if unavailable.
-    """
-    url    = f"{BASE_URL}/odds"
-    params = {
-        "fixture":    fixture_id,
-        "bookmaker":  BET365_BOOKMAKER_ID,
-        "bet":        1,           # Bet ID 1 = "Match Winner" (1X2)
-    }
-    try:
-        resp = requests.get(url, headers=HEADERS, params=params, timeout=15)
-        resp.raise_for_status()
-        data = resp.json()
-        errors = data.get("errors")
-        if errors:
-            print(f"    [API-Sports Error] Odds for fixture {fixture_id}: {errors}")
-
-        bookmakers = data.get("response", [])
-        if not bookmakers:
-            return None, None, None
-
-        bets = bookmakers[0]["bookmakers"][0]["bets"]
-        for bet in bets:
-            if bet["id"] == 1:
-                values     = {v["value"]: float(v["odd"]) for v in bet["values"]}
-                odds_home  = values.get("Home")
-                odds_draw  = values.get("Draw")
-                odds_away  = values.get("Away")
-                return odds_home, odds_draw, odds_away
-    except Exception as exc:
-        print(f"    Odds fetch failed for fixture {fixture_id}: {exc}")
-
-    return None, None, None
 
 
 # ---- Today's fixtures from Supabase ------------------------
@@ -135,7 +122,7 @@ def load_todays_fixtures() -> list[dict]:
     resp = (
         supabase
         .table("fixtures")
-        .select("id, league_id, home_team_id, away_team_id, match_date, status")
+        .select("id, league_id, home_team_id, away_team_id, match_date, status, odds_home, odds_draw, odds_away")
         .gte("match_date", f"{today_utc}T00:00:00+00:00")
         .lte("match_date", f"{today_utc}T23:59:59+00:00")
         .eq("status", "NS")
@@ -146,39 +133,42 @@ def load_todays_fixtures() -> list[dict]:
 
 # ---- Main sync logic ----------------------------------------
 
-def sync_league(league_name: str, league_id: int, todays_fixtures: list[dict]) -> int:
+def sync_competition(league: dict, todays_fixtures: list[dict]) -> int:
     """
-    For one league: fetch standings, build strength table, then process
-    each of today's fixtures in that league.
+    For one competition: fetch standings, build strength table, then process
+    each of today's fixtures in that competition.
     Returns count of fixtures updated.
     """
-    league_fixtures = [f for f in todays_fixtures if f["league_id"] == league_id]
+    code = league["code"]
+    name = league["name"]
+    lid  = league["id"]
+
+    league_fixtures = [f for f in todays_fixtures if f["league_id"] == lid]
     if not league_fixtures:
         return 0
 
-    print(f"  [{league_name}] {len(league_fixtures)} match(es) today.")
-
+    print(f"  [{name}] ({code}) {len(league_fixtures)} match(es) today.")
     print(f"    Fetching standings...")
-    standings = fetch_standings(league_id)
+    table_rows = fetch_standings(code)
     time.sleep(REQUEST_DELAY)
 
-    if not standings:
-        print(f"    No standings data available. Skipping.")
+    if not table_rows:
+        print(f"    No standings data available for {name}. Skipping.")
         return 0
 
-    strength = build_strength_table(standings)
+    strength = build_strength_table(table_rows)
     updated  = 0
 
     for fixture in league_fixtures:
-        fid      = fixture["id"]
-        home_id  = fixture["home_team_id"]
-        away_id  = fixture["away_team_id"]
+        fid     = fixture["id"]
+        home_id = fixture["home_team_id"]
+        away_id = fixture["away_team_id"]
 
         home_str = strength.get(home_id)
         away_str = strength.get(away_id)
 
         if not home_str or not away_str:
-            print(f"    Fixture {fid}: missing strength data, skipping.")
+            print(f"    Fixture {fid}: missing strength data for teams ({home_id} vs {away_id}), skipping.")
             continue
 
         # Compute lambdas
@@ -191,16 +181,24 @@ def sync_league(league_name: str, league_id: int, todays_fixtures: list[dict]) -
             home_advantage=HOME_ADVANTAGE,
         )
 
-        # Fetch Bet365 odds
-        print(f"    Fixture {fid}: fetching odds...")
-        odds_home, odds_draw, odds_away = fetch_odds(fid)
-        time.sleep(REQUEST_DELAY)
+        existing_odds_home = fixture.get("odds_home")
+        existing_odds_draw = fixture.get("odds_draw")
+        existing_odds_away = fixture.get("odds_away")
 
         # Run analytics
         analytics = calc_probabilities(
             lambda_home, lambda_away,
-            odds_home, odds_draw, odds_away,
+            existing_odds_home, existing_odds_draw, existing_odds_away,
         )
+
+        # Retain fair odds generated by the model if bookmaker odds are missing
+        fair_odds_home = round(100.0 / analytics.prob_home, 2) if analytics.prob_home > 0 else None
+        fair_odds_draw = round(100.0 / analytics.prob_draw, 2) if analytics.prob_draw > 0 else None
+        fair_odds_away = round(100.0 / analytics.prob_away, 2) if analytics.prob_away > 0 else None
+
+        final_odds_home = existing_odds_home or fair_odds_home
+        final_odds_draw = existing_odds_draw or fair_odds_draw
+        final_odds_away = existing_odds_away or fair_odds_away
 
         # Build update payload
         update_row = {
@@ -213,9 +211,9 @@ def sync_league(league_name: str, league_id: int, todays_fixtures: list[dict]) -
             "predicted_score":  analytics.predicted_score,
             "prob_over_25":     analytics.prob_over_25,
             "prob_btts":        analytics.prob_btts,
-            "odds_home":        odds_home,
-            "odds_draw":        odds_draw,
-            "odds_away":        odds_away,
+            "odds_home":        final_odds_home,
+            "odds_draw":        final_odds_draw,
+            "odds_away":        final_odds_away,
             "value_pick":       analytics.value_pick,
             "ev_percentage":    analytics.ev_percentage,
             "updated_at":       datetime.now(timezone.utc).isoformat(),
@@ -233,16 +231,16 @@ def main() -> None:
     print(f"Daily sync starting — {date.today().isoformat()} UTC")
 
     todays_fixtures = load_todays_fixtures()
-    print(f"Fixtures today (all leagues): {len(todays_fixtures)}")
+    print(f"Fixtures today (all competitions): {len(todays_fixtures)}")
 
     if not todays_fixtures:
         print("No fixtures found for today. Run sync_monthly_fixtures.py first.")
         return
 
     total_updated = 0
-    for league_name, league_id in LEAGUES.items():
-        total_updated += sync_league(league_name, league_id, todays_fixtures)
-        time.sleep(2)
+    for league in ACTIVE_LEAGUES:
+        total_updated += sync_competition(league, todays_fixtures)
+        time.sleep(REQUEST_DELAY)
 
     print(f"\nDone. Total fixtures updated: {total_updated}")
 

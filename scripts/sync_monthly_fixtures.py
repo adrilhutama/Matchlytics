@@ -15,57 +15,70 @@ from datetime import date, timedelta
 import requests
 
 from config import (
-    API_HOST,
     BASE_URL,
     HEADERS,
     REQUEST_DELAY,
     SEASON,
-    LEAGUES,
+    ACTIVE_LEAGUES,
     supabase,
 )
 
 
-def fetch_fixtures_range(league_id: int, from_date: str, to_date: str) -> list[dict]:
-    """Fetch fixtures from API-Football for a league within a date range."""
-    url = f"{BASE_URL}/fixtures"
+def fetch_fixtures_range(competition_code: str, from_date: str, to_date: str) -> list[dict]:
+    """Fetch scheduled fixtures from football-data.org for a competition within a date range."""
+    url = f"{BASE_URL}/competitions/{competition_code}/matches"
     params = {
-        "league":  league_id,
-        "season":  SEASON,
-        "from":    from_date,
-        "to":      to_date,
-        "status":  "NS",           # Not Started only
-        "timezone": "UTC",
+        "dateFrom": from_date,
+        "dateTo":   to_date,
+        "status":   "SCHEDULED",
     }
     resp = requests.get(url, headers=HEADERS, params=params, timeout=15)
-    resp.raise_for_status()
+    if resp.status_code != 200:
+        error_msg = resp.text
+        try:
+            error_msg = resp.json().get("message", error_msg)
+        except Exception:
+            pass
+        print(f"    [football-data.org Error] {competition_code}: {resp.status_code} - {error_msg}")
+        return []
+
     data = resp.json()
-    errors = data.get("errors")
-    if errors:
-        print(f"    [API-Sports Error] League {league_id}: {errors}")
-    return data.get("response", [])
+    return data.get("matches", [])
 
 
-def parse_fixture_row(f: dict) -> dict:
-    """Extract and flatten the fields we need from a raw API-Football fixture."""
-    fixture   = f["fixture"]
-    league    = f["league"]
-    teams     = f["teams"]
+def parse_fixture_row(m: dict, league: dict) -> dict:
+    """Extract and map fields from a football-data.org match object to Supabase fixture row."""
+    comp = m.get("competition", {})
+    home = m.get("homeTeam", {})
+    away = m.get("awayTeam", {})
+    area = m.get("area", {})
+    season_info = m.get("season", {})
+
+    season_val = SEASON
+    if season_info and season_info.get("startDate"):
+        try:
+            season_val = int(season_info["startDate"][:4])
+        except (ValueError, TypeError):
+            season_val = SEASON
+
+    raw_status = m.get("status", "SCHEDULED")
+    status = "NS" if raw_status in ("SCHEDULED", "TIMED") else raw_status
 
     return {
-        "id":              fixture["id"],
-        "league_id":       league["id"],
-        "league_name":     league["name"],
-        "league_logo":     league["logo"],
-        "league_country":  league["country"],
-        "season":          league["season"],
-        "match_date":      fixture["date"],
-        "status":          fixture["status"]["short"],
-        "home_team_id":    teams["home"]["id"],
-        "home_team_name":  teams["home"]["name"],
-        "home_team_logo":  teams["home"]["logo"],
-        "away_team_id":    teams["away"]["id"],
-        "away_team_name":  teams["away"]["name"],
-        "away_team_logo":  teams["away"]["logo"],
+        "id":              m["id"],
+        "league_id":       league.get("id") or comp.get("id"),
+        "league_name":     league.get("name") or comp.get("name"),
+        "league_logo":     comp.get("emblem") or "",
+        "league_country":  area.get("name") or "",
+        "season":          season_val,
+        "match_date":      m.get("utcDate"),
+        "status":          status,
+        "home_team_id":    home.get("id"),
+        "home_team_name":  home.get("name"),
+        "home_team_logo":  home.get("crest"),
+        "away_team_id":    away.get("id"),
+        "away_team_name":  away.get("name"),
+        "away_team_logo":  away.get("crest"),
     }
 
 
@@ -85,18 +98,20 @@ def main() -> None:
     print(f"Syncing fixtures from {from_str} to {to_str}...")
     total = 0
 
-    for league_name, league_id in LEAGUES.items():
-        print(f"  League: {league_name} (ID={league_id})")
+    for league in ACTIVE_LEAGUES:
+        code = league["code"]
+        name = league["name"]
+        print(f"  Competition: {name} ({code}) [ID={league['id']}]")
         try:
-            raw = fetch_fixtures_range(league_id, from_str, to_str)
-            rows = [parse_fixture_row(f) for f in raw]
+            raw = fetch_fixtures_range(code, from_str, to_str)
+            rows = [parse_fixture_row(m, league) for m in raw]
             upsert_fixtures(rows)
             total += len(rows)
         except requests.HTTPError as exc:
-            print(f"    HTTP error for {league_name}: {exc}")
+            print(f"    HTTP error for {name}: {exc}")
         except Exception as exc:
-            print(f"    Unexpected error for {league_name}: {exc}")
-        time.sleep(2)
+            print(f"    Unexpected error for {name}: {exc}")
+        time.sleep(REQUEST_DELAY)
 
     print(f"\nDone. Total fixtures synced: {total}")
 
