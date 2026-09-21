@@ -18,8 +18,8 @@ export const LEAGUES = [
   { id: 2001,   label: 'UEFA Champions League',  country: 'Europe' },
 ]
 
-// Upcoming window: fixtures in the next 7 days
-const DAYS_AHEAD = 7
+// Upcoming window: fixtures in the next 30 days
+const DAYS_AHEAD = 30
 
 function buildDateRange() {
   const now  = new Date()
@@ -113,7 +113,7 @@ export default function App() {
         ) : (
           <section aria-label="Match fixtures">
             <p className="text-sm text-slate-500 mb-4">
-              {fixtures.length} match{fixtures.length !== 1 ? 'es' : ''} in the next {DAYS_AHEAD} days
+              {fixtures.length} upcoming match{fixtures.length !== 1 ? 'es' : ''} (next {DAYS_AHEAD} days)
             </p>
             <div className="grid gap-4 sm:gap-5">
               {fixtures.map((fixture, idx) => (

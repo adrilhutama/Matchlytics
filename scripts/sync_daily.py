@@ -10,7 +10,7 @@
 from __future__ import annotations
 
 import time
-from datetime import date, datetime, timezone
+from datetime import date, datetime, timedelta, timezone
 
 import requests
 
@@ -114,40 +114,47 @@ def build_strength_table(table_rows: list[dict]) -> dict[int, dict]:
     return strength_table
 
 
-# ---- Today's fixtures from Supabase ------------------------
+# ---- Upcoming fixtures from Supabase -----------------------
 
-def load_todays_fixtures() -> list[dict]:
-    """Load today's not-started fixtures from Supabase."""
-    today_utc = date.today().isoformat()
+def load_upcoming_fixtures(days_ahead: int = 30) -> list[dict]:
+    """Load upcoming not-started fixtures from Supabase within the next 30 days."""
+    now_utc = datetime.now(timezone.utc)
+    from_iso = now_utc.isoformat()
+    to_iso = (now_utc + timedelta(days=days_ahead)).isoformat()
     resp = (
         supabase
         .table("fixtures")
         .select("id, league_id, home_team_id, away_team_id, match_date, status, odds_home, odds_draw, odds_away")
-        .gte("match_date", f"{today_utc}T00:00:00+00:00")
-        .lte("match_date", f"{today_utc}T23:59:59+00:00")
+        .gte("match_date", from_iso)
+        .lte("match_date", to_iso)
         .eq("status", "NS")
+        .order("match_date", desc=False)
         .execute()
     )
     return resp.data or []
 
 
+# Backward-compatibility alias
+load_todays_fixtures = load_upcoming_fixtures
+
+
 # ---- Main sync logic ----------------------------------------
 
-def sync_competition(league: dict, todays_fixtures: list[dict]) -> int:
+def sync_competition(league: dict, fixtures: list[dict]) -> int:
     """
     For one competition: fetch standings, build strength table, then process
-    each of today's fixtures in that competition.
+    each upcoming fixture in that competition.
     Returns count of fixtures updated.
     """
     code = league["code"]
     name = league["name"]
     lid  = league["id"]
 
-    league_fixtures = [f for f in todays_fixtures if f["league_id"] == lid]
+    league_fixtures = [f for f in fixtures if f["league_id"] == lid]
     if not league_fixtures:
         return 0
 
-    print(f"  [{name}] ({code}) {len(league_fixtures)} match(es) today.")
+    print(f"  [{name}] ({code}) {len(league_fixtures)} upcoming match(es).")
     print(f"    Fetching standings...")
     table_rows = fetch_standings(code)
     time.sleep(REQUEST_DELAY)
@@ -230,16 +237,16 @@ def sync_competition(league: dict, todays_fixtures: list[dict]) -> int:
 def main() -> None:
     print(f"Daily sync starting — {date.today().isoformat()} UTC")
 
-    todays_fixtures = load_todays_fixtures()
-    print(f"Fixtures today (all competitions): {len(todays_fixtures)}")
+    upcoming_fixtures = load_upcoming_fixtures(days_ahead=30)
+    print(f"Upcoming fixtures (next 30 days, all competitions): {len(upcoming_fixtures)}")
 
-    if not todays_fixtures:
-        print("No fixtures found for today. Run sync_monthly_fixtures.py first.")
+    if not upcoming_fixtures:
+        print("No upcoming fixtures found. Run sync_monthly_fixtures.py first.")
         return
 
     total_updated = 0
     for league in ACTIVE_LEAGUES:
-        total_updated += sync_competition(league, todays_fixtures)
+        total_updated += sync_competition(league, upcoming_fixtures)
         time.sleep(REQUEST_DELAY)
 
     print(f"\nDone. Total fixtures updated: {total_updated}")

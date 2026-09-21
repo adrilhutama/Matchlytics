@@ -216,11 +216,15 @@ export default function MatchCard({ fixture, style }) {
         </p>
       )}
 
-      {/* ---- No analytics state (metadata only) ---- */}
+      {/* ---- No analytics state (metadata only / pending calculation) ---- */}
       {prob_home == null && (
-        <p className="text-xs text-slate-600 mt-2 italic">
-          Analytics pending — daily sync will populate at 06:00 UTC.
-        </p>
+        <div className="mt-3 py-2 px-3 rounded-lg bg-pitch-900/60 border border-pitch-800/80 flex items-center justify-between text-xs text-slate-400">
+          <span className="flex items-center gap-2">
+            <span className="inline-block w-2 h-2 rounded-full bg-amber-400 animate-pulse" />
+            <span className="font-medium text-slate-300">Analysis Pending</span>
+          </span>
+          <span className="text-slate-500 text-[11px]">Daily Sync at 06:00 UTC</span>
+        </div>
       )}
     </article>
   )

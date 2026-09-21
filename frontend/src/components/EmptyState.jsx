@@ -4,8 +4,8 @@
 
 export default function EmptyState({ leagueLabel, valueOnly, onClearFilters }) {
   const reason = valueOnly
-    ? `No value bets detected in ${leagueLabel || 'the selected leagues'} for the next 7 days.`
-    : `No upcoming fixtures found for ${leagueLabel || 'the selected league'} in the next 7 days.`
+    ? `No value bets detected in ${leagueLabel || 'the selected leagues'} for the next 30 days.`
+    : `No upcoming fixtures found for ${leagueLabel || 'the selected league'} in the next 30 days.`
 
   const hint = valueOnly
     ? 'The model found no odds mispricing above the 5% EV threshold. Check back after the next daily sync (06:00 UTC).'
