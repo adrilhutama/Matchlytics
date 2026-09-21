@@ -45,6 +45,19 @@ HEADERS = {
 # Backward-compatibility alias
 API_KEY = FOOTBALL_DATA_TOKEN
 
+# ---- The Odds API (v4) credentials ---------------------------
+ODDS_API_KEY = os.getenv("ODDS_API_KEY")
+ODDS_API_BASE = "https://api.the-odds-api.com/v4/sports"
+
+ODDS_SPORT_KEYS: dict[str, str] = {
+    "PL":  "soccer_epl",
+    "PD":  "soccer_spain_la_liga",
+    "SA":  "soccer_italy_serie_a",
+    "BL1": "soccer_germany_bundesliga",
+    "FL1": "soccer_france_ligue_one",
+    "CL":  "soccer_uefa_champs_league",
+}
+
 # ---- Supabase (service role — bypasses RLS) -----------------
 # Accept both naming conventions so the module works regardless
 # of whether the GitHub secret is called SUPABASE_SERVICE_ROLE_KEY

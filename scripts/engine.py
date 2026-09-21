@@ -59,16 +59,20 @@ def calc_probabilities(
     Parameters
     ----------
     lambda_home : float
-        Expected goals for the home team.
+        Expected goals for the home team (clamped to [0.6, 3.2]).
     lambda_away : float
-        Expected goals for the away team.
+        Expected goals for the away team (clamped to [0.6, 3.2]).
     odds_home, odds_draw, odds_away : float | None
-        Decimal odds from Bet365. Pass None if not available.
+        Decimal odds from bookmaker. Pass None if not available.
 
     Returns
     -------
     MatchAnalytics dataclass with all computed fields.
     """
+    # Clamp Poisson lambdas strictly between 0.6 and 3.2
+    lambda_home = max(0.6, min(float(lambda_home), 3.2))
+    lambda_away = max(0.6, min(float(lambda_away), 3.2))
+
     matrix = score_matrix(lambda_home, lambda_away)
 
     # Win / Draw / Away probabilities
@@ -100,7 +104,7 @@ def calc_probabilities(
     most_likely_home, most_likely_away = divmod(flat_idx, MAX_GOALS)
     predicted_score = f"{most_likely_home}-{most_likely_away}"
 
-    # Value bet detection
+    # Value bet detection with realistic guardrails
     value_pick, ev_pct = find_best_pick(
         home_win, draw, away_win,
         odds_home, odds_draw, odds_away,
@@ -138,41 +142,44 @@ def find_best_pick(
     odds_home: Optional[float],
     odds_draw: Optional[float],
     odds_away: Optional[float],
-    threshold: float = 0.05,
+    threshold: Optional[float] = None,
+    min_ev: float = 0.02,
+    max_ev: float = 0.35,
+    min_prob: float = 0.15,
+    min_odds: float = 1.25,
+    max_odds: float = 12.0,
 ) -> tuple[Optional[str], Optional[float]]:
     """
-    Evaluate EV for each outcome. Return the pick with the highest positive EV
-    above `threshold`, or (None, None) if no value bet exists.
-
-    Parameters
-    ----------
-    prob_* : float
-        Model probabilities as fractions (0..1), not percentages.
-    odds_* : float | None
-        Decimal odds. None means odds are unavailable for that market.
-    threshold : float
-        Minimum EV (fraction) to qualify as a value bet. Default 0.05 (5%).
-
-    Returns
-    -------
-    (pick_label, ev_as_percentage) or (None, None)
+    Evaluate EV for each outcome with strict sanity guardrails:
+      - Event probability is at least 15% (prob >= 0.15)
+      - Market odds are realistic (1.25 <= odds <= 12.0)
+      - EV is within realistic bounds (2.0% <= EV <= 35.0%)
+    Discards anything > 35% as bad data.
     """
+    if threshold is not None:
+        min_ev = threshold
+
     candidates: list[tuple[str, float]] = []
+    outcomes = [
+        ("HOME", prob_home, odds_home),
+        ("DRAW", prob_draw, odds_draw),
+        ("AWAY", prob_away, odds_away),
+    ]
 
-    if odds_home and odds_home > 1.0:
-        ev = compute_ev(prob_home, odds_home)
-        if ev > threshold:
-            candidates.append(("HOME", ev))
-
-    if odds_draw and odds_draw > 1.0:
-        ev = compute_ev(prob_draw, odds_draw)
-        if ev > threshold:
-            candidates.append(("DRAW", ev))
-
-    if odds_away and odds_away > 1.0:
-        ev = compute_ev(prob_away, odds_away)
-        if ev > threshold:
-            candidates.append(("AWAY", ev))
+    for label, prob, odds in outcomes:
+        if odds is None:
+            continue
+        try:
+            odds_val = float(odds)
+        except (ValueError, TypeError):
+            continue
+        if not (min_odds <= odds_val <= max_odds):
+            continue
+        if prob < min_prob:
+            continue
+        ev = compute_ev(prob, odds_val)
+        if min_ev <= ev <= max_ev:
+            candidates.append((label, ev))
 
     if not candidates:
         return None, None
@@ -193,12 +200,8 @@ def compute_attack_defense_strength(
 ) -> tuple[float, float]:
     """
     Compute a team's Attack Strength and Defense Strength relative to the
-    league average.
-
-    Attack Strength  = team_goals_for_per_game / league_avg_goals_for_per_game
-    Defense Strength = team_goals_against_per_game / league_avg_goals_against_per_game
-
-    A value > 1 means above-average attack / worse-than-average defense.
+    league average, applying Bayesian shrinkage to avoid small-sample distortions:
+    strength = (raw_ratio * games + 1.0 * 4) / (games + 4)
     """
     if team_games == 0:
         return 1.0, 1.0
@@ -206,10 +209,14 @@ def compute_attack_defense_strength(
     team_avg_for     = team_goals_for     / team_games
     team_avg_against = team_goals_against / team_games
 
-    attack_strength  = team_avg_for     / league_avg_goals_for     if league_avg_goals_for     > 0 else 1.0
-    defense_strength = team_avg_against / league_avg_goals_against if league_avg_goals_against > 0 else 1.0
+    raw_attack  = team_avg_for     / league_avg_goals_for     if league_avg_goals_for     > 0 else 1.0
+    raw_defense = team_avg_against / league_avg_goals_against if league_avg_goals_against > 0 else 1.0
 
-    return round(attack_strength, 4), round(defense_strength, 4)
+    # Bayesian shrinkage: prior weight of 4 games at baseline 1.0
+    shrunk_attack  = (raw_attack * team_games + 1.0 * 4) / (team_games + 4)
+    shrunk_defense = (raw_defense * team_games + 1.0 * 4) / (team_games + 4)
+
+    return round(shrunk_attack, 4), round(shrunk_defense, 4)
 
 
 def compute_lambdas(
@@ -222,11 +229,13 @@ def compute_lambdas(
 ) -> tuple[float, float]:
     """
     Compute expected goals (lambda) for each team using the Dixon-Coles
-    strength model.
+    strength model, clamped strictly between 0.6 and 3.2.
 
     lambda_home = home_attack * away_defense * league_avg_for * home_advantage
     lambda_away = away_attack * home_defense * league_avg_for
     """
     lambda_home = home_attack * away_defense * league_avg_for * home_advantage
     lambda_away = away_attack * home_defense * league_avg_for
-    return round(max(lambda_home, 0.1), 2), round(max(lambda_away, 0.1), 2)
+    lambda_home = max(0.6, min(float(lambda_home), 3.2))
+    lambda_away = max(0.6, min(float(lambda_away), 3.2))
+    return round(lambda_home, 2), round(lambda_away, 2)

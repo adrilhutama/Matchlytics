@@ -1,14 +1,16 @@
 # ============================================================
 # scripts/sync_daily.py
-# Daily job: compute Poisson lambdas from standings, calculate
-# probabilities, retain fair odds, and update Supabase fixtures.
+# Daily job: compute Poisson lambdas from standings, fetch
+# real bookmaker odds (Bet365 / Pinnacle) via The Odds API,
+# calculate probabilities, detect sanitized +EV, and update Supabase.
 #
 # Scheduled via GitHub Actions at 06:00 UTC daily.
-# Uses football-data.org v4 API with 6.5s delay between calls.
+# Uses football-data.org v4 and The Odds API v4.
 # ============================================================
 
 from __future__ import annotations
 
+import re
 import time
 from datetime import date, datetime, timedelta, timezone
 
@@ -20,6 +22,9 @@ from config import (
     REQUEST_DELAY,
     ACTIVE_LEAGUES,
     HOME_ADVANTAGE,
+    ODDS_API_KEY,
+    ODDS_API_BASE,
+    ODDS_SPORT_KEYS,
     supabase,
 )
 from engine import (
@@ -27,6 +32,154 @@ from engine import (
     compute_attack_defense_strength,
     compute_lambdas,
 )
+
+
+# ---- Team name matching for The Odds API --------------------
+
+def normalize_name(name: str) -> str:
+    """Normalize team name for fuzzy matching across data providers."""
+    if not name:
+        return ""
+    s = name.lower()
+    s = (
+        s.replace("ü", "u")
+        .replace("ö", "o")
+        .replace("ä", "a")
+        .replace("é", "e")
+        .replace("è", "e")
+        .replace("í", "i")
+        .replace("ó", "o")
+        .replace("á", "a")
+    )
+    # Strip common football club prefixes / suffixes
+    s = re.sub(r"\b(fc|cf|afc|ac|as|ssc|sc|vfb|bayer|bv|tsv|rb|1\.|cd|ud|rcd)\b", "", s)
+    s = re.sub(r"[^\w\s]", "", s)
+    s = re.sub(r"\s+", " ", s).strip()
+    return s
+
+
+def teams_match(name1: str, name2: str) -> bool:
+    """Check if two team names refer to the same football club."""
+    if not name1 or not name2:
+        return False
+    n1 = normalize_name(name1)
+    n2 = normalize_name(name2)
+    if not n1 or not n2:
+        return False
+    if n1 == n2:
+        return True
+    if len(n1) >= 4 and len(n2) >= 4:
+        if n1 in n2 or n2 in n1:
+            return True
+    w1 = set(n1.split())
+    w2 = set(n2.split())
+    if w1 and w2 and (w1.issubset(w2) or w2.issubset(w1)):
+        return True
+    return False
+
+
+# ---- The Odds API (v4) --------------------------------------
+
+def fetch_real_odds(league_code: str) -> list[dict]:
+    """
+    Fetch live 1X2 market odds for a league from The Odds API.
+    Returns list of odds events, or [] if unconfigured or error.
+    """
+    sport_key = ODDS_SPORT_KEYS.get(league_code)
+    if not sport_key:
+        return []
+
+    if not ODDS_API_KEY:
+        print(f"    [INFO] ODDS_API_KEY not configured. Skipping real odds fetch for {league_code}.")
+        return []
+
+    url = f"{ODDS_API_BASE}/{sport_key}/odds"
+    params = {
+        "apiKey":     ODDS_API_KEY,
+        "regions":    "eu",
+        "markets":    "h2h",
+        "oddsFormat": "decimal",
+    }
+    try:
+        resp = requests.get(url, params=params, timeout=15)
+        if resp.status_code == 200:
+            events = resp.json()
+            remaining = resp.headers.get("x-requests-remaining")
+            rem_str = f" ({remaining} requests remaining this month)" if remaining else ""
+            print(f"    [The Odds API] Fetched {len(events)} events for {sport_key}{rem_str}")
+            return events
+        print(f"    [The Odds API Error] {sport_key}: HTTP {resp.status_code} - {resp.text}")
+        return []
+    except Exception as exc:
+        print(f"    [The Odds API Error] Failed to fetch odds for {sport_key}: {exc}")
+        return []
+
+
+def extract_event_odds(event: dict) -> tuple[float | None, float | None, float | None]:
+    """
+    Extract 1X2 decimal odds from an Odds API event.
+    Prefers 'bet365', falls back to 'pinnacle', then any available EU bookmaker.
+    """
+    bookmakers = event.get("bookmakers", [])
+    if not bookmakers:
+        return None, None, None
+
+    selected_bm = None
+    for target in ["bet365", "pinnacle"]:
+        for bm in bookmakers:
+            if bm.get("key") == target:
+                selected_bm = bm
+                break
+        if selected_bm:
+            break
+
+    if not selected_bm:
+        selected_bm = bookmakers[0]
+
+    odds_home = None
+    odds_draw = None
+    odds_away = None
+    event_home = event.get("home_team", "")
+    event_away = event.get("away_team", "")
+
+    for market in selected_bm.get("markets", []):
+        if market.get("key") == "h2h":
+            for outcome in market.get("outcomes", []):
+                name = outcome.get("name", "")
+                price = outcome.get("price")
+                if price is not None:
+                    try:
+                        price_float = float(price)
+                    except (ValueError, TypeError):
+                        continue
+                    if name == event_home or teams_match(name, event_home):
+                        odds_home = price_float
+                    elif name == event_away or teams_match(name, event_away):
+                        odds_away = price_float
+                    elif name.lower() == "draw":
+                        odds_draw = price_float
+
+    return odds_home, odds_draw, odds_away
+
+
+def find_matching_odds(
+    home_name: str,
+    away_name: str,
+    odds_events: list[dict],
+) -> tuple[float | None, float | None, float | None, bool]:
+    """
+    Find matching Odds API event for given home and away team names.
+    Returns (odds_home, odds_draw, odds_away, is_real_odds).
+    """
+    for event in odds_events:
+        ev_home = event.get("home_team", "")
+        ev_away = event.get("away_team", "")
+        if teams_match(home_name, ev_home) and teams_match(away_name, ev_away):
+            oh, od, oa = extract_event_odds(event)
+            if oh or od or oa:
+                return oh, od, oa, True
+
+    return None, None, None, False
 
 
 # ---- Standings / strength computation ----------------------
@@ -54,7 +207,6 @@ def fetch_standings(competition_code: str) -> list[dict]:
         if not standings_list:
             return []
 
-        # Find TOTAL tables across all stages/groups (e.g. Regular Season, League Phase, or Group Stage).
         total_tables = [s for s in standings_list if s.get("type") == "TOTAL"]
         if not total_tables:
             total_tables = [standings_list[0]]
@@ -81,7 +233,7 @@ def fetch_standings(competition_code: str) -> list[dict]:
 
 def build_strength_table(table_rows: list[dict]) -> tuple[dict[int, dict], float, float]:
     """
-    Parse standings into per-team attack/defense strength ratios.
+    Parse standings into per-team attack/defense strength ratios with Bayesian shrinkage.
     Returns: (strength_table, league_avg_for, league_avg_against)
     """
     totals_for     = sum(t.get("goals_for", 0)     for t in table_rows)
@@ -104,15 +256,13 @@ def build_strength_table(table_rows: list[dict]) -> tuple[dict[int, dict], float
         gf      = team.get("goals_for", 0)
         ga      = team.get("goals_against", 0)
 
-        if played == 0:
-            attack, defense = 1.0, 1.0
-        else:
-            attack, defense = compute_attack_defense_strength(
-                gf, ga, played, league_avg_for, league_avg_against
-            )
+        # compute_attack_defense_strength applies Bayesian shrinkage: (raw * games + 4) / (games + 4)
+        attack, defense = compute_attack_defense_strength(
+            gf, ga, played, league_avg_for, league_avg_against
+        )
         strength_table[team_id] = {
-            "attack":             max(0.1, attack),
-            "defense":            max(0.1, defense),
+            "attack":             attack,
+            "defense":            defense,
             "league_avg_for":     league_avg_for,
             "league_avg_against": league_avg_against,
         }
@@ -130,7 +280,7 @@ def load_upcoming_fixtures(days_ahead: int = 30) -> list[dict]:
     resp = (
         supabase
         .table("fixtures")
-        .select("id, league_id, home_team_id, away_team_id, match_date, status, odds_home, odds_draw, odds_away")
+        .select("id, league_id, home_team_id, away_team_id, home_team_name, away_team_name, match_date, status, odds_home, odds_draw, odds_away")
         .gte("match_date", from_iso)
         .lte("match_date", to_iso)
         .eq("status", "NS")
@@ -148,9 +298,10 @@ load_todays_fixtures = load_upcoming_fixtures
 
 def sync_competition(league: dict, fixtures: list[dict]) -> int:
     """
-    For one competition: fetch standings, build strength table, then process
-    each upcoming fixture in that competition.
-    Returns count of fixtures updated.
+    For one competition:
+      1. Fetch real market odds from The Odds API.
+      2. Fetch standings and build strength table with shrinkage.
+      3. Process fixtures: compute clamped lambdas, match real odds, and detect +EV.
     """
     code = league["code"]
     name = league["name"]
@@ -161,6 +312,11 @@ def sync_competition(league: dict, fixtures: list[dict]) -> int:
         return 0
 
     print(f"  [{name}] ({code}) {len(league_fixtures)} upcoming match(es).")
+
+    # 1. Fetch real bookmaker odds for this competition
+    odds_events = fetch_real_odds(code)
+
+    # 2. Fetch standings
     print(f"    Fetching standings...")
     table_rows = fetch_standings(code)
     time.sleep(REQUEST_DELAY)
@@ -179,6 +335,8 @@ def sync_competition(league: dict, fixtures: list[dict]) -> int:
         fid     = fixture["id"]
         home_id = fixture.get("home_team_id")
         away_id = fixture.get("away_team_id")
+        home_name = fixture.get("home_team_name", "")
+        away_name = fixture.get("away_team_name", "")
 
         try:
             # Fallback for Team Stats: if team not found or playedGames == 0, use baseline (1.0)
@@ -203,7 +361,7 @@ def sync_competition(league: dict, fixtures: list[dict]) -> int:
             # Safe floor for league average goals (avoid division by zero or 0 goals)
             safe_avg_goals = max(0.5, float(home_str.get("league_avg_for") or league_avg_for or 1.35))
 
-            # Compute lambdas with Dixon-Coles model
+            # Compute lambdas with Dixon-Coles model (clamped strictly between 0.6 and 3.2)
             lambda_home, lambda_away = compute_lambdas(
                 home_attack=home_str["attack"],
                 home_defense=home_str["defense"],
@@ -213,31 +371,36 @@ def sync_competition(league: dict, fixtures: list[dict]) -> int:
                 home_advantage=HOME_ADVANTAGE,
             )
 
-            # Ensure safe floor for lambdas
-            lambda_home = round(max(0.1, float(lambda_home)), 2)
-            lambda_away = round(max(0.1, float(lambda_away)), 2)
-
-            existing_odds_home = fixture.get("odds_home")
-            existing_odds_draw = fixture.get("odds_draw")
-            existing_odds_away = fixture.get("odds_away")
-
-            # Run analytics
-            analytics = calc_probabilities(
-                lambda_home, lambda_away,
-                existing_odds_home, existing_odds_draw, existing_odds_away,
+            # Match real market odds from The Odds API
+            real_h, real_d, real_a, has_real_odds = find_matching_odds(
+                home_name, away_name, odds_events
             )
 
-            # Clamp odds safely to NUMERIC(5, 2) [between 1.01 and 999.0]
-            def _safe_odds(val: float | None, prob_pct: float) -> float | None:
-                if val and val > 1.0:
-                    return round(min(999.0, max(1.01, float(val))), 2)
-                if prob_pct > 0:
-                    return round(min(999.0, max(1.01, 100.0 / prob_pct)), 2)
-                return None
+            # Run Poisson analytics
+            if has_real_odds:
+                analytics = calc_probabilities(
+                    lambda_home, lambda_away,
+                    real_h, real_d, real_a,
+                )
+                final_odds_home = round(min(999.0, max(1.01, float(real_h))), 2) if real_h else None
+                final_odds_draw = round(min(999.0, max(1.01, float(real_d))), 2) if real_d else None
+                final_odds_away = round(min(999.0, max(1.01, float(real_a))), 2) if real_a else None
+                final_value_pick = analytics.value_pick
+                final_ev_pct = analytics.ev_percentage
+            else:
+                # No real bookmaker odds available yet
+                analytics = calc_probabilities(lambda_home, lambda_away)
+                # Keep fair odds for display so UI shows numbers, but NEVER fabricate +EV
+                fair_h = round(min(999.0, max(1.01, 100.0 / analytics.prob_home)), 2) if analytics.prob_home > 0 else None
+                fair_d = round(min(999.0, max(1.01, 100.0 / analytics.prob_draw)), 2) if analytics.prob_draw > 0 else None
+                fair_a = round(min(999.0, max(1.01, 100.0 / analytics.prob_away)), 2) if analytics.prob_away > 0 else None
 
-            final_odds_home = _safe_odds(existing_odds_home, analytics.prob_home)
-            final_odds_draw = _safe_odds(existing_odds_draw, analytics.prob_draw)
-            final_odds_away = _safe_odds(existing_odds_away, analytics.prob_away)
+                # Keep existing odds if present in DB, otherwise use model fair odds
+                final_odds_home = fixture.get("odds_home") or fair_h
+                final_odds_draw = fixture.get("odds_draw") or fair_d
+                final_odds_away = fixture.get("odds_away") or fair_a
+                final_value_pick = None
+                final_ev_pct = None
 
             # Build update payload
             update_row = {
@@ -253,14 +416,15 @@ def sync_competition(league: dict, fixtures: list[dict]) -> int:
                 "odds_home":        final_odds_home,
                 "odds_draw":        final_odds_draw,
                 "odds_away":        final_odds_away,
-                "value_pick":       analytics.value_pick,
-                "ev_percentage":    round(min(999.0, max(-100.0, analytics.ev_percentage)), 2) if analytics.ev_percentage is not None else None,
+                "value_pick":       final_value_pick,
+                "ev_percentage":    round(min(999.0, max(-100.0, final_ev_pct)), 2) if final_ev_pct is not None else None,
                 "updated_at":       datetime.now(timezone.utc).isoformat(),
             }
 
             supabase.table("fixtures").upsert(update_row, on_conflict="id").execute()
-            pick_label = f" | VALUE: {analytics.value_pick} +{analytics.ev_percentage}% EV" if analytics.value_pick else ""
-            print(f"    Fixture {fid}: lambda {lambda_home:.2f}/{lambda_away:.2f}{pick_label}")
+            odds_source = " [REAL ODDS]" if has_real_odds else " [FAIR ODDS]"
+            pick_label = f" | +EV: {final_value_pick} +{final_ev_pct}%" if final_value_pick else ""
+            print(f"    Fixture {fid} ({home_name} vs {away_name}): {lambda_home:.2f}/{lambda_away:.2f}{odds_source}{pick_label}")
             updated += 1
 
         except Exception as err:

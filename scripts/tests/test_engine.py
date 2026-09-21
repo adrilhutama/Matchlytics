@@ -65,10 +65,10 @@ class TestCalcProbabilities:
         assert result.ev_percentage is None
 
     def test_value_pick_detected(self):
-        # Home model prob ~70%, odds 2.20 => EV = 0.70 * 2.20 - 1 = 0.54 (way above threshold)
-        result = calc_probabilities(3.0, 0.5, odds_home=2.20, odds_draw=3.50, odds_away=5.00)
+        # Home model prob ~83%, odds 1.45 => EV = 0.836 * 1.45 - 1 = ~0.21 (valid: 2% to 35%)
+        result = calc_probabilities(3.0, 0.5, odds_home=1.45, odds_draw=4.50, odds_away=7.00)
         assert result.value_pick == "HOME"
-        assert result.ev_percentage is not None and result.ev_percentage > 0
+        assert result.ev_percentage is not None and 2.0 <= result.ev_percentage <= 35.0
 
 
 class TestComputeEV:
@@ -92,23 +92,36 @@ class TestFindBestPick:
         assert ev is None
 
     def test_picks_highest_ev_outcome(self):
-        # Away has highest EV
+        # Away has highest EV within sane bounds (0.40 * 3.00 - 1 = 0.20 -> 20% EV)
         pick, ev = find_best_pick(
             0.30, 0.30, 0.40,
-            odds_home=1.80, odds_draw=3.00, odds_away=3.50,
-            threshold=0.05,
+            odds_home=1.80, odds_draw=3.00, odds_away=3.00,
         )
         assert pick == "AWAY"
-        assert ev is not None and ev > 0
+        assert ev is not None and 2.0 <= ev <= 35.0
 
     def test_no_pick_below_threshold(self):
-        # Tiny edge — below 5% threshold
+        # Tiny edge — below 2% threshold (0.48 * 2.00 - 1 = -0.04)
         pick, ev = find_best_pick(
             0.48, 0.28, 0.24,
             odds_home=2.00, odds_draw=3.40, odds_away=3.80,
-            threshold=0.05,
         )
-        # 0.48 * 2.00 - 1 = -0.04, no pick
+        assert pick is None
+
+    def test_discards_ev_above_35_percent(self):
+        # EV = 0.70 * 2.50 - 1 = 0.75 (75% EV, discarded as bad data)
+        pick, ev = find_best_pick(0.70, 0.20, 0.10, odds_home=2.50, odds_draw=4.00, odds_away=6.00)
+        assert pick is None
+        assert ev is None
+
+    def test_discards_odds_outside_range(self):
+        # Odds below 1.25 or above 12.0 are rejected
+        pick, ev = find_best_pick(0.90, 0.08, 0.02, odds_home=1.20, odds_draw=6.00, odds_away=15.0)
+        assert pick is None
+
+    def test_discards_prob_below_15_percent(self):
+        # Event with prob 10% (< 15%) is rejected even with high odds
+        pick, ev = find_best_pick(0.60, 0.30, 0.10, odds_home=1.50, odds_draw=3.00, odds_away=11.0)
         assert pick is None
 
 
@@ -136,3 +149,11 @@ class TestStrengthModel:
         lh_adv, _  = compute_lambdas(1.0, 1.0, 1.0, 1.0, 2.0, home_advantage=1.10)
         lh_no, _   = compute_lambdas(1.0, 1.0, 1.0, 1.0, 2.0, home_advantage=1.00)
         assert lh_adv > lh_no
+
+    def test_lambda_clamping_floor_and_ceiling(self):
+        # Extreme high is clamped to 3.2
+        lh_high, la_high = compute_lambdas(5.0, 5.0, 5.0, 5.0, 3.0)
+        assert lh_high == 3.2 and la_high == 3.2
+        # Extreme low is clamped to 0.6
+        lh_low, la_low = compute_lambdas(0.01, 0.01, 0.01, 0.01, 0.5)
+        assert lh_low == 0.6 and la_low == 0.6
