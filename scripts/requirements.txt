@@ -1,5 +1,21 @@
-requests==2.31.0
-supabase==2.4.0
+# ---------------------------------------------------------------
+# Pinned to prevent supabase/gotrue/httpx constructor mismatch.
+# Root cause: gotrue >=2.12 forwards proxy= kwargs that httpx
+# <0.28 does not accept, causing TypeError in create_client().
+# Verified compatible triplet: supabase 2.13.0 + gotrue 2.11.0
+# + httpx <0.28.0
+# ---------------------------------------------------------------
+supabase==2.13.0
+gotrue==2.11.0
+httpx<0.28.0
+
+# HTTP + env
+requests>=2.31.0
+python-dotenv>=1.0.0
+
+# Analytics
 scipy==1.13.0
 numpy==1.26.4
-python-dotenv==1.0.1
+
+# Testing
+pytest>=8.0.0

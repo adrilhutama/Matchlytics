@@ -9,8 +9,32 @@ from supabase import create_client, Client
 
 load_dotenv()
 
+# ---- Pre-flight validation ----------------------------------
+# Raise a clear, descriptive error before create_client() is
+# ever called, so the traceback points here and not deep inside
+# the supabase/gotrue stack.
+
+def _require_env(primary: str, *fallbacks: str) -> str:
+    """
+    Return the value of the first non-empty env var from the
+    given names. Raise ValueError with a clear message if none
+    are set, so failures surface at import time with a useful
+    explanation rather than a cryptic KeyError or TypeError.
+    """
+    for name in (primary, *fallbacks):
+        val = os.environ.get(name, "").strip()
+        if val:
+            return val
+    names = ", ".join([primary, *fallbacks])
+    raise ValueError(
+        f"Missing required environment variable. "
+        f"Checked (in order): {names}. "
+        f"Set it in your .env file or as a GitHub Actions secret."
+    )
+
+
 # ---- API credentials ----------------------------------------
-RAPIDAPI_KEY: str = os.environ["RAPIDAPI_KEY"]
+RAPIDAPI_KEY: str = _require_env("RAPIDAPI_KEY")
 RAPIDAPI_HOST: str = "api-football-v1.p.rapidapi.com"
 RAPIDAPI_BASE: str = "https://api-football-v1.p.rapidapi.com/v3"
 RAPIDAPI_HEADERS: dict = {
@@ -19,8 +43,15 @@ RAPIDAPI_HEADERS: dict = {
 }
 
 # ---- Supabase (service role — bypasses RLS) -----------------
-SUPABASE_URL: str = os.environ["SUPABASE_URL"]
-SUPABASE_SERVICE_KEY: str = os.environ["SUPABASE_SERVICE_ROLE_KEY"]
+# Accept both naming conventions so the module works regardless
+# of whether the GitHub secret is called SUPABASE_SERVICE_ROLE_KEY
+# or SUPABASE_SERVICE_KEY.
+SUPABASE_URL: str = _require_env("SUPABASE_URL")
+SUPABASE_SERVICE_KEY: str = _require_env(
+    "SUPABASE_SERVICE_ROLE_KEY",   # primary — matches GitHub secret name
+    "SUPABASE_SERVICE_KEY",        # fallback — alternative naming
+)
+
 supabase: Client = create_client(SUPABASE_URL, SUPABASE_SERVICE_KEY)
 
 # ---- Active leagues -----------------------------------------
