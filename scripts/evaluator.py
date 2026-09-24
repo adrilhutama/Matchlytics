@@ -12,6 +12,8 @@ from __future__ import annotations
 from datetime import date, datetime, timedelta, timezone
 from typing import Any
 
+import requests
+
 
 
 def calculate_brier_score(prob_home: float, prob_draw: float, prob_away: float, actual_outcome: str) -> float:
@@ -33,7 +35,6 @@ def calculate_brier_score(prob_home: float, prob_draw: float, prob_away: float, 
 
 def fetch_and_settle_completed_matches(base_url: str, headers: dict, supabase: Any) -> int:
     """
-    import requests
     Query football-data.org for fixtures finished in the last 48 hours,
     and update their final scores and status in Supabase.
     """
