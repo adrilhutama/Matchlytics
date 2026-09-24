@@ -11,6 +11,7 @@
 from __future__ import annotations
 
 import re
+import unicodedata
 import time
 from datetime import date, datetime, timedelta, timezone
 
@@ -40,17 +41,8 @@ def normalize_name(name: str) -> str:
     """Normalize team name for fuzzy matching across data providers."""
     if not name:
         return ""
-    s = name.lower()
-    s = (
-        s.replace("ü", "u")
-        .replace("ö", "o")
-        .replace("ä", "a")
-        .replace("é", "e")
-        .replace("è", "e")
-        .replace("í", "i")
-        .replace("ó", "o")
-        .replace("á", "a")
-    )
+    # Strip diacritics and accents (e.g. Munchen, Atletico, Inter)
+    s = unicodedata.normalize("NFKD", name).encode("ASCII", "ignore").decode("utf-8").lower()
     # Strip common football club prefixes / suffixes
     s = re.sub(r"\b(fc|cf|afc|ac|as|ssc|sc|vfb|bayer|bv|tsv|rb|1\.|cd|ud|rcd)\b", "", s)
     s = re.sub(r"[^\w\s]", "", s)
