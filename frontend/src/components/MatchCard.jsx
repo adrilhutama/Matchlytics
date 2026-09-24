@@ -1,14 +1,24 @@
 // ---- MatchCard.jsx ----
-// Comprehensive sports analytics card for a single match fixture.
-// Includes team identities, kickoff & relative timing badges,
-// real market odds indicator, dual-color O/U and BTTS gauges,
-// probability bars, +EV value detection badge, and Score Matrix trigger.
+// Sports analytics card for a single match fixture:
+// - Kickoff & relative timing hints
+// - Real vs Fair Odds source badges
+// - Dual-color O/U 2.5 and BTTS progress gauges
+// - 1X2 probabilities with No-Vig consensus odds
+// - Tiered +EV badge & Margin of Safety indicator
+// - One-click "+ Slip" parlay accumulator builder
+// - Triggers for Score Matrix and Kelly Risk modals
 
+import { useMemo } from 'react'
 import ProbabilityBar from './ProbabilityBar'
 import OddsComparison from './OddsComparison'
 import ValueBadge from './ValueBadge'
 import DualGauge from './DualGauge'
-import { formatLocalizedMatchDate, isRealMarketOdds } from '../utils/analytics'
+import {
+  formatLocalizedMatchDate,
+  isRealMarketOdds,
+  calculateEdgeAndEV,
+  getMarginOfSafety,
+} from '../utils/analytics'
 
 function TeamLogo({ src, name }) {
   return (
@@ -49,6 +59,9 @@ export default function MatchCard({
   isPinned,
   onToggleWatchlist,
   onOpenMatrix,
+  onOpenQuantModal,
+  slipPicks = [],
+  onToggleSlip,
   style,
 }) {
   const {
@@ -67,6 +80,23 @@ export default function MatchCard({
   const isValue = Boolean(value_pick)
   const hasRealOdds = isRealMarketOdds(fixture)
   const { relativeBadge, timeStr, dateStr } = formatLocalizedMatchDate(match_date)
+
+  // Determine active odds and model prob for value pick
+  const { valueOdds, valueProb, valueLabel } = useMemo(() => {
+    if (!value_pick) return { valueOdds: null, valueProb: null, valueLabel: '' }
+    if (value_pick === 'HOME') return { valueOdds: odds_home, valueProb: prob_home, valueLabel: `${home_team_name} Win` }
+    if (value_pick === 'DRAW') return { valueOdds: odds_draw, valueProb: prob_draw, valueLabel: 'Draw (X)' }
+    return { valueOdds: odds_away, valueProb: prob_away, valueLabel: `${away_team_name} Win` }
+  }, [value_pick, odds_home, odds_draw, odds_away, prob_home, prob_draw, prob_away, home_team_name, away_team_name])
+
+  // Margin of safety calculation for value pick
+  const marginSafety = useMemo(() => {
+    if (!isValue || !valueOdds || !valueProb) return null
+    const { netEdge } = calculateEdgeAndEV(valueOdds, valueProb)
+    return getMarginOfSafety(netEdge)
+  }, [isValue, valueOdds, valueProb])
+
+  const isValuePickInSlip = value_pick ? slipPicks.includes(value_pick) : false
 
   return (
     <article
@@ -199,7 +229,7 @@ export default function MatchCard({
           </div>
         )}
 
-        {/* ---- Odds comparison ---- */}
+        {/* ---- Odds comparison with No-Vig & Slip Toggles ---- */}
         {(odds_home || odds_draw || odds_away) && (
           <div className="mb-4">
             <OddsComparison
@@ -210,31 +240,99 @@ export default function MatchCard({
               probDraw={prob_draw}
               probAway={prob_away}
               valuePick={value_pick}
+              slipPicks={slipPicks}
+              onToggleSlipPick={onToggleSlip ? (pick, odds, prob, label) => {
+                onToggleSlip({
+                  fixtureId: fixture.id,
+                  homeTeam: home_team_name,
+                  awayTeam: away_team_name,
+                  pick,
+                  pickLabel: label,
+                  odds,
+                  modelProb: prob,
+                  ev: ((Number(prob) / 100) * Number(odds) - 1) * 100,
+                  leagueName: league_name,
+                  matchDate: match_date,
+                })
+              } : null}
+              onOpenQuant={onOpenQuantModal ? () => onOpenQuantModal(fixture) : null}
             />
           </div>
         )}
       </div>
 
       <div>
-        {/* ---- View Score Matrix Button ---- */}
-        <div className="pt-2 mb-3">
+        {/* ---- Action Buttons: Matrix Heatmap & Quant Risk Modal ---- */}
+        <div className="grid grid-cols-2 gap-2 pt-2 mb-3">
           <button
             type="button"
             onClick={() => onOpenMatrix(fixture)}
-            className="w-full py-2.5 px-4 min-h-[44px] rounded-xl bg-pitch-900 hover:bg-pitch-700 text-slate-300 hover:text-amber-400 border border-pitch-700 font-medium text-xs flex items-center justify-center gap-2 transition-all duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500"
+            className="py-2.5 px-3 min-h-[44px] rounded-xl bg-pitch-900 hover:bg-pitch-700 text-slate-300 hover:text-amber-400 border border-pitch-700 font-medium text-xs flex items-center justify-center gap-1.5 transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500"
           >
             <span aria-hidden="true">📊</span>
-            <span>View Score Matrix Heatmap (6x6)</span>
+            <span>Score Matrix</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => onOpenQuantModal && onOpenQuantModal(fixture)}
+            className="py-2.5 px-3 min-h-[44px] rounded-xl bg-pitch-900 hover:bg-pitch-700 text-slate-300 hover:text-amber-400 border border-pitch-700 font-medium text-xs flex items-center justify-center gap-1.5 transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500"
+          >
+            <span aria-hidden="true">🧮</span>
+            <span>Quant & Kelly</span>
           </button>
         </div>
 
         {/* ---- Value bet strip (when EV detected) ---- */}
         {isValue && (
-          <div className="pt-3 border-t border-pitch-700/60 flex flex-col sm:flex-row sm:justify-between sm:items-center gap-2">
-            <ValueBadge pick={value_pick} evPct={ev_percentage} />
-            <p className="text-xs text-slate-400 font-mono">
-              EV = (Prob × Odds) - 1 | Target: <strong className="text-amber-300">{value_pick}</strong>
-            </p>
+          <div className="pt-3 border-t border-pitch-700/60 flex flex-col gap-2">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <ValueBadge
+                pick={value_pick}
+                evPct={ev_percentage}
+                odds={valueOdds}
+                modelProb={valueProb}
+                onClick={onOpenQuantModal ? () => onOpenQuantModal(fixture) : null}
+              />
+
+              {/* Quick Add Value Pick to Parlay Slip */}
+              {onToggleSlip && valueOdds && (
+                <button
+                  type="button"
+                  onClick={() => onToggleSlip({
+                    fixtureId: fixture.id,
+                    homeTeam: home_team_name,
+                    awayTeam: away_team_name,
+                    pick: value_pick,
+                    pickLabel: valueLabel,
+                    odds: valueOdds,
+                    modelProb: valueProb,
+                    ev: ev_percentage,
+                    leagueName: league_name,
+                    matchDate: match_date,
+                  })}
+                  className={`px-3 py-1.5 min-h-[38px] rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500 ${
+                    isValuePickInSlip
+                      ? 'bg-amber-500 text-pitch-950 font-bold'
+                      : 'bg-pitch-900 border border-pitch-700 text-slate-300 hover:text-amber-400 hover:border-amber-500/40'
+                  }`}
+                >
+                  <span>{isValuePickInSlip ? '✓ Slip Added' : '+ Add EV to Slip'}</span>
+                </button>
+              )}
+            </div>
+
+            {/* Margin of Safety Indicator */}
+            {marginSafety && (
+              <div className="flex items-center justify-between text-[11px] text-slate-400 font-medium">
+                <span className={`px-2 py-0.5 rounded text-[10px] font-bold border ${marginSafety.colorClass}`}>
+                  {marginSafety.label}
+                </span>
+                <span className="font-mono text-slate-500">
+                  Target: <strong className="text-amber-300">{value_pick}</strong> @ {valueOdds ? Number(valueOdds).toFixed(2) : '-'}
+                </span>
+              </div>
+            )}
           </div>
         )}
 

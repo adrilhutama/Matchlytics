@@ -5,6 +5,8 @@
 // - LocalStorage-backed Watchlist bookmarking
 // - Dual View Modes (Detailed Cards vs Compact Table)
 // - Interactive Poisson Score Matrix (6x6 Heatmap) modal
+// - Quantitative Risk Engine & Kelly Criterion modal
+// - Multi-Match Parlay/Acca Slip Builder with Copyable Summary
 // - Full mobile-first responsive layout (360px up to 4K displays)
 
 import { useState, useEffect, useCallback, useMemo } from 'react'
@@ -14,6 +16,8 @@ import FilterBar, { DATE_RANGES } from './components/FilterBar'
 import MatchCard from './components/MatchCard'
 import CompactTableView from './components/CompactTableView'
 import ScoreMatrixModal from './components/ScoreMatrixModal'
+import KellyCalculatorModal from './components/KellyCalculatorModal'
+import ParlaySlipDrawer from './components/ParlaySlipDrawer'
 import LoadingState from './components/LoadingState'
 import EmptyState from './components/EmptyState'
 import ErrorState from './components/ErrorState'
@@ -23,6 +27,8 @@ import {
   sortFixtures,
   getWatchlist,
   toggleWatchlistItem,
+  getParlaySlip,
+  saveParlaySlip,
 } from './utils/analytics'
 
 // ---- League metadata ----------------------------------------
@@ -66,12 +72,52 @@ export default function App() {
   // Watchlist state (persisted in localStorage)
   const [watchlist,           setWatchlist]           = useState(() => getWatchlist())
 
-  // Modal fixture state
-  const [selectedFixture,     setSelectedFixture]     = useState(null)
+  // Parlay Slip state (persisted in localStorage)
+  const [parlaySlip,          setParlaySlip]          = useState(() => getParlaySlip())
+  const [isSlipDrawerOpen,    setIsSlipDrawerOpen]    = useState(false)
+
+  // Modal fixture states
+  const [selectedMatrixFixture, setSelectedMatrixFixture] = useState(null)
+  const [selectedQuantFixture,  setSelectedQuantFixture]  = useState(null)
 
   // Watchlist toggle handler
   const handleToggleWatchlist = useCallback((fixtureId) => {
     setWatchlist((prev) => toggleWatchlistItem(prev, fixtureId))
+  }, [])
+
+  // Parlay slip handlers
+  const handleToggleSlip = useCallback((leg) => {
+    setParlaySlip((prev) => {
+      const existsIndex = prev.findIndex(
+        (l) => l.fixtureId === leg.fixtureId && l.pick === leg.pick
+      )
+      let next
+      if (existsIndex >= 0) {
+        next = prev.filter((_, idx) => idx !== existsIndex)
+      } else {
+        // If fixture already exists with another pick, replace it
+        const filteredOtherPicks = prev.filter((l) => l.fixtureId !== leg.fixtureId)
+        next = [...filteredOtherPicks, leg]
+      }
+      saveParlaySlip(next)
+      return next
+    })
+  }, [])
+
+  const handleRemoveSlipLeg = useCallback((fixtureId, pick) => {
+    setParlaySlip((prev) => {
+      const next = prev.filter(
+        (l) => !(l.fixtureId === fixtureId && l.pick === pick)
+      )
+      saveParlaySlip(next)
+      return next
+    })
+  }, [])
+
+  const handleClearSlip = useCallback(() => {
+    setParlaySlip([])
+    saveParlaySlip([])
+    setIsSlipDrawerOpen(false)
   }, [])
 
   // ---- Data fetching from Supabase --------------------------
@@ -205,24 +251,33 @@ export default function App() {
                 {showWatchlistOnly ? ' in Watchlist' : activeLeague !== 'all' ? ` in ${currentLeagueLabel}` : ''}
                 {dateRange !== 'all' ? ` (${currentDateRangeLabel})` : ''}
               </p>
-              <p className="text-slate-500 hidden sm:block">
-                Odds powered by The Odds API (Bet365 / Pinnacle)
+              <p className="text-slate-500 hidden sm:block font-mono">
+                Model: Poisson / The Odds API (Bet365 & Pinnacle)
               </p>
             </div>
 
             {/* View Mode: Detailed Cards */}
             {viewMode === 'cards' && (
               <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4 sm:gap-5">
-                {displayedFixtures.map((fixture, idx) => (
-                  <MatchCard
-                    key={fixture.id}
-                    fixture={fixture}
-                    isPinned={watchlist.includes(fixture.id)}
-                    onToggleWatchlist={handleToggleWatchlist}
-                    onOpenMatrix={setSelectedFixture}
-                    style={{ animationDelay: `${Math.min(idx * 30, 300)}ms` }}
-                  />
-                ))}
+                {displayedFixtures.map((fixture, idx) => {
+                  const fixtureSlipPicks = parlaySlip
+                    .filter((l) => l.fixtureId === fixture.id)
+                    .map((l) => l.pick)
+
+                  return (
+                    <MatchCard
+                      key={fixture.id}
+                      fixture={fixture}
+                      isPinned={watchlist.includes(fixture.id)}
+                      onToggleWatchlist={handleToggleWatchlist}
+                      onOpenMatrix={setSelectedMatrixFixture}
+                      onOpenQuantModal={setSelectedQuantFixture}
+                      slipPicks={fixtureSlipPicks}
+                      onToggleSlip={handleToggleSlip}
+                      style={{ animationDelay: `${Math.min(idx * 30, 300)}ms` }}
+                    />
+                  )
+                })}
               </div>
             )}
 
@@ -232,7 +287,10 @@ export default function App() {
                 fixtures={displayedFixtures}
                 watchlist={watchlist}
                 onToggleWatchlist={handleToggleWatchlist}
-                onOpenMatrix={setSelectedFixture}
+                onOpenMatrix={setSelectedMatrixFixture}
+                onOpenQuantModal={setSelectedQuantFixture}
+                slipLegs={parlaySlip}
+                onToggleSlip={handleToggleSlip}
               />
             )}
           </section>
@@ -241,9 +299,27 @@ export default function App() {
 
       {/* Interactive Poisson Score Matrix Modal */}
       <ScoreMatrixModal
-        fixture={selectedFixture}
-        isOpen={Boolean(selectedFixture)}
-        onClose={() => setSelectedFixture(null)}
+        fixture={selectedMatrixFixture}
+        isOpen={Boolean(selectedMatrixFixture)}
+        onClose={() => setSelectedMatrixFixture(null)}
+      />
+
+      {/* Quantitative Risk Engine & Kelly Modal */}
+      <KellyCalculatorModal
+        fixture={selectedQuantFixture}
+        isOpen={Boolean(selectedQuantFixture)}
+        onClose={() => setSelectedQuantFixture(null)}
+        onAddToSlip={handleToggleSlip}
+        isInSlip={parlaySlip.some((l) => l.fixtureId === selectedQuantFixture?.id)}
+      />
+
+      {/* Multi-Match Parlay Slip Floating Drawer */}
+      <ParlaySlipDrawer
+        legs={parlaySlip}
+        isOpen={isSlipDrawerOpen}
+        onToggleOpen={() => setIsSlipDrawerOpen(!isSlipDrawerOpen)}
+        onRemoveLeg={handleRemoveSlipLeg}
+        onClearSlip={handleClearSlip}
       />
 
       {/* Footer */}
