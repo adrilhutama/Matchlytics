@@ -94,3 +94,17 @@ EV_THRESHOLD: float = 0.05
 
 # API rate limit: 6.5s sleep delay to stay strictly under 10 req/min free tier cap
 REQUEST_DELAY: float = 6.5
+
+
+# ---- Database Housekeeping Helper ---------------------------
+def prune_stale_fixtures() -> int:
+    """
+    Execute stored database housekeeping function clean_stale_fixtures()
+    to prune completed matches older than 45 days.
+    """
+    try:
+        res = supabase.rpc("clean_stale_fixtures", {}).execute()
+        return res.data or 0
+    except Exception as exc:
+        print(f"Error executing clean_stale_fixtures: {exc}")
+        return 0

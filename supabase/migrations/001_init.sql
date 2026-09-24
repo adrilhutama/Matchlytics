@@ -1,5 +1,5 @@
 -- ============================================================
--- Football Pre-Analysis Platform — Supabase Migration 001
+-- Football Pre-Analysis Platform - Supabase Migration 001
 -- ============================================================
 -- Run this in: Supabase Dashboard > SQL Editor > New Query
 

@@ -27,6 +27,7 @@ from config import (
     ODDS_API_BASE,
     ODDS_SPORT_KEYS,
     supabase,
+    prune_stale_fixtures,
 )
 from engine import (
     calc_probabilities,
@@ -442,6 +443,11 @@ def main() -> None:
         time.sleep(REQUEST_DELAY)
 
     print(f"\nDone. Total fixtures updated: {total_updated}")
+
+    # Database housekeeping: prune matches finished > 45 days ago
+    print("Running database housekeeping (clean_stale_fixtures)...")
+    pruned = prune_stale_fixtures()
+    print(f"Stale fixtures pruned: {pruned}")
 
 
 if __name__ == "__main__":

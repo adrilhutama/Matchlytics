@@ -7,9 +7,10 @@
 // - Interactive Poisson Score Matrix (6x6 Heatmap) modal
 // - Quantitative Risk Engine & Kelly Criterion modal
 // - Multi-Match Parlay/Acca Slip Builder with Copyable Summary
+// - Supabase Realtime channel subscription with debounced live updates
 // - Full mobile-first responsive layout (360px up to 4K displays)
 
-import { useState, useEffect, useCallback, useMemo } from 'react'
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react'
 import { supabase } from './lib/supabase'
 import Header from './components/Header'
 import FilterBar, { DATE_RANGES } from './components/FilterBar'
@@ -59,6 +60,7 @@ export default function App() {
   const [loading,             setLoading]             = useState(true)
   const [error,               setError]               = useState(null)
   const [lastUpdated,         setLastUpdated]         = useState(null)
+  const [realtimeToast,       setRealtimeToast]       = useState(false)
 
   // Filter & Navigation states
   const [activeLeague,        setActiveLeague]        = useState('all')
@@ -80,6 +82,9 @@ export default function App() {
   const [selectedMatrixFixture, setSelectedMatrixFixture] = useState(null)
   const [selectedQuantFixture,  setSelectedQuantFixture]  = useState(null)
 
+  // Debounce timer reference for realtime events
+  const debounceTimerRef = useRef(null)
+
   // Watchlist toggle handler
   const handleToggleWatchlist = useCallback((fixtureId) => {
     setWatchlist((prev) => toggleWatchlistItem(prev, fixtureId))
@@ -95,7 +100,6 @@ export default function App() {
       if (existsIndex >= 0) {
         next = prev.filter((_, idx) => idx !== existsIndex)
       } else {
-        // If fixture already exists with another pick, replace it
         const filteredOtherPicks = prev.filter((l) => l.fixtureId !== leg.fixtureId)
         next = [...filteredOtherPicks, leg]
       }
@@ -121,8 +125,8 @@ export default function App() {
   }, [])
 
   // ---- Data fetching from Supabase --------------------------
-  const fetchFixtures = useCallback(async () => {
-    setLoading(true)
+  const fetchFixtures = useCallback(async (isSilent = false) => {
+    if (!isSilent) setLoading(true)
     setError(null)
 
     const { from, to } = buildDateRange()
@@ -142,14 +146,48 @@ export default function App() {
       setLastUpdated(new Date())
     } catch (err) {
       console.error('Supabase fetch error:', err)
-      setError(err.message || 'Failed to load fixtures.')
+      if (!isSilent) setError(err.message || 'Failed to load fixtures.')
     } finally {
-      setLoading(false)
+      if (!isSilent) setLoading(false)
     }
   }, [])
 
   useEffect(() => {
     fetchFixtures()
+  }, [fetchFixtures])
+
+  // ---- Supabase Realtime Subscription -----------------------
+  useEffect(() => {
+    const channel = supabase
+      .channel('matchlytics-realtime-feed')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'fixtures',
+        },
+        () => {
+          // Debounce rapid sync updates (e.g. 1500ms delay)
+          if (debounceTimerRef.current) {
+            clearTimeout(debounceTimerRef.current)
+          }
+
+          debounceTimerRef.current = setTimeout(() => {
+            fetchFixtures(true)
+            setRealtimeToast(true)
+            setTimeout(() => setRealtimeToast(false), 3500)
+          }, 1500)
+        }
+      )
+      .subscribe()
+
+    return () => {
+      if (debounceTimerRef.current) {
+        clearTimeout(debounceTimerRef.current)
+      }
+      supabase.removeChannel(channel)
+    }
   }, [fetchFixtures])
 
   // ---- Client-side Multi-Criteria Filtering & Sorting -------
@@ -199,6 +237,18 @@ export default function App() {
     <div className="min-h-dvh bg-pitch-950 flex flex-col text-slate-200">
       {/* Header */}
       <Header lastUpdated={lastUpdated} />
+
+      {/* Realtime Toast Notification */}
+      {realtimeToast && (
+        <div
+          role="status"
+          aria-live="polite"
+          className="fixed top-20 right-4 sm:right-6 z-50 px-4 py-2.5 rounded-xl bg-pitch-900/95 border border-emerald-500/50 text-emerald-300 text-xs font-semibold shadow-2xl flex items-center gap-2.5 animate-slide-up backdrop-blur"
+        >
+          <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping" />
+          <span>Data refreshed in real-time</span>
+        </div>
+      )}
 
       {/* Sticky glassmorphism Filter Bar */}
       <div className="sticky top-0 z-20 glass-filter">
@@ -251,9 +301,15 @@ export default function App() {
                 {showWatchlistOnly ? ' in Watchlist' : activeLeague !== 'all' ? ` in ${currentLeagueLabel}` : ''}
                 {dateRange !== 'all' ? ` (${currentDateRangeLabel})` : ''}
               </p>
-              <p className="text-slate-500 hidden sm:block font-mono">
-                Model: Poisson / The Odds API (Bet365 & Pinnacle)
-              </p>
+              <div className="flex items-center gap-3">
+                <span className="inline-flex items-center gap-1.5 text-[11px] text-emerald-400 font-mono">
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                  Realtime Active
+                </span>
+                <span className="text-slate-500 hidden sm:inline font-mono">
+                  Odds: The Odds API (Bet365 / Pinnacle)
+                </span>
+              </div>
             </div>
 
             {/* View Mode: Detailed Cards */}
