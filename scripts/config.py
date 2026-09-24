@@ -1,6 +1,7 @@
 # ============================================================
 # scripts/config.py
-# Central configuration: env vars, Supabase client, league map.
+# Central configuration: env vars, Supabase client, league map,
+# Telegram credentials, and application endpoints.
 # ============================================================
 
 import os
@@ -58,14 +59,20 @@ ODDS_SPORT_KEYS: dict[str, str] = {
     "CL":  "soccer_uefa_champs_league",
 }
 
-# ---- Supabase (service role — bypasses RLS) -----------------
+# ---- Telegram Bot & Notification Credentials ----------------
+TELEGRAM_BOT_TOKEN: str | None = os.getenv("TELEGRAM_BOT_TOKEN")
+TELEGRAM_CHAT_ID: str | None = os.getenv("TELEGRAM_CHAT_ID")
+APP_BASE_URL: str = os.getenv("APP_BASE_URL", "https://tips.imortifex.me/")
+GITHUB_REPOSITORY: str | None = os.getenv("GITHUB_REPOSITORY")
+
+# ---- Supabase (service role: bypasses RLS) ------------------
 # Accept both naming conventions so the module works regardless
 # of whether the GitHub secret is called SUPABASE_SERVICE_ROLE_KEY
 # or SUPABASE_SERVICE_KEY.
 SUPABASE_URL: str = _require_env("SUPABASE_URL")
 SUPABASE_SERVICE_KEY: str = _require_env(
-    "SUPABASE_SERVICE_ROLE_KEY",   # primary — matches GitHub secret name
-    "SUPABASE_SERVICE_KEY",        # fallback — alternative naming
+    "SUPABASE_SERVICE_ROLE_KEY",   # primary: matches GitHub secret name
+    "SUPABASE_SERVICE_KEY",        # fallback: alternative naming
 )
 
 supabase: Client = create_client(SUPABASE_URL, SUPABASE_SERVICE_KEY)

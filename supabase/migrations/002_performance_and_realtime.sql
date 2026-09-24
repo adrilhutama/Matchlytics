@@ -13,7 +13,11 @@ CREATE INDEX IF NOT EXISTS idx_fixtures_value_bets
 ON public.fixtures (match_date ASC)
 WHERE status = 'NS' AND value_pick IS NOT NULL;
 
--- 2. Row Level Security (RLS) Audit & Hardening
+-- 2. Settlement score columns for model tracking
+ALTER TABLE public.fixtures ADD COLUMN IF NOT EXISTS home_score INT;
+ALTER TABLE public.fixtures ADD COLUMN IF NOT EXISTS away_score INT;
+
+-- 3. Row Level Security (RLS) Audit & Hardening
 ALTER TABLE public.fixtures ENABLE ROW LEVEL SECURITY;
 
 DO $$
@@ -26,7 +30,7 @@ BEGIN
   END IF;
 END $$;
 
--- 3. Housekeeping: Clean Stale Fixtures Function
+-- 4. Housekeeping: Clean Stale Fixtures Function
 CREATE OR REPLACE FUNCTION clean_stale_fixtures()
 RETURNS integer AS $$
 DECLARE
@@ -40,7 +44,7 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
 
--- 4. Enable Supabase Realtime for fixtures
+-- 5. Enable Supabase Realtime for fixtures
 DO $$
 BEGIN
   IF NOT EXISTS (

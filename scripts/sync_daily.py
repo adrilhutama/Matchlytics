@@ -4,12 +4,17 @@
 # real bookmaker odds (Bet365 / Pinnacle) via The Odds API,
 # calculate probabilities, detect sanitized +EV, and update Supabase.
 #
+# Also evaluates model accuracy / Brier calibration on recent matches,
+# dispatches daily Telegram SITREP with tap-to-copy parlay slips,
+# and outputs GitHub Actions Markdown Step Summary.
+#
 # Scheduled via GitHub Actions at 06:00 UTC daily.
 # Uses football-data.org v4 and The Odds API v4.
 # ============================================================
 
 from __future__ import annotations
 
+import os
 import re
 import unicodedata
 import time
@@ -26,6 +31,7 @@ from config import (
     ODDS_API_KEY,
     ODDS_API_BASE,
     ODDS_SPORT_KEYS,
+    APP_BASE_URL,
     supabase,
     prune_stale_fixtures,
 )
@@ -34,6 +40,15 @@ from engine import (
     compute_attack_defense_strength,
     compute_lambdas,
 )
+from evaluator import (
+    fetch_and_settle_completed_matches,
+    evaluate_recent_settlement,
+)
+from telegram_notifier import (
+    send_daily_sitrep,
+)
+
+LAST_QUOTA_REMAINING: int | None = None
 
 
 # ---- Team name matching for The Odds API --------------------
@@ -76,8 +91,10 @@ def teams_match(name1: str, name2: str) -> bool:
 def fetch_real_odds(league_code: str) -> list[dict]:
     """
     Fetch live 1X2 market odds for a league from The Odds API.
+    Captures x-requests-remaining quota header.
     Returns list of odds events, or [] if unconfigured or error.
     """
+    global LAST_QUOTA_REMAINING
     sport_key = ODDS_SPORT_KEYS.get(league_code)
     if not sport_key:
         return []
@@ -98,6 +115,11 @@ def fetch_real_odds(league_code: str) -> list[dict]:
         if resp.status_code == 200:
             events = resp.json()
             remaining = resp.headers.get("x-requests-remaining")
+            if remaining is not None:
+                try:
+                    LAST_QUOTA_REMAINING = int(remaining)
+                except ValueError:
+                    pass
             rem_str = f" ({remaining} requests remaining this month)" if remaining else ""
             print(f"    [The Odds API] Fetched {len(events)} events for {sport_key}{rem_str}")
             return events
@@ -138,19 +160,17 @@ def extract_event_odds(event: dict) -> tuple[float | None, float | None, float |
     for market in selected_bm.get("markets", []):
         if market.get("key") == "h2h":
             for outcome in market.get("outcomes", []):
-                name = outcome.get("name", "")
+                outcome_name = outcome.get("name", "")
                 price = outcome.get("price")
-                if price is not None:
-                    try:
-                        price_float = float(price)
-                    except (ValueError, TypeError):
-                        continue
-                    if name == event_home or teams_match(name, event_home):
-                        odds_home = price_float
-                    elif name == event_away or teams_match(name, event_away):
-                        odds_away = price_float
-                    elif name.lower() == "draw":
-                        odds_draw = price_float
+                if not price or float(price) <= 1.0:
+                    continue
+
+                if outcome_name.lower() == "draw":
+                    odds_draw = float(price)
+                elif teams_match(outcome_name, event_home):
+                    odds_home = float(price)
+                elif teams_match(outcome_name, event_away):
+                    odds_away = float(price)
 
     return odds_home, odds_draw, odds_away
 
@@ -161,42 +181,31 @@ def find_matching_odds(
     odds_events: list[dict],
 ) -> tuple[float | None, float | None, float | None, bool]:
     """
-    Find matching Odds API event for given home and away team names.
-    Returns (odds_home, odds_draw, odds_away, is_real_odds).
+    Locate odds for a specific fixture from fetched Odds API events.
+    Returns: (odds_home, odds_draw, odds_away, has_real_odds)
     """
     for event in odds_events:
         ev_home = event.get("home_team", "")
         ev_away = event.get("away_team", "")
         if teams_match(home_name, ev_home) and teams_match(away_name, ev_away):
-            oh, od, oa = extract_event_odds(event)
-            if oh or od or oa:
-                return oh, od, oa, True
-
+            h, d, a = extract_event_odds(event)
+            if h and d and a:
+                return h, d, a, True
     return None, None, None, False
 
 
-# ---- Standings / strength computation ----------------------
+# ---- Standings & Strength Model -----------------------------
 
 def fetch_standings(competition_code: str) -> list[dict]:
-    """
-    Fetch standings table from football-data.org.
-    Safely handles regular leagues, UCL league phase, and UCL group stage tables.
-    Returns: list of dicts with keys: { team_id, team_name, played, goals_for, goals_against }
-    """
+    """Fetch current total standings table from football-data.org."""
     url = f"{BASE_URL}/competitions/{competition_code}/standings"
     try:
         resp = requests.get(url, headers=HEADERS, timeout=15)
         if resp.status_code != 200:
-            error_msg = resp.text
-            try:
-                error_msg = resp.json().get("message", error_msg)
-            except Exception:
-                pass
-            print(f"    [football-data.org Error] Standings for {competition_code}: {resp.status_code} - {error_msg}")
+            print(f"    [football-data.org Error] Standings {competition_code}: {resp.status_code}")
             return []
 
-        data = resp.json()
-        standings_list = data.get("standings", [])
+        standings_list = resp.json().get("standings", [])
         if not standings_list:
             return []
 
@@ -249,7 +258,6 @@ def build_strength_table(table_rows: list[dict]) -> tuple[dict[int, dict], float
         gf      = team.get("goals_for", 0)
         ga      = team.get("goals_against", 0)
 
-        # compute_attack_defense_strength applies Bayesian shrinkage: (raw * games + 4) / (games + 4)
         attack, defense = compute_attack_defense_strength(
             gf, ga, played, league_avg_for, league_avg_against
         )
@@ -263,38 +271,36 @@ def build_strength_table(table_rows: list[dict]) -> tuple[dict[int, dict], float
     return strength_table, league_avg_for, league_avg_against
 
 
-# ---- Upcoming fixtures from Supabase -----------------------
+# ---- Data Access --------------------------------------------
 
 def load_upcoming_fixtures(days_ahead: int = 30) -> list[dict]:
-    """Load upcoming not-started fixtures from Supabase within the next 30 days."""
-    now_utc = datetime.now(timezone.utc)
-    from_iso = now_utc.isoformat()
-    to_iso = (now_utc + timedelta(days=days_ahead)).isoformat()
-    resp = (
-        supabase
-        .table("fixtures")
-        .select("id, league_id, home_team_id, away_team_id, home_team_name, away_team_name, match_date, status, odds_home, odds_draw, odds_away")
-        .gte("match_date", from_iso)
-        .lte("match_date", to_iso)
+    """Load unplayed fixtures from Supabase within the upcoming window."""
+    now = datetime.now(timezone.utc)
+    from_date = now.isoformat()
+    to_date = (now + timedelta(days=days_ahead)).isoformat()
+
+    res = (
+        supabase.table("fixtures")
+        .select("*")
+        .gte("match_date", from_date)
+        .lte("match_date", to_date)
         .eq("status", "NS")
         .order("match_date", desc=False)
         .execute()
     )
-    return resp.data or []
+    return res.data or []
 
 
-# Backward-compatibility alias
-load_todays_fixtures = load_upcoming_fixtures
+# ---- Pipeline Step: Single Competition -----------------------
 
-
-# ---- Main sync logic ----------------------------------------
-
-def sync_competition(league: dict, fixtures: list[dict]) -> int:
+def sync_competition(
+    league: dict,
+    fixtures: list[dict],
+    ev_collector: list[dict] | None = None,
+) -> tuple[int, int]:
     """
-    For one competition:
-      1. Fetch real market odds from The Odds API.
-      2. Fetch standings and build strength table with shrinkage.
-      3. Process fixtures: compute clamped lambdas, match real odds, and detect +EV.
+    Process all upcoming fixtures for one league.
+    Returns: (updated_count, ev_count)
     """
     code = league["code"]
     name = league["name"]
@@ -302,7 +308,7 @@ def sync_competition(league: dict, fixtures: list[dict]) -> int:
 
     league_fixtures = [f for f in fixtures if f["league_id"] == lid]
     if not league_fixtures:
-        return 0
+        return 0, 0
 
     print(f"  [{name}] ({code}) {len(league_fixtures)} upcoming match(es).")
 
@@ -310,7 +316,7 @@ def sync_competition(league: dict, fixtures: list[dict]) -> int:
     odds_events = fetch_real_odds(code)
 
     # 2. Fetch standings
-    print(f"    Fetching standings...")
+    print("    Fetching standings...")
     table_rows = fetch_standings(code)
     time.sleep(REQUEST_DELAY)
 
@@ -322,17 +328,17 @@ def sync_competition(league: dict, fixtures: list[dict]) -> int:
     else:
         strength, league_avg_for, league_avg_against = build_strength_table(table_rows)
 
-    updated  = 0
+    updated = 0
+    ev_count = 0
 
     for fixture in league_fixtures:
-        fid     = fixture["id"]
-        home_id = fixture.get("home_team_id")
-        away_id = fixture.get("away_team_id")
+        fid       = fixture["id"]
+        home_id   = fixture.get("home_team_id")
+        away_id   = fixture.get("away_team_id")
         home_name = fixture.get("home_team_name", "")
         away_name = fixture.get("away_team_name", "")
 
         try:
-            # Fallback for Team Stats: if team not found or playedGames == 0, use baseline (1.0)
             home_str = strength.get(home_id) if home_id else None
             if not home_str or home_str.get("attack", 0) <= 0 or home_str.get("defense", 0) <= 0:
                 home_str = {
@@ -351,10 +357,8 @@ def sync_competition(league: dict, fixtures: list[dict]) -> int:
                     "league_avg_against": league_avg_against,
                 }
 
-            # Safe floor for league average goals (avoid division by zero or 0 goals)
             safe_avg_goals = max(0.5, float(home_str.get("league_avg_for") or league_avg_for or 1.35))
 
-            # Compute lambdas with Dixon-Coles model (clamped strictly between 0.6 and 3.2)
             lambda_home, lambda_away = compute_lambdas(
                 home_attack=home_str["attack"],
                 home_defense=home_str["defense"],
@@ -383,12 +387,10 @@ def sync_competition(league: dict, fixtures: list[dict]) -> int:
             else:
                 # No real bookmaker odds available yet
                 analytics = calc_probabilities(lambda_home, lambda_away)
-                # Keep fair odds for display so UI shows numbers, but NEVER fabricate +EV
                 fair_h = round(min(999.0, max(1.01, 100.0 / analytics.prob_home)), 2) if analytics.prob_home > 0 else None
                 fair_d = round(min(999.0, max(1.01, 100.0 / analytics.prob_draw)), 2) if analytics.prob_draw > 0 else None
                 fair_a = round(min(999.0, max(1.01, 100.0 / analytics.prob_away)), 2) if analytics.prob_away > 0 else None
 
-                # Keep existing odds if present in DB, otherwise use model fair odds
                 final_odds_home = fixture.get("odds_home") or fair_h
                 final_odds_draw = fixture.get("odds_draw") or fair_d
                 final_odds_away = fixture.get("odds_away") or fair_a
@@ -420,16 +422,133 @@ def sync_competition(league: dict, fixtures: list[dict]) -> int:
             print(f"    Fixture {fid} ({home_name} vs {away_name}): {lambda_home:.2f}/{lambda_away:.2f}{odds_source}{pick_label}")
             updated += 1
 
+            if final_value_pick and ev_collector is not None:
+                ev_count += 1
+                pick_odds = (
+                    final_odds_home if final_value_pick == "HOME"
+                    else final_odds_draw if final_value_pick == "DRAW"
+                    else final_odds_away
+                )
+                pick_prob = (
+                    analytics.prob_home if final_value_pick == "HOME"
+                    else analytics.prob_draw if final_value_pick == "DRAW"
+                    else analytics.prob_away
+                )
+                ev_collector.append({
+                    "fixture_id": fid,
+                    "home_team": home_name,
+                    "away_team": away_name,
+                    "league_code": code,
+                    "league_name": name,
+                    "value_pick": final_value_pick,
+                    "odds": pick_odds or 1.0,
+                    "model_prob": pick_prob or 0.0,
+                    "ev_percentage": final_ev_pct or 0.0,
+                })
+
         except Exception as err:
             print(f"[WARN] Skipping fixture {fid}: {err}")
             continue
 
-    return updated
+    return updated, ev_count
 
+
+# ---- GitHub Step Summary Export -----------------------------
+
+def write_github_step_summary(
+    sync_stats: dict,
+    settlement_stats: dict,
+    top_ev_picks: list[dict],
+    league_breakdown: list[dict],
+    quota_remaining: int | None,
+) -> None:
+    """Write structured markdown to $GITHUB_STEP_SUMMARY if present."""
+    summary_path = os.environ.get("GITHUB_STEP_SUMMARY")
+    if not summary_path:
+        return
+
+    try:
+        now_str = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M UTC")
+        quota_str = str(quota_remaining) if quota_remaining is not None else "Active"
+
+        lines = [
+            "# ⚽ Matchlytics Daily Sync Summary",
+            f"**Timestamp:** {now_str} | **Dashboard:** [{APP_BASE_URL}]({APP_BASE_URL})",
+            "",
+            "## 📊 Processing Overview",
+            "| Metric | Value |",
+            "| :--- | :--- |",
+            f"| Upcoming Fixtures Analyzed | {sync_stats.get('total_fixtures', 0)} |",
+            f"| Fixtures Updated in Database | {sync_stats.get('total_updated', 0)} |",
+            f"| +EV Opportunities Found | {len(top_ev_picks)} |",
+            f"| The Odds API Quota Remaining | {quota_str} |",
+            "",
+            "## 🏆 League Breakdown",
+            "| Competition | Code | Matches Processed | +EV Found |",
+            "| :--- | :---: | :---: | :---: |",
+        ]
+
+        for lb in league_breakdown:
+            lines.append(f"| {lb['name']} | `{lb['code']}` | {lb['updated']} | {lb['ev_count']} |")
+
+        lines.extend([
+            "",
+            "## 🎯 Top Value Edges (+EV)",
+            "| Match | League | Pick | Odds | Model Prob | Expected Value |",
+            "| :--- | :---: | :---: | :---: | :---: | :---: |",
+        ])
+
+        if top_ev_picks:
+            for p in top_ev_picks[:8]:
+                lines.append(
+                    f"| {p['home_team']} vs {p['away_team']} | `{p['league_code']}` | "
+                    f"**{p['value_pick']}** | `{p['odds']:.2f}` | `{p['model_prob']:.1f}%` | "
+                    f"**+{p['ev_percentage']:.1f}%** |"
+                )
+        else:
+            lines.append("| *No value bets meeting guardrails today* | - | - | - | - | - |")
+
+        lines.extend([
+            "",
+            "## 📈 Model Calibration & Settlement (Recent 48h)",
+            "| Settled Matches | +EV Bets Evaluated | Record (W - L) | Win Rate | Net ROI | Brier Score |",
+            "| :---: | :---: | :---: | :---: | :---: | :---: |",
+            f"| {settlement_stats.get('settled_count', 0)} | {settlement_stats.get('ev_bets_count', 0)} | "
+            f"{settlement_stats.get('wins', 0)}W - {settlement_stats.get('losses', 0)}L | "
+            f"{settlement_stats.get('win_rate', 0.0)}% | {settlement_stats.get('roi_pct', 0.0)}% | "
+            f"`{settlement_stats.get('brier_score', 0.0)}` |",
+            "",
+            "> Note: Brier score ranges from 0.0 (perfect foresight) to 1.0. Benchmark 0.18-0.22 indicates high calibration.",
+        ])
+
+        with open(summary_path, "a", encoding="utf-8") as f:
+            f.write("\n".join(lines) + "\n")
+        print("    [GitHub Actions] Step summary exported successfully.")
+
+    except Exception as exc:
+        print(f"    [WARN] Failed to write GitHub step summary: {exc}")
+
+
+# ---- Main Pipeline Orchestrator ------------------------------
 
 def main() -> None:
-    print(f"Daily sync starting — {date.today().isoformat()} UTC")
+    now_str = date.today().isoformat()
+    print(f"Daily sync starting - {now_str} UTC")
 
+    # 1. Settle recent completed matches and evaluate accuracy
+    print("Settling recent completed matches from football-data.org...")
+    fetch_and_settle_completed_matches(BASE_URL, HEADERS, supabase)
+
+    print("Evaluating model accuracy & Brier calibration...")
+    settlement_stats = evaluate_recent_settlement(supabase)
+    print(
+        f"Settlement: {settlement_stats.get('settled_count', 0)} matches | "
+        f"Win Rate: {settlement_stats.get('win_rate', 0.0)}% | "
+        f"ROI: {settlement_stats.get('roi_pct', 0.0)}% | "
+        f"Brier: {settlement_stats.get('brier_score', 0.0)}"
+    )
+
+    # 2. Load upcoming fixtures
     upcoming_fixtures = load_upcoming_fixtures(days_ahead=30)
     print(f"Upcoming fixtures (next 30 days, all competitions): {len(upcoming_fixtures)}")
 
@@ -437,17 +556,47 @@ def main() -> None:
         print("No upcoming fixtures found. Run sync_monthly_fixtures.py first.")
         return
 
+    # 3. Synchronize competitions and collect +EV opportunities
     total_updated = 0
+    all_ev_picks: list[dict] = []
+    league_breakdown: list[dict] = []
+
     for league in ACTIVE_LEAGUES:
-        total_updated += sync_competition(league, upcoming_fixtures)
+        updated, ev_count = sync_competition(league, upcoming_fixtures, all_ev_picks)
+        total_updated += updated
+        league_breakdown.append({
+            "name": league["name"],
+            "code": league["code"],
+            "updated": updated,
+            "ev_count": ev_count,
+        })
         time.sleep(REQUEST_DELAY)
 
-    print(f"\nDone. Total fixtures updated: {total_updated}")
+    # Sort value picks descending by expected value
+    all_ev_picks.sort(key=lambda x: x.get("ev_percentage", 0.0), reverse=True)
+    print(f"\nDone. Total fixtures updated: {total_updated} | +EV found: {len(all_ev_picks)}")
 
-    # Database housekeeping: prune matches finished > 45 days ago
+    # 4. Database housekeeping: prune matches finished > 45 days ago
     print("Running database housekeeping (clean_stale_fixtures)...")
     pruned = prune_stale_fixtures()
     print(f"Stale fixtures pruned: {pruned}")
+
+    # 5. Dispatch Telegram Daily SITREP
+    sync_stats = {
+        "total_fixtures": len(upcoming_fixtures),
+        "total_updated": total_updated,
+    }
+    print("Dispatching Telegram Daily SITREP...")
+    send_daily_sitrep(sync_stats, settlement_stats, all_ev_picks, LAST_QUOTA_REMAINING)
+
+    # 6. Output GitHub Actions Markdown Summary
+    write_github_step_summary(
+        sync_stats,
+        settlement_stats,
+        all_ev_picks,
+        league_breakdown,
+        LAST_QUOTA_REMAINING,
+    )
 
 
 if __name__ == "__main__":

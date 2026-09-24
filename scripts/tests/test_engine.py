@@ -101,7 +101,7 @@ class TestFindBestPick:
         assert ev is not None and 2.0 <= ev <= 35.0
 
     def test_no_pick_below_threshold(self):
-        # Tiny edge — below 2% threshold (0.48 * 2.00 - 1 = -0.04)
+        # Tiny edge - below 2% threshold (0.48 * 2.00 - 1 = -0.04)
         pick, ev = find_best_pick(
             0.48, 0.28, 0.24,
             odds_home=2.00, odds_draw=3.40, odds_away=3.80,
