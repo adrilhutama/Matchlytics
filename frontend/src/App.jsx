@@ -57,6 +57,7 @@ function buildDateRange() {
 
 export default function App() {
   const [fixtures,            setFixtures]            = useState([])
+  const [standingsMap,        setStandingsMap]        = useState({})
   const [loading,             setLoading]             = useState(true)
   const [error,               setError]               = useState(null)
   const [lastUpdated,         setLastUpdated]         = useState(null)
@@ -124,6 +125,25 @@ export default function App() {
     setIsSlipDrawerOpen(false)
   }, [])
 
+  // ---- Standings fetching from Supabase ----------------------
+  const fetchStandings = useCallback(async () => {
+    try {
+      const { data, error: stErr } = await supabase
+        .from('team_standings')
+        .select('*')
+      if (!stErr && data) {
+        const map = {}
+        data.forEach((row) => {
+          if (row.id) map[row.id] = row
+          if (row.team_id) map[row.team_id] = row
+        })
+        setStandingsMap(map)
+      }
+    } catch (err) {
+      console.warn('Failed to load team standings:', err)
+    }
+  }, [])
+
   // ---- Data fetching from Supabase --------------------------
   const fetchFixtures = useCallback(async (isSilent = false) => {
     if (!isSilent) setLoading(true)
@@ -154,7 +174,8 @@ export default function App() {
 
   useEffect(() => {
     fetchFixtures()
-  }, [fetchFixtures])
+    fetchStandings()
+  }, [fetchFixtures, fetchStandings])
 
   // ---- Supabase Realtime Subscription -----------------------
   useEffect(() => {
@@ -175,9 +196,21 @@ export default function App() {
 
           debounceTimerRef.current = setTimeout(() => {
             fetchFixtures(true)
+            fetchStandings()
             setRealtimeToast(true)
             setTimeout(() => setRealtimeToast(false), 3500)
           }, 1500)
+        }
+      )
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'team_standings',
+        },
+        () => {
+          fetchStandings()
         }
       )
       .subscribe()
@@ -330,6 +363,7 @@ export default function App() {
                       onOpenQuantModal={setSelectedQuantFixture}
                       slipPicks={fixtureSlipPicks}
                       onToggleSlip={handleToggleSlip}
+                      standingsMap={standingsMap}
                       style={{ animationDelay: `${Math.min(idx * 30, 300)}ms` }}
                     />
                   )
@@ -347,6 +381,7 @@ export default function App() {
                 onOpenQuantModal={setSelectedQuantFixture}
                 slipLegs={parlaySlip}
                 onToggleSlip={handleToggleSlip}
+                standingsMap={standingsMap}
               />
             )}
           </section>
@@ -358,6 +393,7 @@ export default function App() {
         fixture={selectedMatrixFixture}
         isOpen={Boolean(selectedMatrixFixture)}
         onClose={() => setSelectedMatrixFixture(null)}
+        standingsMap={standingsMap}
       />
 
       {/* Quantitative Risk Engine & Kelly Modal */}

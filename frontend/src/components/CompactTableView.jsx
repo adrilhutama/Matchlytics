@@ -13,6 +13,7 @@ import {
   calculateZeroVigOdds,
 } from '../utils/analytics'
 import ValueBadge from './ValueBadge'
+import FormGuide from './FormGuide'
 
 export default function CompactTableView({
   fixtures,
@@ -22,6 +23,7 @@ export default function CompactTableView({
   onOpenQuantModal,
   slipLegs = [],
   onToggleSlip,
+  standingsMap = {},
 }) {
   return (
     <div className="w-full bg-pitch-900 border border-pitch-700 rounded-xl overflow-hidden shadow-lg animate-fade-in">
@@ -43,6 +45,9 @@ export default function CompactTableView({
           </thead>
           <tbody className="divide-y divide-pitch-800 text-xs">
             {fixtures.map((fixture) => {
+              const homeStandings = standingsMap[fixture.home_team_id] || standingsMap[`${fixture.league_id}_${fixture.home_team_id}`] || null
+              const awayStandings = standingsMap[fixture.away_team_id] || standingsMap[`${fixture.league_id}_${fixture.away_team_id}`] || null
+
               const isPinned = watchlist.includes(fixture.id)
               const hasRealOdds = isRealMarketOdds(fixture)
               const { relativeBadge, timeStr } = formatLocalizedMatchDate(fixture.match_date)
@@ -115,36 +120,56 @@ export default function CompactTableView({
 
                   {/* Fixture (Teams) */}
                   <td className="py-2.5 px-3">
-                    <div className="flex flex-col gap-1 min-w-[190px]">
-                      <div className="flex items-center gap-2">
-                        {fixture.home_team_logo && (
-                          <img
-                            src={fixture.home_team_logo}
-                            alt=""
-                            width={16}
-                            height={16}
-                            className="w-4 h-4 object-contain flex-shrink-0"
-                            onError={(e) => { e.currentTarget.style.display = 'none' }}
-                          />
-                        )}
-                        <span className={`font-semibold truncate ${fixture.value_pick === 'HOME' ? 'text-amber-300' : 'text-slate-200'}`}>
-                          {fixture.home_team_name}
-                        </span>
+                    <div className="flex flex-col gap-1.5 min-w-[210px]">
+                      <div className="flex items-center justify-between gap-2">
+                        <div className="flex items-center gap-2 min-w-0">
+                          {fixture.home_team_logo && (
+                            <img
+                              src={fixture.home_team_logo}
+                              alt=""
+                              width={16}
+                              height={16}
+                              className="w-4 h-4 object-contain flex-shrink-0"
+                              onError={(e) => { e.currentTarget.style.display = 'none' }}
+                            />
+                          )}
+                          <span className={`font-semibold truncate ${fixture.value_pick === 'HOME' ? 'text-amber-300' : 'text-slate-200'}`}>
+                            {fixture.home_team_name}
+                          </span>
+                        </div>
+                        <div className="flex items-center gap-1.5 flex-shrink-0">
+                          {homeStandings?.form && <FormGuide form={homeStandings.form} size="sm" />}
+                          {homeStandings?.home_played > 0 && (
+                            <span className="text-[10px] text-slate-500 font-mono">
+                              H:{homeStandings.home_goals_for}-{homeStandings.home_goals_against}
+                            </span>
+                          )}
+                        </div>
                       </div>
-                      <div className="flex items-center gap-2">
-                        {fixture.away_team_logo && (
-                          <img
-                            src={fixture.away_team_logo}
-                            alt=""
-                            width={16}
-                            height={16}
-                            className="w-4 h-4 object-contain flex-shrink-0"
-                            onError={(e) => { e.currentTarget.style.display = 'none' }}
-                          />
-                        )}
-                        <span className={`font-semibold truncate ${fixture.value_pick === 'AWAY' ? 'text-amber-300' : 'text-slate-300'}`}>
-                          {fixture.away_team_name}
-                        </span>
+                      <div className="flex items-center justify-between gap-2">
+                        <div className="flex items-center gap-2 min-w-0">
+                          {fixture.away_team_logo && (
+                            <img
+                              src={fixture.away_team_logo}
+                              alt=""
+                              width={16}
+                              height={16}
+                              className="w-4 h-4 object-contain flex-shrink-0"
+                              onError={(e) => { e.currentTarget.style.display = 'none' }}
+                            />
+                          )}
+                          <span className={`font-semibold truncate ${fixture.value_pick === 'AWAY' ? 'text-amber-300' : 'text-slate-300'}`}>
+                            {fixture.away_team_name}
+                          </span>
+                        </div>
+                        <div className="flex items-center gap-1.5 flex-shrink-0">
+                          {awayStandings?.form && <FormGuide form={awayStandings.form} size="sm" />}
+                          {awayStandings?.away_played > 0 && (
+                            <span className="text-[10px] text-slate-500 font-mono">
+                              A:{awayStandings.away_goals_for}-{awayStandings.away_goals_against}
+                            </span>
+                          )}
+                        </div>
                       </div>
                     </div>
                   </td>

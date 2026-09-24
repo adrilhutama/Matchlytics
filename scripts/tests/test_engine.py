@@ -8,6 +8,7 @@ import math
 import pytest
 from scripts.engine import (
     score_matrix,
+    calculate_lambdas,
     calc_probabilities,
     compute_ev,
     find_best_pick,
@@ -157,3 +158,40 @@ class TestStrengthModel:
         # Extreme low is clamped to 0.6
         lh_low, la_low = compute_lambdas(0.01, 0.01, 0.01, 0.01, 0.5)
         assert lh_low == 0.6 and la_low == 0.6
+
+
+class TestCalculateLambdasSplit:
+    def test_zero_games_uses_baseline(self):
+        lh, la = calculate_lambdas(
+            home_stats={"home_played": 0, "home_goals_for": 0, "home_goals_against": 0},
+            away_stats={"away_played": 0, "away_goals_for": 0, "away_goals_against": 0},
+            league_averages={"home_avg_goals_for": 1.5, "away_avg_goals_for": 1.2},
+        )
+        # 1.0 * 1.0 * 1.5 = 1.5, 1.0 * 1.0 * 1.2 = 1.2
+        assert pytest.approx(lh, 0.05) == 1.5
+        assert pytest.approx(la, 0.05) == 1.2
+
+    def test_strong_home_team_elevates_lambda(self):
+        lh, la = calculate_lambdas(
+            home_stats={"home_played": 10, "home_goals_for": 35, "home_goals_against": 5},
+            away_stats={"away_played": 10, "away_goals_for": 6, "away_goals_against": 28},
+            league_averages={"home_avg_goals_for": 1.5, "away_avg_goals_for": 1.2},
+        )
+        assert lh > 2.0
+        assert la < 1.0
+
+    def test_clamping_floor_and_ceiling(self):
+        # Extreme attack clamped to 3.2
+        lh_max, la_max = calculate_lambdas(
+            home_stats={"home_played": 10, "home_goals_for": 100, "home_goals_against": 0},
+            away_stats={"away_played": 10, "away_goals_for": 100, "away_goals_against": 100},
+            league_averages={"home_avg_goals_for": 1.5, "away_avg_goals_for": 1.2},
+        )
+        assert lh_max <= 3.2
+        # Extreme defense clamped to 0.6
+        lh_min, la_min = calculate_lambdas(
+            home_stats={"home_played": 10, "home_goals_for": 0, "home_goals_against": 0},
+            away_stats={"away_played": 10, "away_goals_for": 0, "away_goals_against": 0},
+            league_averages={"home_avg_goals_for": 0.2, "away_avg_goals_for": 0.2},
+        )
+        assert lh_min >= 0.6 and la_min >= 0.6

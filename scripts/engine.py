@@ -200,8 +200,8 @@ def compute_attack_defense_strength(
 ) -> tuple[float, float]:
     """
     Compute a team's Attack Strength and Defense Strength relative to the
-    league average, applying Bayesian shrinkage to avoid small-sample distortions:
-    strength = (raw_ratio * games + 1.0 * 4) / (games + 4)
+    league average, applying Bayesian shrinkage:
+    strength = (raw_ratio * games + 1.0 * 3) / (games + 3)
     """
     if team_games == 0:
         return 1.0, 1.0
@@ -212,9 +212,9 @@ def compute_attack_defense_strength(
     raw_attack  = team_avg_for     / league_avg_goals_for     if league_avg_goals_for     > 0 else 1.0
     raw_defense = team_avg_against / league_avg_goals_against if league_avg_goals_against > 0 else 1.0
 
-    # Bayesian shrinkage: prior weight of 4 games at baseline 1.0
-    shrunk_attack  = (raw_attack * team_games + 1.0 * 4) / (team_games + 4)
-    shrunk_defense = (raw_defense * team_games + 1.0 * 4) / (team_games + 4)
+    # Bayesian shrinkage: prior weight of 3 games at baseline 1.0
+    shrunk_attack  = (raw_attack * team_games + 1.0 * 3) / (team_games + 3)
+    shrunk_defense = (raw_defense * team_games + 1.0 * 3) / (team_games + 3)
 
     return round(shrunk_attack, 4), round(shrunk_defense, 4)
 
@@ -239,3 +239,70 @@ def compute_lambdas(
     lambda_home = max(0.6, min(float(lambda_home), 3.2))
     lambda_away = max(0.6, min(float(lambda_away), 3.2))
     return round(lambda_home, 2), round(lambda_away, 2)
+
+
+def calculate_lambdas(
+    home_stats: dict,
+    away_stats: dict,
+    league_averages: dict,
+) -> tuple[float, float]:
+    """
+    Calculate Poisson lambdas based on Home/Away table splits:
+    - Base lambda_home on Home Team's specific Home Goals Scored / Conceded against League Home averages.
+    - Base lambda_away on Away Team's specific Away Goals Scored / Conceded against League Away averages.
+    - Bayesian shrinkage: (raw_ratio * games + 1.0 * 3) / (games + 3).
+    - Clamped strictly between 0.6 and 3.2.
+    """
+    home_played = int(home_stats.get("home_played") or home_stats.get("played") or 0)
+    away_played = int(away_stats.get("away_played") or away_stats.get("played") or 0)
+
+    home_gf = float(home_stats.get("home_goals_for") or home_stats.get("goals_for") or 0.0)
+    home_ga = float(home_stats.get("home_goals_against") or home_stats.get("goals_against") or 0.0)
+
+    away_gf = float(away_stats.get("away_goals_for") or away_stats.get("goals_for") or 0.0)
+    away_ga = float(away_stats.get("away_goals_against") or away_stats.get("goals_against") or 0.0)
+
+    league_home_avg = float(
+        league_averages.get("home_avg_goals_for")
+        or league_averages.get("league_home_avg")
+        or 1.50
+    )
+    league_away_avg = float(
+        league_averages.get("away_avg_goals_for")
+        or league_averages.get("league_away_avg")
+        or 1.20
+    )
+
+    # Floor safe positive averages
+    league_home_avg = max(0.5, league_home_avg)
+    league_away_avg = max(0.5, league_away_avg)
+
+    # Home team specific ratios at home
+    if home_played > 0:
+        raw_home_attack  = (home_gf / home_played) / league_home_avg
+        raw_home_defense = (home_ga / home_played) / league_away_avg
+        home_attack  = (raw_home_attack * home_played + 1.0 * 3) / (home_played + 3)
+        home_defense = (raw_home_defense * home_played + 1.0 * 3) / (home_played + 3)
+    else:
+        home_attack  = 1.0
+        home_defense = 1.0
+
+    # Away team specific ratios away
+    if away_played > 0:
+        raw_away_attack  = (away_gf / away_played) / league_away_avg
+        raw_away_defense = (away_ga / away_played) / league_home_avg
+        away_attack  = (raw_away_attack * away_played + 1.0 * 3) / (away_played + 3)
+        away_defense = (raw_away_defense * away_played + 1.0 * 3) / (away_played + 3)
+    else:
+        away_attack  = 1.0
+        away_defense = 1.0
+
+    # Dixon-Coles formulation with home/away baseline
+    lh = home_attack * away_defense * league_home_avg
+    la = away_attack * home_defense * league_away_avg
+
+    # Clamp strictly between 0.6 and 3.2
+    lambda_home = round(max(0.6, min(float(lh), 3.2)), 2)
+    lambda_away = round(max(0.6, min(float(la), 3.2)), 2)
+
+    return lambda_home, lambda_away

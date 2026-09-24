@@ -1,15 +1,14 @@
-name: Daily Analytics Sync
+name: Odds & Quant Analytics Sync
 
 on:
   schedule:
-    # Runs at 06:00 UTC every day
-    - cron: "0 6 * * *"
-  # Manual trigger for testing
+    # Runs twice daily at 06:00 UTC and 14:00 UTC
+    - cron: "0 6,14 * * *"
   workflow_dispatch:
 
 jobs:
-  sync:
-    name: Sync Standings, Odds & Analytics
+  sync-odds-analytics:
+    name: Sync Odds, Poisson Engine & Telegram SITREP
     runs-on: ubuntu-latest
     timeout-minutes: 15
 
@@ -27,12 +26,10 @@ jobs:
       - name: Upgrade pip
         run: python -m pip install --upgrade pip
 
-      - name: Install pinned dependencies
-        # --no-cache-dir forces pip to resolve from PyPI every time,
-        # preventing stale caches from serving incompatible versions.
+      - name: Install dependencies
         run: pip install --no-cache-dir -r scripts/requirements.txt
 
-      - name: Run daily sync
+      - name: Run odds & analytics sync
         env:
           FOOTBALL_DATA_TOKEN:       ${{ secrets.FOOTBALL_DATA_TOKEN }}
           ODDS_API_KEY:              ${{ secrets.ODDS_API_KEY }}
@@ -41,8 +38,6 @@ jobs:
           APP_BASE_URL:              "https://tips.imortifex.me/"
           GITHUB_REPOSITORY:         ${{ github.repository }}
           SUPABASE_URL:              ${{ secrets.SUPABASE_URL }}
-          # Support both secret naming conventions.
-          # config.py checks SUPABASE_SERVICE_ROLE_KEY first, then SUPABASE_SERVICE_KEY.
           SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY || secrets.SUPABASE_SERVICE_KEY }}
           SUPABASE_SERVICE_KEY:      ${{ secrets.SUPABASE_SERVICE_KEY || secrets.SUPABASE_SERVICE_ROLE_KEY }}
         run: |
@@ -51,4 +46,4 @@ jobs:
 
       - name: Log completion
         if: always()
-        run: echo "Daily sync completed at $(date -u)"
+        run: echo "Odds and quant analytics sync finished at $(date -u)"

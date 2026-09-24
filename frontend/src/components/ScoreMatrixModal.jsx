@@ -5,8 +5,9 @@
 
 import { useEffect, useRef, useMemo } from 'react'
 import { computePoissonMatrix } from '../utils/analytics'
+import FormGuide from './FormGuide'
 
-export default function ScoreMatrixModal({ fixture, isOpen, onClose }) {
+export default function ScoreMatrixModal({ fixture, isOpen, onClose, standingsMap = {} }) {
   const modalRef = useRef(null)
 
   // Close on Escape key
@@ -28,6 +29,9 @@ export default function ScoreMatrixModal({ fixture, isOpen, onClose }) {
   }, [fixture])
 
   if (!isOpen || !fixture || !matrixData) return null
+
+  const homeStandings = standingsMap?.[fixture?.home_team_id] || standingsMap?.[`${fixture?.league_id}_${fixture?.home_team_id}`] || null
+  const awayStandings = standingsMap?.[fixture?.away_team_id] || standingsMap?.[`${fixture?.league_id}_${fixture?.away_team_id}`] || null
 
   const {
     home_team_name, home_team_logo,

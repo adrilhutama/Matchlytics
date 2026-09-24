@@ -65,14 +65,17 @@ def fetch_and_settle_completed_matches(base_url: str, headers: dict, supabase: A
             a_score = score_data.get("away")
 
             if mid and h_score is not None and a_score is not None:
-                # Update fixture record in Supabase
-                supabase.table("fixtures").update({
-                    "status": "FT",
-                    "home_score": int(h_score),
-                    "away_score": int(a_score),
-                    "updated_at": datetime.now(timezone.utc).isoformat(),
-                }).eq("id", mid).execute()
-                settled_count += 1
+                try:
+                    # Update fixture record in Supabase
+                    supabase.table("fixtures").update({
+                        "status": "FT",
+                        "home_score": int(h_score),
+                        "away_score": int(a_score),
+                        "updated_at": datetime.now(timezone.utc).isoformat(),
+                    }).eq("id", mid).execute()
+                    settled_count += 1
+                except Exception as inner_err:
+                    print(f"    [WARN] Failed to settle fixture {mid}: {inner_err}")
 
         print(f"    Settled {settled_count} recent finished match(es).")
         return settled_count

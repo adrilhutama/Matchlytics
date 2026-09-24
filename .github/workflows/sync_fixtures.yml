@@ -1,15 +1,14 @@
-name: Monthly Fixture Sync
+name: Fixtures Sync (30-Day Rolling Window)
 
 on:
   schedule:
-    # Runs on the 1st of every month at 05:00 UTC
-    - cron: "0 5 1 * *"
-  # Manual trigger to backfill or update
+    # Runs weekly every Monday at 02:00 UTC
+    - cron: "0 2 * * 1"
   workflow_dispatch:
 
 jobs:
-  monthly-sync:
-    name: Pull Next 30 Days of Fixtures
+  sync-fixtures:
+    name: Ingest Upcoming Fixtures
     runs-on: ubuntu-latest
     timeout-minutes: 10
 
@@ -27,17 +26,13 @@ jobs:
       - name: Upgrade pip
         run: python -m pip install --upgrade pip
 
-      - name: Install pinned dependencies
-        # --no-cache-dir forces pip to resolve from PyPI every time,
-        # preventing stale caches from serving incompatible versions.
+      - name: Install dependencies
         run: pip install --no-cache-dir -r scripts/requirements.txt
 
-      - name: Run monthly fixture sync
+      - name: Run monthly fixtures sync
         env:
           FOOTBALL_DATA_TOKEN:       ${{ secrets.FOOTBALL_DATA_TOKEN }}
           SUPABASE_URL:              ${{ secrets.SUPABASE_URL }}
-          # Support both secret naming conventions.
-          # config.py checks SUPABASE_SERVICE_ROLE_KEY first, then SUPABASE_SERVICE_KEY.
           SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY || secrets.SUPABASE_SERVICE_KEY }}
           SUPABASE_SERVICE_KEY:      ${{ secrets.SUPABASE_SERVICE_KEY || secrets.SUPABASE_SERVICE_ROLE_KEY }}
         run: |
@@ -46,4 +41,4 @@ jobs:
 
       - name: Log completion
         if: always()
-        run: echo "Monthly fixture sync completed at $(date -u)"
+        run: echo "Fixtures sync finished at $(date -u)"

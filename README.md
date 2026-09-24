@@ -4,7 +4,7 @@
 
 **Production-ready football match pre-analysis platform**
 
-Calculate Poisson probabilities, expected goals (xG), Over/Under 2.5, BTTS, and detect +EV value bets against Bet365 odds — entirely on a free-tier stack.
+Calculate Poisson probabilities, expected goals (xG), Over/Under 2.5, BTTS, and detect +EV value bets against Bet365 odds  -  entirely on a free-tier stack.
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Python](https://img.shields.io/badge/Python-3.10%2B-3776AB?logo=python&logoColor=white)](https://python.org)
@@ -21,7 +21,7 @@ Calculate Poisson probabilities, expected goals (xG), Over/Under 2.5, BTTS, and 
 
 ## Overview
 
-Matchlytics is a zero-cost statistical football analytics platform that automates the full pipeline from raw league data to actionable pre-match insights. It pulls standings from the API-Football free tier, computes Poisson-distribution score matrices to derive win/draw/loss probabilities, fetches Bet365 decimal odds, and flags bets where the model's implied probability exceeds the bookmaker's price by more than 5% — a positive expected value (+EV) signal.
+Matchlytics is a zero-cost statistical football analytics platform that automates the full pipeline from raw league data to actionable pre-match insights. It pulls standings from the API-Football free tier, computes Poisson-distribution score matrices to derive win/draw/loss probabilities, fetches Bet365 decimal odds, and flags bets where the model's implied probability exceeds the bookmaker's price by more than 5%  -  a positive expected value (+EV) signal.
 
 The frontend is a responsive dark-mode dashboard that reads directly from Supabase via a public anon key (no backend server required), deploys to Vercel in one click, and displays fixtures for the next 7 days filtered by league or value-bet status.
 
@@ -42,14 +42,14 @@ The frontend is a responsive dark-mode dashboard that reads directly from Supaba
 - Surfaces the pick with the highest EV when multiple outcomes qualify.
 
 ### Dual-Pipeline GitHub Actions Automation
-- **Monthly fixture sync** (`monthly_fixtures.yml`) — runs on the 1st of each month, pulling the next 30 days of scheduled matches. Uses ~5 API calls. Keeps fixture metadata current without burning daily quota.
-- **Daily analytics sync** (`daily_sync.yml`) — runs at 06:00 UTC. Fetches standings (5 calls) and today's Bet365 odds (1 call per fixture, ~15 calls), then computes and upserts all analytical metrics. Total: ~20 calls/day, well within the 100/day free limit.
+- **Monthly fixture sync** (`monthly_fixtures.yml`)  -  runs on the 1st of each month, pulling the next 30 days of scheduled matches. Uses ~5 API calls. Keeps fixture metadata current without burning daily quota.
+- **Daily analytics sync** (`daily_sync.yml`)  -  runs at 06:00 UTC. Fetches standings (5 calls) and today's Bet365 odds (1 call per fixture, ~15 calls), then computes and upserts all analytical metrics. Total: ~20 calls/day, well within the 100/day free limit.
 
 ### Dark-Mode Analytics Dashboard
-- Vite + React 18 + Tailwind CSS 3 — no backend server, reads Supabase directly via `@supabase/supabase-js`.
+- Vite + React 18 + Tailwind CSS 3  -  no backend server, reads Supabase directly via `@supabase/supabase-js`.
 - League filter pills (All, EPL, La Liga, Serie A, Bundesliga, Ligue 1) and a **+EV Value Bets Only** toggle.
 - Each match card shows: team logos, predicted scoreline, probability bars (home/draw/away), Over 2.5 and BTTS badges, Bet365 odds vs model fair odds, and a glowing amber +EV badge for value picks.
-- Fully responsive — tested at 375 px mobile through 1280 px desktop.
+- Fully responsive  -  tested at 375 px mobile through 1280 px desktop.
 - Accessible: WCAG AA contrast, keyboard-navigable, ARIA roles on all interactive elements.
 
 ---
@@ -58,7 +58,7 @@ The frontend is a responsive dark-mode dashboard that reads directly from Supaba
 
 ```
 ┌─────────────────────────┐
-│     API-Football        │  (RapidAPI — free tier, 100 req/day)
+│     API-Football        │  (RapidAPI  -  free tier, 100 req/day)
 │  /standings  /fixtures  │
 │  /odds (Bet365 ID=8)    │
 └────────────┬────────────┘
@@ -82,7 +82,7 @@ The frontend is a responsive dark-mode dashboard that reads directly from Supaba
                      │  supabase-py (service role)
                      ▼
 ┌─────────────────────────┐
-│   Supabase PostgreSQL   │  (free tier — 500 MB)
+│   Supabase PostgreSQL   │  (free tier  -  500 MB)
 │   Table: fixtures       │
 │   RLS: anon = SELECT    │
 └────────────┬────────────┘
@@ -195,8 +195,8 @@ Matchlytics/
             ├── OddsComparison.jsx      # Bookmaker vs model fair odds
             ├── ValueBadge.jsx          # Amber +EV badge (the single glow element)
             ├── LoadingState.jsx        # Shimmer skeleton cards
-            ├── EmptyState.jsx          # No results — named cause + action
-            └── ErrorState.jsx          # Supabase error — named cause + Retry
+            ├── EmptyState.jsx          # No results  -  named cause + action
+            └── ErrorState.jsx          # Supabase error  -  named cause + Retry
 ```
 
 ---
@@ -272,7 +272,7 @@ Add these in **Repository Settings > Secrets and variables > Actions > New repos
 |---|---|
 | `RAPIDAPI_KEY` | Your API-Football key from RapidAPI |
 | `SUPABASE_URL` | `https://<your-project-ref>.supabase.co` |
-| `SUPABASE_SERVICE_ROLE_KEY` | Service role key (bypasses RLS — backend only) |
+| `SUPABASE_SERVICE_ROLE_KEY` | Service role key (bypasses RLS  -  backend only) |
 
 The `daily_sync.yml` workflow fires automatically at **06:00 UTC** every day. You can also trigger it manually via **Actions > Daily Analytics Sync > Run workflow**.
 
@@ -283,13 +283,13 @@ The `monthly_fixtures.yml` workflow fires on the **1st of each month at 05:00 UT
 ## Vercel Deployment
 
 1. Import this repository at [vercel.com/new](https://vercel.com/new).
-2. Vercel detects `vercel.json` automatically — the build root is set to `frontend/`.
+2. Vercel detects `vercel.json` automatically  -  the build root is set to `frontend/`.
 3. Add the following **Environment Variables** in the Vercel project settings:
 
 | Variable | Description |
 |---|---|
 | `VITE_SUPABASE_URL` | `https://<your-project-ref>.supabase.co` |
-| `VITE_SUPABASE_ANON_KEY` | Public anon key (safe for browser — RLS enforces read-only) |
+| `VITE_SUPABASE_ANON_KEY` | Public anon key (safe for browser  -  RLS enforces read-only) |
 
 4. Deploy. Every push to `main` triggers an automatic redeploy.
 
@@ -319,7 +319,7 @@ The monthly fixture sync consumes an additional ~5–10 calls and runs only once
 
 ## License
 
-MIT License — see [LICENSE](LICENSE) for details.
+MIT License  -  see [LICENSE](LICENSE) for details.
 
 ---
 

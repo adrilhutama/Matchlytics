@@ -13,6 +13,7 @@ import ProbabilityBar from './ProbabilityBar'
 import OddsComparison from './OddsComparison'
 import ValueBadge from './ValueBadge'
 import DualGauge from './DualGauge'
+import FormGuide from './FormGuide'
 import {
   formatLocalizedMatchDate,
   isRealMarketOdds,
@@ -62,6 +63,7 @@ export default function MatchCard({
   onOpenQuantModal,
   slipPicks = [],
   onToggleSlip,
+  standingsMap = {},
   style,
 }) {
   const {
@@ -76,6 +78,9 @@ export default function MatchCard({
     value_pick, ev_percentage,
     lambda_home, lambda_away,
   } = fixture
+
+  const homeStandings = standingsMap[fixture.home_team_id] || standingsMap[`${fixture.league_id}_${fixture.home_team_id}`] || null
+  const awayStandings = standingsMap[fixture.away_team_id] || standingsMap[`${fixture.league_id}_${fixture.away_team_id}`] || null
 
   const isValue = Boolean(value_pick)
   const hasRealOdds = isRealMarketOdds(fixture)
@@ -178,11 +183,19 @@ export default function MatchCard({
         {/* ---- Teams & Predicted Score ---- */}
         <div className="flex items-center justify-between gap-3 mb-5">
           {/* Home */}
-          <div className="flex flex-col items-center gap-2 flex-1 text-center min-w-0">
+          <div className="flex flex-col items-center gap-1.5 flex-1 text-center min-w-0">
             <TeamLogo src={home_team_logo} name={home_team_name} />
             <span className="text-sm font-semibold text-slate-200 line-clamp-2 leading-tight">
               {home_team_name}
             </span>
+            {homeStandings?.form && (
+              <FormGuide form={homeStandings.form} size="sm" />
+            )}
+            {homeStandings?.home_played > 0 && (
+              <span className="text-[10px] text-slate-400 font-mono">
+                H: {homeStandings.home_goals_for}:{homeStandings.home_goals_against} ({homeStandings.home_played}G)
+              </span>
+            )}
           </div>
 
           {/* Centre: predicted score + metadata */}
@@ -203,11 +216,19 @@ export default function MatchCard({
           </div>
 
           {/* Away */}
-          <div className="flex flex-col items-center gap-2 flex-1 text-center min-w-0">
+          <div className="flex flex-col items-center gap-1.5 flex-1 text-center min-w-0">
             <TeamLogo src={away_team_logo} name={away_team_name} />
             <span className="text-sm font-semibold text-slate-200 line-clamp-2 leading-tight">
               {away_team_name}
             </span>
+            {awayStandings?.form && (
+              <FormGuide form={awayStandings.form} size="sm" />
+            )}
+            {awayStandings?.away_played > 0 && (
+              <span className="text-[10px] text-slate-400 font-mono">
+                A: {awayStandings.away_goals_for}:{awayStandings.away_goals_against} ({awayStandings.away_played}G)
+              </span>
+            )}
           </div>
         </div>
 
