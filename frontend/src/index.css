@@ -23,14 +23,14 @@
     min-height: 100dvh;
   }
 
-  /* Accessible focus ring — visible, not the default outline */
+  /* Accessible focus ring: visible, high-contrast indicator */
   :focus-visible {
     outline: 2px solid theme('colors.amber.500');
     outline-offset: 3px;
     border-radius: 4px;
   }
 
-  /* Scrollbar styling — matches dark palette */
+  /* Scrollbar styling: matches dark palette */
   ::-webkit-scrollbar        { width: 6px; height: 6px; }
   ::-webkit-scrollbar-track  { background: theme('colors.pitch.900'); }
   ::-webkit-scrollbar-thumb  { background: theme('colors.pitch.600'); border-radius: 3px; }
@@ -62,7 +62,7 @@
     box-shadow: 0 0 12px 2px rgba(245, 158, 11, 0.35);
   }
 
-  /* Glass treatment — used only on the filter bar header (1 element, dose cap) (R-10) */
+  /* Glass treatment: used only on the filter bar header (1 element, dose cap) (R-10) */
   .glass-filter {
     background: rgba(14, 17, 23, 0.75);
     backdrop-filter: blur(12px);
@@ -70,7 +70,7 @@
     border-bottom: 1px solid rgba(255, 255, 255, 0.06);
   }
 
-  /* Card base — solid surface, no float shadow by default */
+  /* Card base: solid surface, no float shadow by default */
   .match-card {
     @apply bg-pitch-800 border border-pitch-700 rounded-xl;
     transition: border-color 0.2s ease, transform 0.15s ease;
@@ -96,7 +96,7 @@
     text-wrap: balance;
   }
 
-  /* Number columns — monospace for tabular alignment */
+  /* Number columns: monospace for tabular alignment */
   .tabular-nums {
     font-family: theme('fontFamily.mono');
     font-variant-numeric: tabular-nums;

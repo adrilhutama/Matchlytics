@@ -14,7 +14,7 @@ export default function ValueBadge({ pick, evPct }) {
       role="status"
       aria-label={`Value bet detected: ${labels[pick]} with ${evPct}% expected value`}
     >
-      {/* Solid filled triangle — a real directional signal, not a decorative arrow (R-08) */}
+      {/* Solid filled triangle: a real directional signal, not a decorative arrow (R-08) */}
       <svg
         width="10"
         height="10"
@@ -28,7 +28,7 @@ export default function ValueBadge({ pick, evPct }) {
       <span className="text-xs font-semibold text-amber-400">
         +EV {evPct}%
       </span>
-      <span className="text-xs text-amber-500/70 font-medium">
+      <span className="text-xs text-amber-500/80 font-medium">
         {labels[pick]}
       </span>
     </div>

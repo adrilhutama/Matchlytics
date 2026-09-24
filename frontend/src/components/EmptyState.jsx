@@ -1,50 +1,68 @@
 // ---- EmptyState.jsx ----
-// Shown when the Supabase query returns zero rows.
-// Names the cause and provides the one action to resolve it (R-27).
+// Context-sensitive empty state when no fixtures match active filters.
+// Provides clear diagnostic explanation and single reset action.
 
-export default function EmptyState({ leagueLabel, valueOnly, onClearFilters }) {
-  const reason = valueOnly
-    ? `No value bets detected in ${leagueLabel || 'the selected leagues'} for the next 30 days.`
-    : `No upcoming fixtures found for ${leagueLabel || 'the selected league'} in the next 30 days.`
+export default function EmptyState({
+  leagueLabel,
+  valueOnly,
+  dateRangeLabel,
+  searchQuery,
+  isWatchlist,
+  onClearFilters,
+}) {
+  let title = 'No fixtures found'
+  let hint = 'Try adjusting your search criteria, league filter, or time window.'
 
-  const hint = valueOnly
-    ? 'The model found no odds mispricing above the 5% EV threshold. Check back after the next daily sync (06:00 UTC).'
-    : 'Fixture metadata is populated by the monthly sync. Run sync_monthly_fixtures.py or trigger the GitHub Action if data is missing.'
+  if (isWatchlist) {
+    title = 'Your Watchlist is empty'
+    hint = 'Click the star icon (⭐) on any match card to bookmark it for quick access here.'
+  } else if (searchQuery) {
+    title = `No matches found for "${searchQuery}"`
+    hint = 'Check the team or league spelling, or clear the search query to view all available fixtures.'
+  } else if (valueOnly) {
+    title = `No +EV value bets found in ${leagueLabel || 'selected leagues'}`
+    hint = 'The quantitative model found no current market mispricings meeting the strict 2%-35% EV guardrails.'
+  } else if (dateRangeLabel && dateRangeLabel !== 'All (30 Days)') {
+    title = `No upcoming matches scheduled for ${dateRangeLabel}`
+    hint = 'No fixtures kick off in this specific time window. Switch to All (30 Days) to see future matches.'
+  }
 
   return (
     <div
-      className="flex flex-col items-center justify-center py-20 text-center animate-fade-in"
+      className="flex flex-col items-center justify-center py-16 px-4 text-center animate-fade-in bg-pitch-900/40 border border-pitch-800 rounded-2xl"
       role="status"
       aria-live="polite"
     >
-      {/* Pitch icon — relevant to a sports data tool */}
-      <svg
-        width="48"
-        height="48"
-        viewBox="0 0 48 48"
-        fill="none"
-        className="text-pitch-600 mb-4"
-        aria-hidden="true"
-      >
-        <rect x="4" y="8" width="40" height="32" rx="3" stroke="currentColor" strokeWidth="2" />
-        <line x1="24" y1="8" x2="24" y2="40" stroke="currentColor" strokeWidth="1.5" strokeDasharray="3 3" />
-        <circle cx="24" cy="24" r="6" stroke="currentColor" strokeWidth="1.5" />
-        <rect x="4" y="16" width="6" height="16" rx="1" stroke="currentColor" strokeWidth="1.5" />
-        <rect x="38" y="16" width="6" height="16" rx="1" stroke="currentColor" strokeWidth="1.5" />
-      </svg>
-
-      <h2 className="text-slate-300 font-semibold text-base mb-2">{reason}</h2>
-      <p className="text-slate-500 text-sm max-w-md text-balance">{hint}</p>
-
-      {(valueOnly || leagueLabel !== 'All Leagues') && (
-        <button
-          id="clear-filters-btn"
-          onClick={onClearFilters}
-          className="mt-6 px-4 py-2 text-sm font-medium rounded-lg bg-pitch-800 border border-pitch-700 text-slate-300 hover:border-slate-500 hover:text-slate-200 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500"
+      <div className="w-16 h-16 rounded-2xl bg-pitch-800 flex items-center justify-center text-slate-500 mb-4 border border-pitch-700">
+        <svg
+          width="32"
+          height="32"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="1.5"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          aria-hidden="true"
         >
-          Clear filters
-        </button>
-      )}
+          <circle cx="11" cy="11" r="8" />
+          <line x1="21" y1="21" x2="16.65" y2="16.65" />
+          <line x1="11" y1="8" x2="11" y2="14" />
+          <line x1="8" y1="11" x2="14" y2="11" />
+        </svg>
+      </div>
+
+      <h2 className="text-slate-200 font-semibold text-base sm:text-lg mb-2">{title}</h2>
+      <p className="text-slate-400 text-sm max-w-md text-balance leading-relaxed mb-6">{hint}</p>
+
+      <button
+        type="button"
+        id="clear-filters-btn"
+        onClick={onClearFilters}
+        className="px-4 py-2.5 min-h-[44px] text-xs font-semibold rounded-xl bg-pitch-800 hover:bg-amber-500 hover:text-pitch-950 text-slate-200 border border-pitch-700 transition-all duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500"
+      >
+        Reset all filters
+      </button>
     </div>
   )
 }
