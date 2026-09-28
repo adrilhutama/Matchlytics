@@ -22,10 +22,18 @@ export default function Sidebar({
   valueCount,
   watchlistCount,
   lastUpdated,
+  deferredInstall,
 }) {
   const timeStr = lastUpdated
     ? lastUpdated.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' })
     : null
+
+  const handleInstall = async () => {
+    if (!deferredInstall) return
+    deferredInstall.prompt()
+    const { outcome } = await deferredInstall.userChoice
+    console.log(`Install prompt outcome: ${outcome}`)
+  }
 
   return (
     <aside
@@ -196,6 +204,25 @@ export default function Sidebar({
           >
             tips.imortifex.me
           </a>
+          <button
+            type="button"
+            id="sidebar-install-btn"
+            onClick={handleInstall}
+            className={`w-full mt-2 min-h-[44px] px-3 py-2 rounded-xl text-xs font-medium border transition-all flex items-center justify-center gap-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500 ${
+              deferredInstall
+                ? 'bg-pitch-800 hover:bg-pitch-700 text-slate-300 hover:text-slate-100 border-pitch-700 hover:border-pitch-600'
+                : 'bg-transparent border-transparent text-transparent pointer-events-none'
+            }`}
+            style={{ visibility: deferredInstall ? 'visible' : 'hidden' }}
+            aria-label="Install application"
+          >
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+              <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+              <polyline points="17 8 12 3 7 8" />
+              <line x1="12" y1="3" x2="12" y2="15" />
+            </svg>
+            Install App
+          </button>
         </div>
       </div>
     </aside>

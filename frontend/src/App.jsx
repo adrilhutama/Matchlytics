@@ -25,6 +25,7 @@ import ErrorState from './components/ErrorState'
 import Sidebar from './components/Sidebar'
 import MobileNav from './components/MobileNav'
 import MobileLeagueDrawer from './components/MobileLeagueDrawer'
+import InstallPrompt from './components/InstallPrompt'
 import {
   isDateInRange,
   matchesSearch,
@@ -96,6 +97,18 @@ export default function App() {
   // Modal fixtures
   const [selectedMatrixFixture, setSelectedMatrixFixture] = useState(null)
   const [selectedQuantFixture,  setSelectedQuantFixture]  = useState(null)
+
+  // PWA: capture native install prompt so Sidebar can offer "Install App"
+  const [deferredInstall, setDeferredInstall] = useState(null)
+
+  useEffect(() => {
+    function onBeforeInstall(e) {
+      e.preventDefault()
+      setDeferredInstall(e)
+    }
+    window.addEventListener('beforeinstallprompt', onBeforeInstall)
+    return () => window.removeEventListener('beforeinstallprompt', onBeforeInstall)
+  }, [])
 
   const debounceTimerRef = useRef(null)
 
@@ -327,6 +340,7 @@ export default function App() {
         valueCount={valueCount}
         watchlistCount={watchlist.length}
         lastUpdated={lastUpdated}
+        deferredInstall={deferredInstall}
       />
 
       {/* ─── Main Content Area ──────────────────────────────── */}
@@ -534,6 +548,9 @@ export default function App() {
         onRemoveLeg={handleRemoveSlipLeg}
         onClearSlip={handleClearSlip}
       />
+
+      {/* PWA install prompt (mobile floating banner + iOS hint) */}
+      <InstallPrompt />
     </div>
   )
 }
