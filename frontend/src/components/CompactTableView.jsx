@@ -27,13 +27,13 @@ export default function CompactTableView({
 }) {
   return (
     <div className="w-full bg-pitch-900 border border-pitch-700 rounded-xl overflow-hidden shadow-lg animate-fade-in">
-      <div className="overflow-x-auto">
+      <div className="overflow-x-auto no-scrollbar touch-pan-x">
         <table className="w-full text-left border-collapse min-w-[920px]">
           <thead>
             <tr className="border-b border-pitch-700/80 bg-pitch-950 text-[11px] uppercase tracking-wider text-slate-400">
-              <th scope="col" className="py-3 px-3 w-10 text-center">Pin</th>
-              <th scope="col" className="py-3 px-3 w-32">Kickoff</th>
-              <th scope="col" className="py-3 px-3">Fixture</th>
+              <th scope="col" className="py-3 px-3 w-10 text-center sticky left-0 z-20 bg-pitch-950">Pin</th>
+              <th scope="col" className="py-3 px-3 w-32 sticky left-10 z-20 bg-pitch-950">Kickoff</th>
+              <th scope="col" className="py-3 px-3 sticky left-[168px] z-20 bg-pitch-950 shadow-[2px_0_5px_rgba(0,0,0,0.4)] border-r border-pitch-800">Fixture</th>
               <th scope="col" className="py-3 px-3 w-28">League</th>
               <th scope="col" className="py-3 px-3 w-24 text-center">xG (λ)</th>
               <th scope="col" className="py-3 px-3 w-36 text-center">1 / X / 2 Prob</th>
@@ -90,7 +90,7 @@ export default function CompactTableView({
                   }`}
                 >
                   {/* Pin / Star Action */}
-                  <td className="py-2.5 px-3 text-center">
+                  <td className="py-2.5 px-3 text-center sticky left-0 z-10 bg-pitch-900">
                     <button
                       type="button"
                       onClick={() => onToggleWatchlist(fixture.id)}
@@ -113,13 +113,13 @@ export default function CompactTableView({
                   </td>
 
                   {/* Kickoff */}
-                  <td className="py-2.5 px-3 whitespace-nowrap">
+                  <td className="py-2.5 px-3 whitespace-nowrap sticky left-10 z-10 bg-pitch-900">
                     <span className="font-medium text-slate-200 block">{relativeBadge}</span>
                     <span className="text-[11px] text-slate-500 font-mono">{timeStr}</span>
                   </td>
 
                   {/* Fixture (Teams) */}
-                  <td className="py-2.5 px-3">
+                  <td className="py-2.5 px-3 sticky left-[168px] z-10 bg-pitch-900 shadow-[2px_0_5px_rgba(0,0,0,0.4)] border-r border-pitch-800">
                     <div className="flex flex-col gap-1.5 min-w-[210px]">
                       <div className="flex items-center justify-between gap-2">
                         <div className="flex items-center gap-2 min-w-0">

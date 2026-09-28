@@ -125,7 +125,7 @@ export default function KellyCalculatorModal({
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-pitch-950/85 backdrop-blur-sm animate-fade-in"
+      className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-2 sm:p-4 bg-pitch-950/85 backdrop-blur-sm animate-fade-in"
       role="dialog"
       aria-modal="true"
       aria-labelledby="kelly-modal-title"
@@ -133,9 +133,12 @@ export default function KellyCalculatorModal({
     >
       <div
         ref={modalRef}
-        className="relative w-full max-w-3xl bg-pitch-900 border border-pitch-700 rounded-2xl p-4 sm:p-6 shadow-2xl overflow-y-auto max-h-[92vh] text-slate-200"
+        className="relative w-full max-w-3xl bg-pitch-900 border-t sm:border border-pitch-700 rounded-t-2xl sm:rounded-2xl p-3 sm:p-6 shadow-2xl overflow-y-auto max-h-[90vh] text-slate-200"
+        style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}
         onClick={(e) => e.stopPropagation()}
       >
+        {/* Mobile drag handle */}
+        <div className="w-10 h-1 bg-slate-600 rounded-full mx-auto mb-2 sm:hidden" aria-hidden="true" />
         {/* Close Button */}
         <button
           type="button"

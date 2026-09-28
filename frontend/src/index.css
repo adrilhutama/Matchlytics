@@ -101,4 +101,15 @@
     font-family: theme('fontFamily.mono');
     font-variant-numeric: tabular-nums;
   }
+
+  /* Hide scrollbar while preserving native touch momentum scrolling.
+     Used on pill rows and horizontal table panning so it does not
+     visually obstruct the UI yet still allows fluid swipe gestures. */
+  .no-scrollbar::-webkit-scrollbar {
+    display: none;
+  }
+  .no-scrollbar {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
 }

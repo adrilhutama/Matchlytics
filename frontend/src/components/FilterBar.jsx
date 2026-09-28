@@ -40,7 +40,7 @@ export default function FilterBar({
       {/* ---- Row 1: Search, Sort & View Mode ---- */}
       <div className="flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3">
         {/* Search Bar */}
-        <div className="relative flex-1">
+        <div className="relative flex-1 min-w-0">
           <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-500">
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
               <circle cx="11" cy="11" r="8" />
@@ -53,7 +53,7 @@ export default function FilterBar({
             onChange={(e) => onSearchChange(e.target.value)}
             placeholder="Search team or league..."
             aria-label="Search fixtures by team or league"
-            className="w-full pl-10 pr-9 py-2 min-h-[44px] rounded-xl bg-pitch-900 border border-pitch-700 text-sm text-slate-100 placeholder-slate-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500 focus-visible:border-transparent transition-all"
+            className="w-full pl-10 pr-9 py-2.5 min-h-[44px] rounded-xl bg-pitch-900 border border-pitch-700 text-sm text-slate-100 placeholder-slate-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500 focus-visible:border-transparent transition-all"
           />
           {searchQuery && (
             <button
@@ -71,7 +71,8 @@ export default function FilterBar({
         </div>
 
         {/* Controls Cluster: Sort + View Mode */}
-        <div className="flex items-center gap-2 flex-wrap sm:flex-nowrap">
+        {/* Stacks vertically on small screens, row on sm+ */}
+        <div className="flex items-center gap-2 flex-wrap">
           {/* Sorting Dropdown */}
           <div className="flex-1 sm:flex-initial">
             <label htmlFor="sort-dropdown" className="sr-only">Sort matches</label>
@@ -99,7 +100,7 @@ export default function FilterBar({
               type="button"
               onClick={() => onViewModeChange('cards')}
               aria-pressed={viewMode === 'cards'}
-              className={`min-h-[40px] px-3 py-1.5 rounded-lg text-xs font-medium transition-all flex items-center gap-1.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500 ${
+              className={`min-h-[44px] px-3 py-2 rounded-lg text-xs font-medium transition-all flex items-center gap-1.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500 ${
                 viewMode === 'cards'
                   ? 'bg-amber-500 text-pitch-950 font-semibold shadow'
                   : 'text-slate-400 hover:text-slate-200'
@@ -117,7 +118,7 @@ export default function FilterBar({
               type="button"
               onClick={() => onViewModeChange('table')}
               aria-pressed={viewMode === 'table'}
-              className={`min-h-[40px] px-3 py-1.5 rounded-lg text-xs font-medium transition-all flex items-center gap-1.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500 ${
+              className={`min-h-[44px] px-3 py-2 rounded-lg text-xs font-medium transition-all flex items-center gap-1.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500 ${
                 viewMode === 'table'
                   ? 'bg-amber-500 text-pitch-950 font-semibold shadow'
                   : 'text-slate-400 hover:text-slate-200'
@@ -134,11 +135,15 @@ export default function FilterBar({
         </div>
       </div>
 
-      {/* ---- Row 2: Date Filters & Watchlist / League Pills ---- */}
-      <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3 pt-1 border-t border-pitch-800/80">
+      {/* ---- Row 2: Date Range Pills (horizontal scroll on mobile) & +EV toggle ---- */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pt-1 border-t border-pitch-800/80">
         {/* Date Range Pills */}
-        <div className="flex items-center gap-1.5 flex-wrap" role="group" aria-label="Filter by date range">
-          <span className="text-[11px] uppercase tracking-wider text-slate-500 font-semibold mr-1 hidden sm:inline">
+        <div
+          className="flex overflow-x-auto no-scrollbar py-1 gap-1.5 touch-pan-x"
+          role="group"
+          aria-label="Filter by date range"
+        >
+          <span className="text-[11px] uppercase tracking-wider text-slate-500 font-semibold flex-shrink-0 self-center mr-1 hidden sm:inline">
             Time:
           </span>
           {DATE_RANGES.map((r) => {
@@ -149,7 +154,7 @@ export default function FilterBar({
                 type="button"
                 onClick={() => onDateRangeChange(r.id)}
                 aria-pressed={isActive}
-                className={`min-h-[38px] px-3 py-1.5 text-xs font-medium rounded-lg transition-all border focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500 ${
+                className={`flex-shrink-0 px-3 py-2 text-xs font-medium rounded-xl transition-all border focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500 min-h-[40px] ${
                   isActive
                     ? 'bg-pitch-700 text-amber-300 border-amber-400/60 font-semibold'
                     : 'bg-pitch-900 text-slate-400 border-pitch-700 hover:border-slate-500 hover:text-slate-200'
@@ -162,10 +167,10 @@ export default function FilterBar({
         </div>
 
         {/* Value Bet Only Switch */}
-        <div className="flex items-center justify-between lg:justify-end gap-3">
+        <div className="flex items-center justify-end gap-3 flex-shrink-0 pt-1 sm:pt-0">
           <label
             htmlFor="value-only-toggle"
-            className="flex items-center gap-2 cursor-pointer select-none flex-shrink-0"
+            className="flex items-center gap-2 cursor-pointer select-none"
           >
             <span className="text-xs text-slate-300 font-medium whitespace-nowrap">
               +EV Bets Only
@@ -176,9 +181,7 @@ export default function FilterBar({
               role="switch"
               aria-checked={valueOnly}
               onClick={() => onValueOnlyChange(!valueOnly)}
-              className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500 ${
-                valueOnly ? 'bg-amber-500' : 'bg-pitch-700'
-              }`}
+              className="relative inline-flex h-6 w-11 items-center rounded-full transition-colors duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500 min-h-[44px] py-1"
             >
               <span
                 className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform duration-200 ${
@@ -190,14 +193,14 @@ export default function FilterBar({
         </div>
       </div>
 
-      {/* ---- Row 3: League Selector & Watchlist Tab ---- */}
-      <div className="flex items-center gap-1.5 flex-wrap pt-1" role="navigation" aria-label="Filter by league or watchlist">
+      {/* ---- Row 3: League Selector & Watchlist Tab (horizontal scroll on mobile) ---- */}
+      <div className="flex overflow-x-auto no-scrollbar items-center gap-1.5 py-1 touch-pan-x" role="navigation" aria-label="Filter by league or watchlist">
         {/* Watchlist Tab */}
         <button
           type="button"
           onClick={onToggleWatchlistTab}
           aria-pressed={showWatchlistOnly}
-          className={`min-h-[38px] px-3 py-1.5 text-xs font-semibold rounded-lg transition-all border flex items-center gap-1.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500 ${
+          className={`flex-shrink-0 min-h-[40px] px-3 py-2 text-xs font-semibold rounded-xl transition-all border flex items-center gap-1.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500 ${
             showWatchlistOnly
               ? 'bg-amber-500 text-pitch-950 border-amber-500 shadow'
               : 'bg-pitch-900 text-amber-400 border-amber-500/40 hover:bg-amber-500/10'
@@ -206,7 +209,7 @@ export default function FilterBar({
           <span>⭐</span>
           <span>Watchlist</span>
           {watchlistCount > 0 && (
-            <span className={`px-1.5 py-0.2 rounded-full text-[10px] font-bold ${
+            <span className={`px-1.5 py-0.5 rounded-full text-[10px] font-bold ${
               showWatchlistOnly ? 'bg-pitch-950 text-amber-300' : 'bg-amber-500/20 text-amber-300'
             }`}>
               {watchlistCount}
@@ -224,7 +227,7 @@ export default function FilterBar({
               id={`filter-${league.id}`}
               onClick={() => onLeagueChange(league.id)}
               aria-pressed={isActive}
-              className={`min-h-[38px] px-3 py-1.5 text-xs font-medium rounded-lg transition-all border focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500 ${
+              className={`flex-shrink-0 min-h-[40px] px-3 py-2 text-xs font-medium rounded-xl transition-all border focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500 ${
                 isActive
                   ? 'bg-amber-500 text-pitch-950 border-amber-500 font-semibold'
                   : 'bg-pitch-900 text-slate-400 border-pitch-700 hover:border-slate-500 hover:text-slate-200'

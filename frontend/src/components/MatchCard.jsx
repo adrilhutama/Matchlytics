@@ -23,19 +23,19 @@ import {
 
 function TeamLogo({ src, name }) {
   return (
-    <div className="w-12 h-12 flex-shrink-0 flex items-center justify-center">
+    <div className="w-7 h-7 sm:w-8 sm:h-8 flex-shrink-0 flex items-center justify-center">
       {src ? (
         <img
           src={src}
           alt={`${name} crest`}
-          width={48}
-          height={48}
+          width={32}
+          height={32}
           className="w-full h-full object-contain drop-shadow"
           loading="lazy"
           onError={(e) => { e.currentTarget.style.display = 'none' }}
         />
       ) : (
-        <div className="w-10 h-10 rounded-full bg-pitch-700 flex items-center justify-center text-sm font-bold text-slate-300">
+        <div className="w-6 h-6 sm:w-7 sm:h-7 rounded-full bg-pitch-700 flex items-center justify-center text-xs font-bold text-slate-300">
           {name?.[0] ?? '?'}
         </div>
       )}
@@ -105,7 +105,7 @@ export default function MatchCard({
 
   return (
     <article
-      className={`match-card ${isValue ? 'match-card--value' : ''} p-5 animate-slide-up flex flex-col justify-between`}
+      className={`match-card ${isValue ? 'match-card--value' : ''} p-3.5 sm:p-5 animate-slide-up flex flex-col justify-between`}
       style={style}
       aria-label={`${home_team_name} vs ${away_team_name}, ${dateStr}`}
     >
@@ -185,7 +185,7 @@ export default function MatchCard({
           {/* Home */}
           <div className="flex flex-col items-center gap-1.5 flex-1 text-center min-w-0">
             <TeamLogo src={home_team_logo} name={home_team_name} />
-            <span className="text-sm font-semibold text-slate-200 line-clamp-2 leading-tight">
+            <span className="text-xs sm:text-sm font-semibold text-slate-200 line-clamp-2 leading-tight max-w-[130px] sm:max-w-none">
               {home_team_name}
             </span>
             {homeStandings?.form && (
@@ -218,7 +218,7 @@ export default function MatchCard({
           {/* Away */}
           <div className="flex flex-col items-center gap-1.5 flex-1 text-center min-w-0">
             <TeamLogo src={away_team_logo} name={away_team_name} />
-            <span className="text-sm font-semibold text-slate-200 line-clamp-2 leading-tight">
+            <span className="text-xs sm:text-sm font-semibold text-slate-200 line-clamp-2 leading-tight max-w-[130px] sm:max-w-none">
               {away_team_name}
             </span>
             {awayStandings?.form && (
@@ -288,7 +288,7 @@ export default function MatchCard({
           <button
             type="button"
             onClick={() => onOpenMatrix(fixture)}
-            className="py-2.5 px-3 min-h-[44px] rounded-xl bg-pitch-900 hover:bg-pitch-700 text-slate-300 hover:text-amber-400 border border-pitch-700 font-medium text-xs flex items-center justify-center gap-1.5 transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500"
+            className="py-2.5 px-3 min-h-[44px] rounded-xl bg-pitch-900 hover:bg-pitch-700 text-slate-300 hover:text-amber-400 border border-pitch-700 font-medium text-xs flex items-center justify-center gap-1.5 transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500 w-full"
           >
             <span aria-hidden="true">📊</span>
             <span>Score Matrix</span>
@@ -297,7 +297,7 @@ export default function MatchCard({
           <button
             type="button"
             onClick={() => onOpenQuantModal && onOpenQuantModal(fixture)}
-            className="py-2.5 px-3 min-h-[44px] rounded-xl bg-pitch-900 hover:bg-pitch-700 text-slate-300 hover:text-amber-400 border border-pitch-700 font-medium text-xs flex items-center justify-center gap-1.5 transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500"
+            className="py-2.5 px-3 min-h-[44px] rounded-xl bg-pitch-900 hover:bg-pitch-700 text-slate-300 hover:text-amber-400 border border-pitch-700 font-medium text-xs flex items-center justify-center gap-1.5 transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500 w-full"
           >
             <span aria-hidden="true">🧮</span>
             <span>Quant & Kelly</span>

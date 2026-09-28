@@ -54,7 +54,7 @@ export default function ScoreMatrixModal({ fixture, isOpen, onClose, standingsMa
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-pitch-950/80 backdrop-blur-sm animate-fade-in"
+      className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-2 sm:p-4 bg-pitch-950/80 backdrop-blur-sm animate-fade-in"
       role="dialog"
       aria-modal="true"
       aria-labelledby="matrix-modal-title"
@@ -62,9 +62,12 @@ export default function ScoreMatrixModal({ fixture, isOpen, onClose, standingsMa
     >
       <div
         ref={modalRef}
-        className="relative w-full max-w-2xl bg-pitch-900 border border-pitch-700 rounded-2xl p-4 sm:p-6 shadow-2xl overflow-y-auto max-h-[92vh]"
+        className="relative w-full max-w-2xl bg-pitch-900 border-t sm:border border-pitch-700 rounded-t-2xl sm:rounded-2xl p-3 sm:p-6 shadow-2xl overflow-y-auto max-h-[90vh]"
+        style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}
         onClick={(e) => e.stopPropagation()}
       >
+        {/* Mobile drag handle */}
+        <div className="w-10 h-1 bg-slate-600 rounded-full mx-auto mb-2 sm:hidden" aria-hidden="true" />
         {/* Close Button */}
         <button
           type="button"
@@ -131,21 +134,22 @@ export default function ScoreMatrixModal({ fixture, isOpen, onClose, standingsMa
         </div>
 
         {/* Heatmap Grid */}
-        <div className="overflow-x-auto pb-2 mb-5">
-          <div className="min-w-[360px]">
+        <div className="overflow-x-auto no-scrollbar pb-2 mb-5 touch-pan-x">
+          <div className="min-w-[360px] max-sm:min-w-full">
             {/* Column Label: Home Goals */}
-            <div className="text-center text-xs font-semibold text-sky-400 mb-2">
+            <div className="text-center text-xs font-semibold text-sky-400 mb-1">
               ← {home_team_name} (Home Goals) →
             </div>
+            <p className="text-center text-[10px] text-slate-600 mb-2 sm:hidden">Swipe to scroll all goal counts →</p>
 
             <table className="w-full text-center border-collapse">
               <thead>
                 <tr>
-                  <th className="text-[11px] font-medium text-slate-500 p-1.5 w-16 text-left">
+                  <th className="text-[11px] font-medium text-slate-500 px-1 py-0.5 sm:px-1.5 sm:py-1 w-12 sm:w-16 text-left">
                     Away ↓
                   </th>
                   {[0, 1, 2, 3, 4, 5].map((h) => (
-                    <th key={h} className="text-xs font-bold text-slate-300 p-1.5 bg-pitch-950/60 rounded-t border-b border-pitch-800">
+                    <th key={h} className="text-xs font-bold text-slate-300 px-1 py-0.5 sm:px-1.5 sm:py-1 bg-pitch-950/60 rounded-t border-b border-pitch-800">
                       {h}
                     </th>
                   ))}
@@ -154,7 +158,7 @@ export default function ScoreMatrixModal({ fixture, isOpen, onClose, standingsMa
               <tbody>
                 {matrix.map((row, awayGoals) => (
                   <tr key={awayGoals}>
-                    <th className="text-xs font-bold text-rose-400 p-1.5 text-left bg-pitch-950/60 rounded-l border-r border-pitch-800">
+                    <th className="text-xs font-bold text-rose-400 px-1 py-0.5 sm:px-1.5 sm:py-1 text-left bg-pitch-950/60 rounded-l border-r border-pitch-800">
                       {awayGoals}
                     </th>
                     {row.map((cell) => {
@@ -166,7 +170,7 @@ export default function ScoreMatrixModal({ fixture, isOpen, onClose, standingsMa
                       return (
                         <td
                           key={cell.home}
-                          className={`p-1 relative transition-all duration-150 ${
+                          className={`px-0.5 py-0.5 sm:px-1 sm:py-1 relative transition-all duration-150 min-w-[42px] sm:min-w-[50px] ${
                             isTop || isPredicted
                               ? 'ring-2 ring-amber-400/80 rounded z-10'
                               : 'hover:ring-1 hover:ring-slate-400/50'
@@ -176,11 +180,11 @@ export default function ScoreMatrixModal({ fixture, isOpen, onClose, standingsMa
                           }}
                           title={`${home_team_name} ${cell.home} - ${cell.away} ${away_team_name}: ${cell.prob.toFixed(2)}%`}
                         >
-                          <div className="py-1.5 px-0.5 rounded flex flex-col items-center justify-center">
-                            <span className="text-[11px] font-mono font-medium text-slate-300">
+                          <div className="py-1 px-0.5 rounded flex flex-col items-center justify-center">
+                            <span className="text-[10px] sm:text-[11px] font-mono font-medium text-slate-300 leading-none">
                               {cell.home}-{cell.away}
                             </span>
-                            <span className={`text-[10px] font-mono font-bold ${
+                            <span className={`text-[9px] sm:text-[10px] font-mono font-bold mt-0.5 leading-none ${
                               ratio > 0.6 ? 'text-amber-200' : 'text-slate-400'
                             }`}>
                               {cell.prob.toFixed(1)}%

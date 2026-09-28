@@ -71,7 +71,10 @@ export default function ParlaySlipDrawer({
   return (
     <>
       {/* Floating Trigger Pill (always visible on bottom right when items exist) */}
-      <div className="fixed bottom-4 right-4 z-40">
+      <div
+        className="fixed right-4 bottom-4 sm:right-6 sm:bottom-6 z-40"
+        style={{ marginBottom: 'env(safe-area-inset-bottom)' }}
+      >
         <button
           type="button"
           onClick={onToggleOpen}
@@ -97,9 +100,12 @@ export default function ParlaySlipDrawer({
         >
           <div
             id="parlay-drawer"
-            className="w-full sm:max-w-md bg-pitch-900 border-t sm:border border-pitch-700 rounded-t-2xl sm:rounded-2xl p-5 shadow-2xl overflow-y-auto max-h-[85vh] text-slate-200"
+            className="w-full sm:max-w-md bg-pitch-900 border-t sm:border border-pitch-700 rounded-t-2xl sm:rounded-2xl shadow-2xl overflow-y-auto max-h-[85vh] text-slate-200 px-4 pt-1 sm:p-5"
+            style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}
             onClick={(e) => e.stopPropagation()}
           >
+            {/* Mobile drag handle */}
+            <div className="w-10 h-1 bg-slate-600 rounded-full mx-auto my-2 sm:hidden" aria-hidden="true" />
             {/* Header */}
             <div className="flex items-center justify-between pb-3 border-b border-pitch-800">
               <div className="flex items-center gap-2">
