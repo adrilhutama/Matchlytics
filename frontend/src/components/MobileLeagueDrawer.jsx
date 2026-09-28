@@ -21,7 +21,7 @@ export default function MobileLeagueDrawer({
       />
       {/* Sheet */}
       <div
-        className="fixed inset-x-0 bottom-0 z-50 bg-pitch-900 border-t border-pitch-700 rounded-t-2xl p-4 pb-6 max-h-[70vh] overflow-y-auto"
+        className="fixed inset-x-0 bottom-0 z-50 w-full bg-pitch-900 border-t border-pitch-700 rounded-t-3xl shadow-2xl overflow-y-auto max-h-[70vh] px-4 pb-6 pt-2"
         style={{ paddingBottom: 'calc(env(safe-area-inset-bottom) + 24px)' }}
         role="dialog"
         aria-modal="true"

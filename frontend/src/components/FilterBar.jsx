@@ -139,7 +139,7 @@ export default function FilterBar({
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pt-1 border-t border-pitch-800/80">
         {/* Date Range Pills */}
         <div
-          className="flex overflow-x-auto no-scrollbar py-1 gap-1.5 touch-pan-x"
+          className="flex items-center gap-1.5 overflow-x-auto no-scrollbar flex-nowrap w-full py-1 touch-pan-x"
           role="group"
           aria-label="Filter by date range"
         >

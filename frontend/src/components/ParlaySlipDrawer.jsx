@@ -70,11 +70,8 @@ export default function ParlaySlipDrawer({
 
   return (
     <>
-      {/* Floating Trigger Pill (always visible on bottom right when items exist) */}
-      <div
-        className="fixed right-4 bottom-4 sm:right-6 sm:bottom-6 z-40"
-        style={{ marginBottom: 'env(safe-area-inset-bottom)' }}
-      >
+      {/* Floating Trigger Pill — desktop only (mobile gets the bottom-nav Slip tab) */}
+      <div className="hidden lg:flex fixed bottom-6 right-6 z-40">
         <button
           type="button"
           onClick={onToggleOpen}
@@ -100,7 +97,7 @@ export default function ParlaySlipDrawer({
         >
           <div
             id="parlay-drawer"
-            className="w-full sm:max-w-md bg-pitch-900 border-t sm:border border-pitch-700 rounded-t-2xl sm:rounded-2xl shadow-2xl overflow-y-auto max-h-[85vh] text-slate-200 px-4 pt-1 sm:p-5"
+            className="w-full bg-pitch-900 border-t border-pitch-700 rounded-t-3xl shadow-2xl overflow-y-auto max-h-[85vh] text-slate-200 px-4 pt-1 pb-6"
             style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}
             onClick={(e) => e.stopPropagation()}
           >
