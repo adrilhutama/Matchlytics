@@ -320,6 +320,5 @@ export default function CompactTableView({
           </tbody>
         </table>
       </div>
-    </div>
   )
 }

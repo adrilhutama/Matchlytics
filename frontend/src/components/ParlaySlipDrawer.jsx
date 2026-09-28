@@ -70,7 +70,7 @@ export default function ParlaySlipDrawer({
 
   return (
     <>
-      {/* Floating Trigger Pill — desktop only (mobile gets the bottom-nav Slip tab) */}
+      {/* Floating Trigger Pill, desktop only (mobile gets the bottom-nav Slip tab) */}
       <div className="hidden lg:flex fixed bottom-6 right-6 z-40">
         <button
           type="button"
