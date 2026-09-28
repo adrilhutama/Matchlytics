@@ -316,7 +316,7 @@ export default function App() {
   }, [])
 
   return (
-    <div className="min-h-screen bg-pitch-900 text-slate-100 flex overflow-x-hidden">
+    <div className="w-full min-h-screen bg-pitch-900 text-slate-100 flex overflow-x-hidden">
       {/* ─── Desktop Left Sidebar ────────────────────────────── */}
       <Sidebar
         activeFeed={activeFeed}
@@ -389,7 +389,7 @@ export default function App() {
           </div>
         )}
 
-        <main className="max-w-7xl mx-auto px-2 sm:px-4 lg:px-6 py-3 flex-1 w-full min-w-0" id="main-content">
+        <main className="w-full px-2 sm:px-4 lg:px-6 py-2 min-w-0" id="main-content">
           {loading ? (
             <LoadingState />
           ) : error ? (

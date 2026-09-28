@@ -36,9 +36,9 @@ export default function FilterBar({
   onViewModeChange,
 }) {
   return (
-    <div className="space-y-3">
+    <div className="space-y-2">
       {/* ---- Row 1: Search, Sort & View Mode ---- */}
-      <div className="flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3">
+      <div className="flex items-center gap-2 flex-wrap">
         {/* Search Bar */}
         <div className="relative flex-1 min-w-0">
           <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-500">
@@ -53,7 +53,7 @@ export default function FilterBar({
             onChange={(e) => onSearchChange(e.target.value)}
             placeholder="Search team or league..."
             aria-label="Search fixtures by team or league"
-            className="w-full pl-10 pr-9 py-2.5 min-h-[44px] rounded-xl bg-pitch-900 border border-pitch-700 text-sm text-slate-100 placeholder-slate-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500 focus-visible:border-transparent transition-all"
+            className="w-full pl-10 pr-9 py-1.5 min-h-[40px] rounded-xl bg-pitch-900 border border-pitch-700 text-xs text-slate-100 placeholder-slate-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500 focus-visible:border-transparent transition-all"
           />
           {searchQuery && (
             <button
@@ -71,16 +71,16 @@ export default function FilterBar({
         </div>
 
         {/* Controls Cluster: Sort + View Mode */}
-        {/* Stacks vertically on small screens, row on sm+ */}
-        <div className="flex items-center gap-2 flex-wrap">
+        {/* One compact row; sort stretches, toggle stays fixed */}
+        <div className="flex items-center gap-2 w-full sm:w-auto">
           {/* Sorting Dropdown */}
-          <div className="flex-1 sm:flex-initial">
+          <div className="flex-1 min-w-0 sm:flex-initial">
             <label htmlFor="sort-dropdown" className="sr-only">Sort matches</label>
             <select
               id="sort-dropdown"
               value={sortOption}
               onChange={(e) => onSortChange(e.target.value)}
-              className="w-full sm:w-auto min-h-[44px] px-3 py-2 rounded-xl bg-pitch-900 border border-pitch-700 text-xs font-medium text-slate-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500"
+              className="w-full min-h-[40px] px-2.5 py-1.5 rounded-xl bg-pitch-900 border border-pitch-700 text-xs font-medium text-slate-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500"
             >
               {SORT_OPTIONS.map((opt) => (
                 <option key={opt.id} value={opt.id} className="bg-pitch-900 text-slate-200">

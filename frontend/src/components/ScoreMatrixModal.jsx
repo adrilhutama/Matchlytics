@@ -62,7 +62,7 @@ export default function ScoreMatrixModal({ fixture, isOpen, onClose, standingsMa
     >
       <div
         ref={modalRef}
-        className="relative w-full max-w-2xl bg-pitch-900 border-t sm:border border-pitch-700 rounded-t-2xl sm:rounded-2xl p-3 sm:p-6 shadow-2xl overflow-y-auto max-h-[90vh]"
+        className="relative w-full bg-pitch-900 border-t border-pitch-700 rounded-t-3xl p-4 shadow-2xl overflow-y-auto max-h-[90vh]"
         style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}
         onClick={(e) => e.stopPropagation()}
       >
@@ -134,7 +134,7 @@ export default function ScoreMatrixModal({ fixture, isOpen, onClose, standingsMa
         </div>
 
         {/* Heatmap Grid */}
-        <div className="overflow-x-auto no-scrollbar pb-2 mb-5 touch-pan-x">
+        <div className="w-full overflow-x-auto touch-pan-x py-2 mb-5 no-scrollbar">
           <div className="min-w-[360px] max-sm:min-w-full">
             {/* Column Label: Home Goals */}
             <div className="text-center text-xs font-semibold text-sky-400 mb-1">
@@ -170,7 +170,7 @@ export default function ScoreMatrixModal({ fixture, isOpen, onClose, standingsMa
                       return (
                         <td
                           key={cell.home}
-                          className={`px-0.5 py-0.5 sm:px-1 sm:py-1 relative transition-all duration-150 min-w-[42px] sm:min-w-[50px] ${
+                          className={`px-0.5 py-0.5 sm:px-1 sm:py-1 relative transition-all duration-150 min-w-[32px] sm:min-w-[42px] w-8 h-8 sm:w-10 sm:h-10 ${
                             isTop || isPredicted
                               ? 'ring-2 ring-amber-400/80 rounded z-10'
                               : 'hover:ring-1 hover:ring-slate-400/50'
