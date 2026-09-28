@@ -194,7 +194,8 @@ export default function FilterBar({
       </div>
 
       {/* ---- Row 3: League Selector & Watchlist Tab (horizontal scroll on mobile) ---- */}
-      <div className="flex overflow-x-auto no-scrollbar items-center gap-1.5 py-1 touch-pan-x" role="navigation" aria-label="Filter by league or watchlist">
+      {/* Hidden on desktop (lg+) because league selection lives in the Left Sidebar */}
+      <div className="hidden lg:flex overflow-x-auto no-scrollbar items-center gap-1.5 py-1 touch-pan-x" role="navigation" aria-label="Filter by league or watchlist">
         {/* Watchlist Tab */}
         <button
           type="button"

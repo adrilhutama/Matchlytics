@@ -1,14 +1,14 @@
 // ---- App.jsx ----
-// Main dashboard orchestrator:
-// - Granular date range filtering (Today, Next 3 Days, Weekend, 30 Days)
-// - Real-time diacritic-insensitive search
-// - LocalStorage-backed Watchlist bookmarking
-// - Dual View Modes (Detailed Cards vs Compact Table)
-// - Interactive Poisson Score Matrix (6x6 Heatmap) modal
-// - Quantitative Risk Engine & Kelly Criterion modal
-// - Multi-Match Parlay/Acca Slip Builder with Copyable Summary
-// - Supabase Realtime channel subscription with debounced live updates
-// - Full mobile-first responsive layout (360px up to 4K displays)
+// Main dashboard orchestrator, modern SaaS layout:
+// - Left Sidebar  (desktop/laptop, lg+)       : branding, feeds, leagues, status
+// - Top Filter Bar (scrolls with main content): search, date range, sort, view mode
+// - Mobile Bottom Nav (below lg)              : Matches / +EV / Leagues / Watchlist / Slip
+// - Mobile League Drawer                      : slide-up sheet triggered from nav
+//
+// Data sources
+// - Supabase realtime channel debounced at 1500 ms
+// - LocalStorage-backed watchlist & parlay slip
+// - Date-range, league, value-only, search, sort, and view-mode filters all applied client-side
 
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react'
 import { supabase } from './lib/supabase'
@@ -22,6 +22,9 @@ import ParlaySlipDrawer from './components/ParlaySlipDrawer'
 import LoadingState from './components/LoadingState'
 import EmptyState from './components/EmptyState'
 import ErrorState from './components/ErrorState'
+import Sidebar from './components/Sidebar'
+import MobileNav from './components/MobileNav'
+import MobileLeagueDrawer from './components/MobileLeagueDrawer'
 import {
   isDateInRange,
   matchesSearch,
@@ -32,7 +35,7 @@ import {
   saveParlaySlip,
 } from './utils/analytics'
 
-// ---- League metadata ----------------------------------------
+// ---- League metadata (also imported by Sidebar when needed) --------
 export const LEAGUES = [
   { id: 'all',  label: 'All Leagues',            country: null },
   { id: 2021,   label: 'Premier League',         country: 'England' },
@@ -42,6 +45,8 @@ export const LEAGUES = [
   { id: 2015,   label: 'Ligue 1',                country: 'France' },
   { id: 2001,   label: 'UEFA Champions League',  country: 'Europe' },
 ]
+
+const LEAGUE_IDS = LEAGUES.filter((l) => l.id !== 'all').map((l) => l.id)
 
 const DAYS_AHEAD = 30
 
@@ -55,6 +60,12 @@ function buildDateRange() {
   }
 }
 
+// Feed type maps cleanly onto existing filter booleans:
+//   'all'        -> no extra filters
+//   'value'      -> valueOnly = true
+//   'watchlist'  -> showWatchlistOnly = true
+//   'matches'    -> same as 'all' (kept for mobile-nav consistency)
+
 export default function App() {
   const [fixtures,            setFixtures]            = useState([])
   const [standingsMap,        setStandingsMap]        = useState({})
@@ -63,7 +74,8 @@ export default function App() {
   const [lastUpdated,         setLastUpdated]         = useState(null)
   const [realtimeToast,       setRealtimeToast]       = useState(false)
 
-  // Filter & Navigation states
+  // Navigation state
+  const [activeFeed,          setActiveFeed]          = useState('all')
   const [activeLeague,        setActiveLeague]        = useState('all')
   const [showWatchlistOnly,   setShowWatchlistOnly]   = useState(false)
   const [valueOnly,           setValueOnly]           = useState(false)
@@ -72,26 +84,53 @@ export default function App() {
   const [sortOption,          setSortOption]          = useState('kickoff_asc')
   const [viewMode,            setViewMode]            = useState('cards')
 
-  // Watchlist state (persisted in localStorage)
-  const [watchlist,           setWatchlist]           = useState(() => getWatchlist())
+  // Mobile-specific sheet state
+  const [isLeagueDrawerOpen,  setIsLeagueDrawerOpen]  = useState(false)
+  const [activeMobileTab,     setActiveMobileTab]     = useState('matches')
 
-  // Parlay Slip state (persisted in localStorage)
+  // Persistence-backed lists
+  const [watchlist,           setWatchlist]           = useState(() => getWatchlist())
   const [parlaySlip,          setParlaySlip]          = useState(() => getParlaySlip())
   const [isSlipDrawerOpen,    setIsSlipDrawerOpen]    = useState(false)
 
-  // Modal fixture states
+  // Modal fixtures
   const [selectedMatrixFixture, setSelectedMatrixFixture] = useState(null)
   const [selectedQuantFixture,  setSelectedQuantFixture]  = useState(null)
 
-  // Debounce timer reference for realtime events
   const debounceTimerRef = useRef(null)
 
-  // Watchlist toggle handler
+  // Keep activeFeed in sync when user interacts with top-level toggles
+  const handleFeedSelect = useCallback((feed) => {
+    setActiveFeed(feed)
+    if (feed === 'value')       { setValueOnly(true);            setShowWatchlistOnly(false) }
+    else if (feed === 'watchlist') { setValueOnly(false); setShowWatchlistOnly(true)  }
+    else                        { setValueOnly(false); setShowWatchlistOnly(false)  }
+  }, [])
+
+  const handleToggleValueOnly = useCallback(() => {
+    setValueOnly((prev) => {
+      const next = !prev
+      setActiveFeed(next ? 'value' : 'all')
+      setShowWatchlistOnly(false)
+      return next
+    })
+  }, [])
+
+  const handleToggleWatchlistFeed = useCallback(() => {
+    setShowWatchlistOnly((prev) => {
+      const next = !prev
+      setActiveFeed(next ? 'watchlist' : 'all')
+      setValueOnly(false)
+      return next
+    })
+  }, [])
+
+  // Watchlist toggle per-match star
   const handleToggleWatchlist = useCallback((fixtureId) => {
     setWatchlist((prev) => toggleWatchlistItem(prev, fixtureId))
   }, [])
 
-  // Parlay slip handlers
+  // Parlay-slip handlers
   const handleToggleSlip = useCallback((leg) => {
     setParlaySlip((prev) => {
       const existsIndex = prev.findIndex(
@@ -134,8 +173,8 @@ export default function App() {
       if (!stErr && data) {
         const map = {}
         data.forEach((row) => {
-          if (row.id) map[row.id] = row
-          if (row.team_id) map[row.team_id] = row
+          if (row.id) map[String(row.id)] = row
+          if (row.team_id) map[String(row.team_id)] = row
         })
         setStandingsMap(map)
       }
@@ -183,17 +222,9 @@ export default function App() {
       .channel('matchlytics-realtime-feed')
       .on(
         'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'fixtures',
-        },
+        { event: '*', schema: 'public', table: 'fixtures' },
         () => {
-          // Debounce rapid sync updates (e.g. 1500ms delay)
-          if (debounceTimerRef.current) {
-            clearTimeout(debounceTimerRef.current)
-          }
-
+          if (debounceTimerRef.current) clearTimeout(debounceTimerRef.current)
           debounceTimerRef.current = setTimeout(() => {
             fetchFixtures(true)
             fetchStandings()
@@ -204,11 +235,7 @@ export default function App() {
       )
       .on(
         'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'team_standings',
-        },
+        { event: '*', schema: 'public', table: 'team_standings' },
         () => {
           fetchStandings()
         }
@@ -216,9 +243,7 @@ export default function App() {
       .subscribe()
 
     return () => {
-      if (debounceTimerRef.current) {
-        clearTimeout(debounceTimerRef.current)
-      }
+      if (debounceTimerRef.current) clearTimeout(debounceTimerRef.current)
       supabase.removeChannel(channel)
     }
   }, [fetchFixtures])
@@ -227,29 +252,24 @@ export default function App() {
   const displayedFixtures = useMemo(() => {
     let result = fixtures
 
-    // 1. Watchlist tab filter
     if (showWatchlistOnly) {
       result = result.filter((f) => watchlist.includes(f.id))
     } else if (activeLeague !== 'all') {
       result = result.filter((f) => f.league_id === activeLeague)
     }
 
-    // 2. Value bet (+EV) only filter
     if (valueOnly) {
       result = result.filter((f) => Boolean(f.value_pick))
     }
 
-    // 3. Granular date range filter
     if (dateRange !== 'all') {
       result = result.filter((f) => isDateInRange(f.match_date, dateRange))
     }
 
-    // 4. Diacritic-insensitive search
     if (searchQuery.trim()) {
       result = result.filter((f) => matchesSearch(f, searchQuery))
     }
 
-    // 5. Multi-criteria sorting
     return sortFixtures(result, sortOption)
   }, [fixtures, activeLeague, showWatchlistOnly, watchlist, valueOnly, dateRange, searchQuery, sortOption])
 
@@ -266,129 +286,230 @@ export default function App() {
   const currentLeagueLabel = LEAGUES.find((l) => l.id === activeLeague)?.label
   const currentDateRangeLabel = DATE_RANGES.find((r) => r.id === dateRange)?.label
 
+  const valueCount = fixtures.filter((f) => Boolean(f.value_pick)).length
+
+  // Map activeFeed back to the three boolean toggles used by the rest of the app
+  useEffect(() => {
+    if (activeFeed === 'value') {
+      setValueOnly(true)
+      setShowWatchlistOnly(false)
+    } else if (activeFeed === 'watchlist') {
+      setValueOnly(false)
+      setShowWatchlistOnly(true)
+    } else {
+      setValueOnly(false)
+      setShowWatchlistOnly(false)
+    }
+  }, [activeFeed])
+
+  const handleLeagueChangeFromSidebar = useCallback((id) => {
+    setActiveLeague(id)
+    setShowWatchlistOnly(false)
+    setActiveFeed(id === 'all' ? 'all' : 'matches')
+  }, [])
+
+  const handleMobileTab = useCallback((tab) => {
+    setActiveMobileTab(tab)
+    if (tab === 'value')        { setValueOnly(true);  setShowWatchlistOnly(false) }
+    else if (tab === 'watchlist') { setValueOnly(false); setShowWatchlistOnly(true)  }
+    else                        { setValueOnly(false); setShowWatchlistOnly(false) }
+  }, [])
+
   return (
-    <div className="min-h-dvh bg-pitch-950 flex flex-col text-slate-200">
-      {/* Header */}
-      <Header lastUpdated={lastUpdated} />
+    <div className="min-h-screen bg-pitch-900 text-slate-100 flex overflow-x-hidden">
+      {/* ─── Desktop Left Sidebar ────────────────────────────── */}
+      <Sidebar
+        activeFeed={activeFeed}
+        onFeedSelect={handleFeedSelect}
+        leagues={LEAGUES.filter((l) => l.id !== 'all')}
+        activeLeague={activeLeague}
+        onLeagueChange={handleLeagueChangeFromSidebar}
+        valueCount={valueCount}
+        watchlistCount={watchlist.length}
+        lastUpdated={lastUpdated}
+      />
 
-      {/* Realtime Toast Notification */}
-      {realtimeToast && (
-        <div
-          role="status"
-          aria-live="polite"
-          className="fixed top-20 right-4 sm:right-6 z-50 px-4 py-2.5 rounded-xl bg-pitch-900/95 border border-emerald-500/50 text-emerald-300 text-xs font-semibold shadow-2xl flex items-center gap-2.5 animate-slide-up backdrop-blur"
-        >
-          <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping" />
-          <span>Data refreshed in real-time</span>
-        </div>
-      )}
-
-      {/* Sticky glassmorphism Filter Bar */}
-      <div className="sticky top-0 z-20 glass-filter">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 py-3">
-          <FilterBar
-            searchQuery={searchQuery}
-            onSearchChange={setSearchQuery}
-            dateRange={dateRange}
-            onDateRangeChange={setDateRange}
-            leagues={LEAGUES}
-            activeLeague={activeLeague}
-            onLeagueChange={(id) => {
-              setActiveLeague(id)
-              setShowWatchlistOnly(false)
-            }}
-            watchlistCount={watchlist.length}
-            showWatchlistOnly={showWatchlistOnly}
-            onToggleWatchlistTab={() => setShowWatchlistOnly(!showWatchlistOnly)}
-            valueOnly={valueOnly}
-            onValueOnlyChange={setValueOnly}
-            sortOption={sortOption}
-            onSortChange={setSortOption}
-            viewMode={viewMode}
-            onViewModeChange={setViewMode}
+      {/* ─── Main Content Area ──────────────────────────────── */}
+      <div className="flex-1 lg:pl-64 flex flex-col min-w-0 pb-20 lg:pb-8">
+        {/* Mobile top brand bar (visible below lg) */}
+        <div className="lg:hidden sticky top-0 z-20 bg-pitch-950/90 backdrop-blur-md border-b border-pitch-800 px-4 py-3 flex items-center gap-2.5">
+          <span
+            className="inline-block w-7 h-7 rounded-md bg-amber-500 flex-shrink-0"
+            aria-hidden="true"
+            style={{ clipPath: 'polygon(50% 0%, 100% 50%, 50% 100%, 0% 50%)' }}
           />
+          <h1 className="text-sm font-bold text-slate-100 tracking-tight">Matchlytics</h1>
+          <span className="ml-auto inline-flex items-center gap-1.5 text-[11px] text-emerald-400 font-mono">
+            <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" aria-hidden="true" />
+            Live
+          </span>
         </div>
+
+        {/* Sticky glassmorphism Filter Bar */}
+        <div className="sticky top-0 z-10 glass-filter">
+          <div className="max-w-7xl mx-auto px-3 sm:px-6 py-3">
+            <FilterBar
+              searchQuery={searchQuery}
+              onSearchChange={setSearchQuery}
+              dateRange={dateRange}
+              onDateRangeChange={setDateRange}
+              leagues={LEAGUES}   // passed through; hidden on desktop via CSS/media if needed
+              activeLeague={activeLeague}
+              onLeagueChange={(id) => {
+                setActiveLeague(id)
+                setShowWatchlistOnly(false)
+              }}
+              watchlistCount={watchlist.length}
+              showWatchlistOnly={showWatchlistOnly}
+              onToggleWatchlistTab={() => setShowWatchlistOnly((p) => !p)}
+              valueOnly={valueOnly}
+              onValueOnlyChange={(v) => {
+                setValueOnly(v)
+                if (v) setActiveFeed('value')
+                else if (showWatchlistOnly) setActiveFeed('watchlist')
+                else setActiveFeed('all')
+              }}
+              sortOption={sortOption}
+              onSortChange={setSortOption}
+              viewMode={viewMode}
+              onViewModeChange={setViewMode}
+            />
+          </div>
+        </div>
+
+        {/* Realtime Toast Notification */}
+        {realtimeToast && (
+          <div
+            role="status"
+            aria-live="polite"
+            className="fixed top-20 right-3 sm:right-6 z-50 px-4 py-2.5 rounded-xl bg-pitch-900/95 border border-emerald-500/50 text-emerald-300 text-xs font-semibold shadow-2xl flex items-center gap-2.5 animate-slide-up backdrop-blur"
+          >
+            <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping" aria-hidden="true" />
+            <span>Data refreshed in real-time</span>
+          </div>
+        )}
+
+        <main className="max-w-7xl mx-auto px-3 sm:px-6 py-4 flex-1 w-full" id="main-content">
+          {loading ? (
+            <LoadingState />
+          ) : error ? (
+            <ErrorState message={error} onRetry={fetchFixtures} />
+          ) : displayedFixtures.length === 0 ? (
+            <EmptyState
+              leagueLabel={currentLeagueLabel}
+              valueOnly={valueOnly}
+              dateRangeLabel={currentDateRangeLabel}
+              searchQuery={searchQuery}
+              isWatchlist={showWatchlistOnly}
+              onClearFilters={handleClearFilters}
+            />
+          ) : (
+            <section aria-label="Match fixtures feed">
+              {/* Feed metadata bar */}
+              <div className="flex flex-wrap items-center justify-between gap-2 mb-4 text-xs text-slate-400">
+                <p>
+                  Showing{' '}
+                  <strong className="text-amber-400 font-mono">
+                    {displayedFixtures.length}
+                  </strong>{' '}
+                  {displayedFixtures.length === 1 ? 'fixture' : 'fixtures'}
+                  {showWatchlistOnly
+                    ? ' in Watchlist'
+                    : activeLeague !== 'all'
+                    ? ` in ${currentLeagueLabel}`
+                    : ''}
+                  {dateRange !== 'all' ? ` (${currentDateRangeLabel})` : ''}
+                </p>
+                <div className="flex items-center gap-3">
+                  <span className="inline-flex items-center gap-1.5 text-[11px] text-emerald-400 font-mono">
+                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" aria-hidden="true" />
+                    Realtime Active
+                  </span>
+                  <span className="text-slate-500 hidden sm:inline font-mono">
+                    Odds: The Odds API (Bet365 / Pinnacle)
+                  </span>
+                </div>
+              </div>
+
+              {/* View Mode: Detailed Cards */}
+              {viewMode === 'cards' && (
+                <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3 sm:gap-4">
+                  {displayedFixtures.map((fixture, idx) => {
+                    const fixtureSlipPicks = parlaySlip
+                      .filter((l) => l.fixtureId === fixture.id)
+                      .map((l) => l.pick)
+
+                    return (
+                      <MatchCard
+                        key={fixture.id}
+                        fixture={fixture}
+                        isPinned={watchlist.includes(fixture.id)}
+                        onToggleWatchlist={handleToggleWatchlist}
+                        onOpenMatrix={setSelectedMatrixFixture}
+                        onOpenQuantModal={setSelectedQuantFixture}
+                        slipPicks={fixtureSlipPicks}
+                        onToggleSlip={handleToggleSlip}
+                        standingsMap={standingsMap}
+                        style={{ animationDelay: `${Math.min(idx * 30, 300)}ms` }}
+                      />
+                    )
+                  })}
+                </div>
+              )}
+
+              {/* View Mode: Compact Table */}
+              {viewMode === 'table' && (
+                <CompactTableView
+                  fixtures={displayedFixtures}
+                  watchlist={watchlist}
+                  onToggleWatchlist={handleToggleWatchlist}
+                  onOpenMatrix={setSelectedMatrixFixture}
+                  onOpenQuantModal={setSelectedQuantFixture}
+                  slipLegs={parlaySlip}
+                  onToggleSlip={handleToggleSlip}
+                  standingsMap={standingsMap}
+                />
+              )}
+            </section>
+          )}
+        </main>
+
+        {/* Footer */}
+        <footer className="max-w-7xl mx-auto px-4 sm:px-6 py-8 border-t border-pitch-800/80 w-full mt-auto">
+          <div className="flex flex-col sm:flex-row items-center justify-between gap-4 text-xs text-slate-500">
+            <p>
+              Matchlytics uses Poisson bivariate goal distribution modelling.
+              Probabilities are quantitative estimates, not guarantees.
+            </p>
+            <p className="text-slate-600 font-mono">
+              Bet Responsibly. 18+
+            </p>
+          </div>
+        </footer>
       </div>
 
-      {/* Main Content Area */}
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 py-6 flex-1 w-full" id="main-content">
-        {loading ? (
-          <LoadingState />
-        ) : error ? (
-          <ErrorState message={error} onRetry={fetchFixtures} />
-        ) : displayedFixtures.length === 0 ? (
-          <EmptyState
-            leagueLabel={currentLeagueLabel}
-            valueOnly={valueOnly}
-            dateRangeLabel={currentDateRangeLabel}
-            searchQuery={searchQuery}
-            isWatchlist={showWatchlistOnly}
-            onClearFilters={handleClearFilters}
-          />
-        ) : (
-          <section aria-label="Match fixtures feed">
-            {/* Feed metadata bar */}
-            <div className="flex flex-wrap items-center justify-between gap-2 mb-4 text-xs text-slate-400">
-              <p>
-                Showing <strong className="text-amber-400 font-mono">{displayedFixtures.length}</strong> {displayedFixtures.length === 1 ? 'fixture' : 'fixtures'}
-                {showWatchlistOnly ? ' in Watchlist' : activeLeague !== 'all' ? ` in ${currentLeagueLabel}` : ''}
-                {dateRange !== 'all' ? ` (${currentDateRangeLabel})` : ''}
-              </p>
-              <div className="flex items-center gap-3">
-                <span className="inline-flex items-center gap-1.5 text-[11px] text-emerald-400 font-mono">
-                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
-                  Realtime Active
-                </span>
-                <span className="text-slate-500 hidden sm:inline font-mono">
-                  Odds: The Odds API (Bet365 / Pinnacle)
-                </span>
-              </div>
-            </div>
+      {/* ─── Mobile Bottom Navigation Bar ─────────────────── */}
+      <MobileNav
+        activeTab={activeMobileTab}
+        onTabChange={handleMobileTab}
+        valueOnly={valueOnly}
+        onToggleValueOnly={handleToggleValueOnly}
+        watchlistCount={watchlist.length}
+        slipCount={parlaySlip.length}
+        onOpenLeagues={() => setIsLeagueDrawerOpen(true)}
+        onOpenSlip={() => setIsSlipDrawerOpen(true)}
+      />
 
-            {/* View Mode: Detailed Cards */}
-            {viewMode === 'cards' && (
-              <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4 sm:gap-5">
-                {displayedFixtures.map((fixture, idx) => {
-                  const fixtureSlipPicks = parlaySlip
-                    .filter((l) => l.fixtureId === fixture.id)
-                    .map((l) => l.pick)
+      {/* ─── Mobile League Sheet (below lg only) ─────────── */}
+      <MobileLeagueDrawer
+        leagues={LEAGUES.filter((l) => l.id !== 'all')}
+        activeLeague={activeLeague}
+        onSelect={handleLeagueChangeFromSidebar}
+        isOpen={isLeagueDrawerOpen}
+        onClose={() => setIsLeagueDrawerOpen(false)}
+      />
 
-                  return (
-                    <MatchCard
-                      key={fixture.id}
-                      fixture={fixture}
-                      isPinned={watchlist.includes(fixture.id)}
-                      onToggleWatchlist={handleToggleWatchlist}
-                      onOpenMatrix={setSelectedMatrixFixture}
-                      onOpenQuantModal={setSelectedQuantFixture}
-                      slipPicks={fixtureSlipPicks}
-                      onToggleSlip={handleToggleSlip}
-                      standingsMap={standingsMap}
-                      style={{ animationDelay: `${Math.min(idx * 30, 300)}ms` }}
-                    />
-                  )
-                })}
-              </div>
-            )}
-
-            {/* View Mode: Compact Table */}
-            {viewMode === 'table' && (
-              <CompactTableView
-                fixtures={displayedFixtures}
-                watchlist={watchlist}
-                onToggleWatchlist={handleToggleWatchlist}
-                onOpenMatrix={setSelectedMatrixFixture}
-                onOpenQuantModal={setSelectedQuantFixture}
-                slipLegs={parlaySlip}
-                onToggleSlip={handleToggleSlip}
-                standingsMap={standingsMap}
-              />
-            )}
-          </section>
-        )}
-      </main>
-
-      {/* Interactive Poisson Score Matrix Modal */}
+      {/* ─── Modals & Drawers (always rendered) ───────────── */}
       <ScoreMatrixModal
         fixture={selectedMatrixFixture}
         isOpen={Boolean(selectedMatrixFixture)}
@@ -396,16 +517,16 @@ export default function App() {
         standingsMap={standingsMap}
       />
 
-      {/* Quantitative Risk Engine & Kelly Modal */}
       <KellyCalculatorModal
         fixture={selectedQuantFixture}
         isOpen={Boolean(selectedQuantFixture)}
         onClose={() => setSelectedQuantFixture(null)}
         onAddToSlip={handleToggleSlip}
-        isInSlip={parlaySlip.some((l) => l.fixtureId === selectedQuantFixture?.id)}
+        isInSlip={parlaySlip.some(
+          (l) => l.fixtureId === selectedQuantFixture?.id
+        )}
       />
 
-      {/* Multi-Match Parlay Slip Floating Drawer */}
       <ParlaySlipDrawer
         legs={parlaySlip}
         isOpen={isSlipDrawerOpen}
@@ -413,18 +534,6 @@ export default function App() {
         onRemoveLeg={handleRemoveSlipLeg}
         onClearSlip={handleClearSlip}
       />
-
-      {/* Footer */}
-      <footer className="max-w-7xl mx-auto px-4 sm:px-6 py-8 border-t border-pitch-800/80 w-full mt-auto">
-        <div className="flex flex-col sm:flex-row items-center justify-between gap-4 text-xs text-slate-500">
-          <p>
-            Matchlytics uses Poisson bivariate goal distribution modelling. Probabilities are quantitative estimates, not guarantees.
-          </p>
-          <p className="text-slate-600 font-mono">
-            Bet Responsibly. 18+
-          </p>
-        </div>
-      </footer>
     </div>
   )
 }

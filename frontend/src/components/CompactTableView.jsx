@@ -28,7 +28,7 @@ export default function CompactTableView({
   return (
     <div className="w-full bg-pitch-900 border border-pitch-700 rounded-xl overflow-hidden shadow-lg animate-fade-in">
       <div className="overflow-x-auto no-scrollbar touch-pan-x">
-        <table className="w-full text-left border-collapse min-w-[920px]">
+        <table className="w-full text-left border-collapse min-w-[720px]">
           <thead>
             <tr className="border-b border-pitch-700/80 bg-pitch-950 text-[11px] uppercase tracking-wider text-slate-400">
               <th scope="col" className="py-3 px-3 w-10 text-center sticky left-0 z-20 bg-pitch-950">Pin</th>
