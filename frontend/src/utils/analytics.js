@@ -508,6 +508,149 @@ export function sortFixtures(fixtures, sortKey) {
 }
 
 /**
+ * Multi-class Brier score for a single fixture.
+ * Brier = (p_h - y_h)^2 + (p_d - y_d)^2 + (p_a - y_a)^2
+ * Inputs are percentages (0-100); outputs a decimal sum of squares.
+ */
+export function calculateBrierScore(probHome, probDraw, probAway, actualOutcome) {
+  const ph = Math.max(0, Math.min(1, Number(probHome) > 1 ? Number(probHome) / 100 : Number(probHome)))
+  const pd = Math.max(0, Math.min(1, Number(probDraw) > 1 ? Number(probDraw) / 100 : Number(probDraw)))
+  const pa = Math.max(0, Math.min(1, Number(probAway) > 1 ? Number(probAway) / 100 : Number(probAway)))
+
+  const yh = actualOutcome === 'HOME' ? 1 : 0
+  const yd = actualOutcome === 'DRAW' ? 1 : 0
+  const ya = actualOutcome === 'AWAY' ? 1 : 0
+
+  return (ph - yh) ** 2 + (pd - yd) ** 2 + (pa - ya) ** 2
+}
+
+/**
+ * Simulate a historical bankroll from settled fixtures.
+ * Returns cumulative equity series for Flat and Quarter-Kelly staking,
+ * plus aggregated performance statistics.
+ *
+ * @param {Array<{match_date,value_pick,odds_home,odds_draw,odds_away,home_score,away_score,prob_home,prob_draw,prob_away,league_name}>} settledFixtures
+ * @param {number} kellyPct  Quarter-Kelly stake percentage (default 2.5)
+ * @returns {{stats,bets,flatEquity,kellyEquity,brierScore}}
+ */
+export function simulateBankroll(settledFixtures, kellyPct = 2.5) {
+  if (!settledFixtures || settledFixtures.length === 0) {
+    return { stats: null, bets: [], flatEquity: [], kellyEquity: [], brierScore: null }
+  }
+
+  const sorted = [...settledFixtures].sort((a, b) =>
+    new Date(a.match_date) - new Date(b.match_date)
+  )
+
+  const bets = []
+  const flatEquity = []
+  const kellyEquity = []
+  let flatBalance = 100
+  let kellyBalance = 100
+  let wins = 0
+  let losses = 0
+  let brierSum = 0
+  let brierN = 0
+
+  for (const f of sorted) {
+    const h = Number(f.home_score)
+    const a = Number(f.away_score)
+    let actualOutcome
+    if (h > a) actualOutcome = 'HOME'
+    else if (h < a) actualOutcome = 'AWAY'
+    else actualOutcome = 'DRAW'
+
+    const pick = f.value_pick
+    const oddsMap = { HOME: f.odds_home, DRAW: f.odds_draw, AWAY: f.odds_away }
+    const marketOdds = Number(oddsMap[pick] ?? 0) || 1.0
+    const isWin = pick === actualOutcome
+
+    let flatProfit
+    let kellyProfit
+    if (isWin) {
+      wins++
+      flatProfit = marketOdds - 1
+      kellyProfit = (kellyPct / 100) * (marketOdds - 1)
+    } else {
+      losses++
+      flatProfit = -1
+      kellyProfit = -(kellyPct / 100)
+    }
+
+    flatBalance += flatProfit
+    kellyBalance += kellyProfit
+
+    flatEquity.push({
+      index: bets.length,
+      match_date: f.match_date,
+      matchLabel: `${f.home_team_name ?? '?'} vs ${f.away_team_name ?? '?'}`,
+      league: f.league_name,
+      equity: Math.round(flatBalance * 100) / 100,
+      betProfit: Math.round(flatProfit * 100) / 100,
+    })
+
+    kellyEquity.push({
+      index: bets.length,
+      match_date: f.match_date,
+      matchLabel: `${f.home_team_name ?? '?'} vs ${f.away_team_name ?? '?'}`,
+      league: f.league_name,
+      equity: Math.round(kellyBalance * 100) / 100,
+      betProfit: Math.round(kellyProfit * 100) / 100,
+    })
+
+    bets.push({
+      match_date: f.match_date,
+      matchLabel: `${f.home_team_name ?? '?'} vs ${f.away_team_name ?? '?'}`,
+      league: f.league_name,
+      selection: pick,
+      odds: marketOdds,
+      outcome: actualOutcome,
+      result: isWin ? 'WIN' : 'LOSS',
+      flatProfit: Math.round(flatProfit * 100) / 100,
+      kellyProfit: Math.round(kellyProfit * 100) / 100,
+    })
+
+    const ph = f.prob_home
+    const pd = f.prob_draw
+    const pa = f.prob_away
+    if (ph != null && pd != null && pa != null) {
+      const bs = calculateBrierScore(ph, pd, pa, actualOutcome)
+      brierSum += bs
+      brierN++
+    }
+  }
+
+  const total = bets.length
+  const winRate = total > 0 ? Math.round((wins / total) * 1000) / 10 : 0
+  const netUnitsFlat = flatBalance - 100
+  const roiPct = total > 0 ? Math.round((netUnitsFlat / total) * 1000) / 10 : 0
+  const avgBrier = brierN > 0 ? Math.round((brierSum / brierN) * 1000) / 1000 : null
+
+  const stats = {
+    totalBets: total,
+    wins,
+    losses,
+    winRate,
+    roiPct,
+    brierScore: avgBrier,
+    finalFlatEquity: Math.round(flatBalance * 100) / 100,
+    finalKellyEquity: Math.round(kellyBalance * 100) / 100,
+  }
+
+  return { stats, bets, flatEquity, kellyEquity, brierScore: avgBrier }
+}
+
+/**
+ * Determine Brier score calibration tier badge.
+ */
+export function getBrierTier(brier) {
+  if (brier == null) return null
+  if (brier < 0.20) return { label: 'Well Calibrated', cls: 'text-emerald-400 bg-emerald-500/10 border-emerald-500/30' }
+  if (brier <= 0.25) return { label: 'Moderate', cls: 'text-amber-400 bg-amber-500/10 border-amber-500/30' }
+  return { label: 'Under-Calibrated', cls: 'text-rose-400 bg-rose-500/10 border-rose-500/30' }
+}
+
+/**
  * Watchlist localStorage persistence
  */
 export const WATCHLIST_STORAGE_KEY = 'matchlytics_watchlist';

@@ -19,6 +19,7 @@ import CompactTableView from './components/CompactTableView'
 import ScoreMatrixModal from './components/ScoreMatrixModal'
 import KellyCalculatorModal from './components/KellyCalculatorModal'
 import ParlaySlipDrawer from './components/ParlaySlipDrawer'
+import PerformanceModal from './components/PerformanceModal'
 import LoadingState from './components/LoadingState'
 import EmptyState from './components/EmptyState'
 import ErrorState from './components/ErrorState'
@@ -97,6 +98,8 @@ export default function App() {
   // Modal fixtures
   const [selectedMatrixFixture, setSelectedMatrixFixture] = useState(null)
   const [selectedQuantFixture,  setSelectedQuantFixture]  = useState(null)
+  const [isBacktestOpen, setIsBacktestOpen] = useState(false)
+  const [settledFixtures, setSettledFixtures] = useState([])
 
   // PWA: capture native install prompt so Sidebar can offer "Install App"
   const [deferredInstall, setDeferredInstall] = useState(null)
@@ -224,10 +227,29 @@ export default function App() {
     }
   }, [])
 
+  // ---- Settled fixtures fetching (for performance backtest) ----
+  const fetchSettledFixtures = useCallback(async () => {
+    try {
+      const { data, error: sbErr } = await supabase
+        .from('fixtures')
+        .select('*')
+        .in('status', ['FT', 'FINISHED', 'AET', 'PEN'])
+        .not('home_score', 'is', null)
+        .not('away_score', 'is', null)
+        .not('value_pick', 'is', null)
+        .order('match_date', { ascending: true })
+
+      if (!sbErr && data) setSettledFixtures(data)
+    } catch (err) {
+      console.warn('Failed to load settled fixtures for backtest:', err)
+    }
+  }, [])
+
   useEffect(() => {
     fetchFixtures()
     fetchStandings()
-  }, [fetchFixtures, fetchStandings])
+    fetchSettledFixtures()
+  }, [fetchFixtures, fetchStandings, fetchSettledFixtures])
 
   // ---- Supabase Realtime Subscription -----------------------
   useEffect(() => {
@@ -241,6 +263,7 @@ export default function App() {
           debounceTimerRef.current = setTimeout(() => {
             fetchFixtures(true)
             fetchStandings()
+            fetchSettledFixtures()
             setRealtimeToast(true)
             setTimeout(() => setRealtimeToast(false), 3500)
           }, 1500)
@@ -341,6 +364,7 @@ export default function App() {
         watchlistCount={watchlist.length}
         lastUpdated={lastUpdated}
         deferredInstall={deferredInstall}
+        onOpenBacktest={() => setIsBacktestOpen(true)}
       />
 
       {/* ─── Main Content Area ──────────────────────────────── */}
@@ -512,6 +536,7 @@ export default function App() {
         slipCount={parlaySlip.length}
         onOpenLeagues={() => setIsLeagueDrawerOpen(true)}
         onOpenSlip={() => setIsSlipDrawerOpen(true)}
+        onOpenBacktest={() => setIsBacktestOpen(true)}
       />
 
       {/* ─── Mobile League Sheet (below lg only) ─────────── */}
@@ -547,6 +572,13 @@ export default function App() {
         onToggleOpen={() => setIsSlipDrawerOpen(!isSlipDrawerOpen)}
         onRemoveLeg={handleRemoveSlipLeg}
         onClearSlip={handleClearSlip}
+      />
+
+      {/* Historical Bankroll Simulator & Settled Bets Ledger */}
+      <PerformanceModal
+        isOpen={isBacktestOpen}
+        onClose={() => setIsBacktestOpen(false)}
+        fixtures={settledFixtures}
       />
 
       {/* PWA install prompt (mobile floating banner + iOS hint) */}

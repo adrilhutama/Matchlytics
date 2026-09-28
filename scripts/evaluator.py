@@ -85,6 +85,150 @@ def fetch_and_settle_completed_matches(base_url: str, headers: dict, supabase: A
         return 0
 
 
+def evaluate_full_history(supabase: Any) -> dict:
+    """
+    Query Supabase for ALL finished fixtures (no date window).
+    Returns full backtest stats plus a chronological equity-curve series
+    suitable for the frontend Track Record dashboard.
+
+    Returned keys:
+        stats    — total_bets, wins, losses, win_rate, roi_pct, brier_score
+        bets     — list of per-match result rows (chronological ASC)
+        equity   — running-equity points for flat staking (bankroll=100)
+        equity_k — running-equity points for quarter-Kelly (stake=2.5%)
+    """
+    defaults = {
+        "stats": {"total_bets": 0, "wins": 0, "losses": 0,
+                  "win_rate": 0.0, "roi_pct": 0.0, "brier_score": None},
+        "bets": [],
+        "equity": [],
+        "equity_k": [],
+    }
+
+    try:
+        res = (
+            supabase.table("fixtures")
+            .select("*")
+            .in_("status", ["FT", "FINISHED", "AET", "PEN"])
+            .not_.is_("home_score", "null")
+            .not_.is_("away_score", "null")
+            .order("match_date", ascending=True)
+            .execute()
+        )
+
+        rows = res.data or []
+        if not rows:
+            return defaults
+
+        brier_sum = 0.0
+        brier_n = 0
+        ev_bets_count = 0
+        wins = 0
+        losses = 0
+        net_units = 0.0
+
+        flat_bankroll = 100.0
+        kelly_bankroll = 100.0
+        kelly_stake_pct = 2.5
+
+        bets = []
+        equity_curve = []
+        equity_curve_k = []
+
+        for r in rows:
+            h_score = int(r["home_score"])
+            a_score = int(r["away_score"])
+
+            if h_score > a_score:
+                actual_outcome = "HOME"
+            elif h_score == a_score:
+                actual_outcome = "DRAW"
+            else:
+                actual_outcome = "AWAY"
+
+            # Brier score (probabilities stored as percentages)
+            ph = r.get("prob_home")
+            pd = r.get("prob_draw")
+            pa = r.get("prob_away")
+            if ph is not None and pd is not None and pa is not None:
+                brier_val = calculate_brier_score(ph, pd, pa, actual_outcome)
+                brier_sum += brier_val
+                brier_n += 1
+
+            # +EV track record
+            val_pick = r.get("value_pick")
+            if val_pick in ("HOME", "DRAW", "AWAY"):
+                ev_bets_count += 1
+                pick_odds = (
+                    r.get("odds_home") if val_pick == "HOME"
+                    else r.get("odds_draw") if val_pick == "DRAW"
+                    else r.get("odds_away")
+                )
+                odds_val = float(pick_odds) if pick_odds else 1.0
+
+                if val_pick == actual_outcome:
+                    wins += 1
+                    profit = odds_val - 1.0
+                    net_units += profit
+                else:
+                    losses += 1
+                    net_units -= 1.0
+
+                profit_flat = round(profit, 4) if val_pick == actual_outcome else -1.0
+                profit_k = round(kelly_stake_pct / 100 * profit, 4) if val_pick == actual_outcome else round(-kelly_stake_pct / 100, 4)
+            else:
+                profit_flat = 0.0
+                profit_k = 0.0
+
+            flat_bankroll = round(flat_bankroll + profit_flat, 4)
+            kelly_bankroll = round(kelly_bankroll + profit_k, 4)
+
+            if val_pick in ("HOME", "DRAW", "AWAY"):
+                bets.append({
+                    "match_date": r.get("match_date"),
+                    "match_label": f"{r.get('home_team_name', '?')} vs {r.get('away_team_name', '?')}",
+                    "league": r.get("league_name"),
+                    "selection": val_pick,
+                    "odds": round(odds_val, 2),
+                    "outcome": actual_outcome,
+                    "result": "WIN" if val_pick == actual_outcome else "LOSS",
+                    "flat_profit": profit_flat,
+                    "kelly_profit": profit_k,
+                })
+                equity_curve.append({
+                    "index": len(equity_curve),
+                    "match_date": r.get("match_date"),
+                    "equity": flat_bankroll,
+                })
+                equity_curve_k.append({
+                    "index": len(equity_curve_k),
+                    "match_date": r.get("match_date"),
+                    "equity": kelly_bankroll,
+                })
+
+        avg_brier = round(brier_sum / brier_n, 3) if brier_n > 0 else None
+        win_rate = round((wins / ev_bets_count) * 100, 1) if ev_bets_count > 0 else 0.0
+        roi_pct = round((net_units / ev_bets_count) * 100, 1) if ev_bets_count > 0 else 0.0
+
+        return {
+            "stats": {
+                "total_bets": ev_bets_count,
+                "wins": wins,
+                "losses": losses,
+                "win_rate": win_rate,
+                "roi_pct": roi_pct,
+                "brier_score": avg_brier,
+            },
+            "bets": bets,
+            "equity": equity_curve,
+            "equity_k": equity_curve_k,
+        }
+
+    except Exception as exc:
+        print(f"    [WARN] Exception evaluating full settlement history: {exc}")
+        return defaults
+
+
 def evaluate_recent_settlement(supabase: Any) -> dict:
     """
     Query Supabase for finished fixtures within the last 48 hours.
@@ -183,3 +327,5 @@ def evaluate_recent_settlement(supabase: Any) -> dict:
     except Exception as exc:
         print(f"    [WARN] Exception evaluating recent settlement: {exc}")
         return defaults
+
+

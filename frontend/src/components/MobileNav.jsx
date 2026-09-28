@@ -1,8 +1,9 @@
 // ---- MobileNav.jsx ----
 // Mobile-only bottom navigation bar (visible below lg).
-// Five thumb-friendly tabs with active amber glow.
+// Six thumb-friendly tabs with active amber glow.
 // "Leagues" opens a slide-up sheet via onOpenLeagues.
 // "Slip" toggles the parlay drawer via onOpenSlip.
+// "Track" opens the performance backtest modal via onOpenBacktest.
 // All touch targets are >= 44px minimum height.
 
 export default function MobileNav({
@@ -14,11 +15,13 @@ export default function MobileNav({
   slipCount,
   onOpenLeagues,
   onOpenSlip,
+  onOpenBacktest,
 }) {
   const tabs = [
     { id: 'matches',       label: 'Matches', icon: '⚽' },
     { id: 'value',         label: '+EV Only', icon: '🎯' },
     { id: 'leagues',       label: 'Leagues',  icon: '🏆' },
+    { id: 'track',         label: 'Track',    icon: '📈' },
     { id: 'watchlist',     label: 'Watchlist', icon: '⭐' },
     { id: 'slip',          label: 'Slip',     icon: '📋' },
   ]
@@ -36,6 +39,7 @@ export default function MobileNav({
           if (tab.id === 'value')   onClick = () => onToggleValueOnly()
           if (tab.id === 'leagues') onClick = () => onOpenLeagues()
           if (tab.id === 'slip')    onClick = () => onOpenSlip()
+          if (tab.id === 'track')   onClick = () => onOpenBacktest()
           // watchlist tab also toggles filter (same action as clicking the pill in sidebar)
 
           const badgeCount =

@@ -23,6 +23,7 @@ export default function Sidebar({
   watchlistCount,
   lastUpdated,
   deferredInstall,
+  onOpenBacktest,
 }) {
   const timeStr = lastUpdated
     ? lastUpdated.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' })
@@ -135,6 +136,18 @@ export default function Sidebar({
           </li>
         </ul>
       </nav>
+
+      {/* ---- Track Record / Backtest ---- */}
+      <button
+        type="button"
+        onClick={onOpenBacktest}
+        className="w-full min-h-[44px] px-3 rounded-xl text-sm font-medium transition-all flex items-center gap-2.5 mb-4 text-slate-300 hover:bg-pitch-900 hover:text-slate-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500"
+      >
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+          <polyline points="22 12 18 12 15 21 9 3 6 12 2 12" />
+        </svg>
+        Track Record &amp; Backtest
+      </button>
 
       {/* ---- Competitions Section ---- */}
       <nav aria-label="Competitions">
