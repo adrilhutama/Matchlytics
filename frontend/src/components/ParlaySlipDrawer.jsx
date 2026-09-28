@@ -92,17 +92,19 @@ export default function ParlaySlipDrawer({
       {/* Drawer Overlay & Panel */}
       {isOpen && (
         <div
-          className="fixed inset-0 z-50 flex items-end sm:items-center justify-end p-0 sm:p-4 bg-pitch-950/60 backdrop-blur-sm animate-fade-in"
+          className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-end p-0 animate-fade-in"
           onClick={onToggleOpen}
         >
           <div
             id="parlay-drawer"
-            className="w-full bg-pitch-900 border-t border-pitch-700 rounded-t-3xl shadow-2xl overflow-y-auto max-h-[85vh] text-slate-200 px-4 pt-1 pb-6"
+            className="w-full bg-pitch-900 border-t border-pitch-700 rounded-t-3xl shadow-2xl flex flex-col max-h-[90vh]"
             style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}
             onClick={(e) => e.stopPropagation()}
           >
             {/* Mobile drag handle */}
-            <div className="w-10 h-1 bg-slate-600 rounded-full mx-auto my-2 sm:hidden" aria-hidden="true" />
+            <div className="w-12 h-1.5 bg-slate-700 rounded-full mx-auto mt-2.5 mb-1 shrink-0" aria-hidden="true" />
+            {/* Scrollable body */}
+            <div className="flex-1 overflow-y-auto touch-pan-y px-4 pt-1 pb-4">
             {/* Header */}
             <div className="flex items-center justify-between pb-3 border-b border-pitch-800">
               <div className="flex items-center gap-2">
@@ -222,6 +224,7 @@ export default function ParlaySlipDrawer({
               >
                 <span>{copied ? '✓ Copied to Clipboard!' : '📋 Copy Parlay Summary'}</span>
               </button>
+            </div>
             </div>
           </div>
         </div>

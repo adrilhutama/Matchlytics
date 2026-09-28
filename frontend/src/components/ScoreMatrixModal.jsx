@@ -54,7 +54,7 @@ export default function ScoreMatrixModal({ fixture, isOpen, onClose, standingsMa
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-2 sm:p-4 bg-pitch-950/80 backdrop-blur-sm animate-fade-in"
+      className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-end sm:items-center justify-center p-0 sm:p-4 animate-fade-in"
       role="dialog"
       aria-modal="true"
       aria-labelledby="matrix-modal-title"
@@ -62,12 +62,16 @@ export default function ScoreMatrixModal({ fixture, isOpen, onClose, standingsMa
     >
       <div
         ref={modalRef}
-        className="relative w-full bg-pitch-900 border-t border-pitch-700 rounded-t-3xl p-4 shadow-2xl overflow-y-auto max-h-[90vh]"
-        style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}
+        className="relative w-full max-w-full sm:max-w-2xl bg-pitch-900 border-t sm:border border-pitch-700 rounded-t-3xl sm:rounded-2xl max-h-[92vh] flex flex-col shadow-2xl overflow-hidden"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Mobile drag handle */}
-        <div className="w-10 h-1 bg-slate-600 rounded-full mx-auto mb-2 sm:hidden" aria-hidden="true" />
+        <div className="w-12 h-1.5 bg-slate-700 rounded-full mx-auto mt-2.5 mb-1 sm:hidden shrink-0" aria-hidden="true" />
+        {/* Scrollable body */}
+        <div
+          className="p-4 sm:p-6 overflow-y-auto flex-1 touch-pan-y"
+          style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}
+        >
         {/* Close Button */}
         <button
           type="button"
@@ -251,6 +255,7 @@ export default function ScoreMatrixModal({ fixture, isOpen, onClose, standingsMa
           >
             Close
           </button>
+        </div>
         </div>
       </div>
     </div>
