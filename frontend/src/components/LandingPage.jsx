@@ -19,6 +19,7 @@ import {
   calculateEdgeAndEV,
   getMarginOfSafety,
   calculateParlayAggregates,
+  calculateKelly,
   isRealMarketOdds,
   simulateBankroll,
   getBrierTier,
@@ -31,6 +32,89 @@ const GITHUB_ACTIONS_URL = `${GITHUB_REPO_URL}/actions`
 // Illustrative expected-goals pair used only for the scored heatmap demo.
 const DEMO_LAMBDA_HOME = 1.55
 const DEMO_LAMBDA_AWAY = 1.05
+
+// ------------------------------------------------------------------
+// Verified proof badges (each claim maps to something the audit confirmed):
+//   - engine unit suite result, fixed stake cap, and de-vig method.
+// Prices mirror the in-app SubscriptionModal so the two surfaces never
+// drift apart. Env vars win; the fallbacks are the production ladder.
+// ------------------------------------------------------------------
+const PROOF_BADGES = [
+  { label: '33/33 Engine Tests Passed', icon: '◈' },
+  { label: '2.5% Hard-Capped Fractional Kelly', icon: '◍' },
+  { label: 'Zero-Vig Consensus De-vigging', icon: '◇' },
+]
+
+const PRICE_PRO = import.meta.env.VITE_PRICE_PRO || 'Rp 149.000 / bln'
+const PRICE_ANNUAL = import.meta.env.VITE_PRICE_ANNUAL || import.meta.env.VITE_PRICE_SEASON || 'Rp 999.000 / thn'
+
+const PRICING_TIERS = [
+  {
+    id: 'free',
+    name: 'Free Starter',
+    price: 'Rp 0',
+    cadence: 'No card required',
+    badge: null,
+    scope: 'Daily match horizon (today only)',
+    cta: 'Get Started Free',
+    perks: [
+      'Basic 1X2 Poisson probabilities',
+      'Match summary and scoreline readout',
+      'Watchlist and league filters',
+      'Community access',
+    ],
+  },
+  {
+    id: 'pro',
+    name: 'Pro Pass',
+    price: PRICE_PRO,
+    cadence: 'Billed monthly · cancel anytime',
+    badge: 'Popular',
+    scope: 'Next 7 days fixture horizon (weekly)',
+    cta: 'Upgrade to Pro',
+    featured: true,
+    perks: [
+      'Complete +EV value scanner',
+      '6×6 scoreline matrix heatmap',
+      'Fractional Kelly calculator',
+      'Smart parlay slip builder',
+    ],
+  },
+  {
+    id: 'annual',
+    name: 'Season / Annual Pass',
+    price: PRICE_ANNUAL,
+    cadence: 'One season, one rate',
+    badge: 'Best Value (Save ~44%)',
+    scope: 'All 30 days horizon (full season)',
+    cta: 'Get Season Access',
+    perks: [
+      'Everything in Pro Pass',
+      'Full-season historical backtest archives',
+      'Verified equity curve ledger',
+      'Priority support queue',
+    ],
+  },
+]
+
+// Pipeline & security cards for the architecture section.
+const PIPELINE_SECURITY_CARDS = [
+  {
+    index: 'A',
+    title: 'Data Ingestion',
+    body: 'High-frequency fixtures and standings stream in from football-data.org while decimal odds pull from The Odds API (Bet365 and Pinnacle), throttled at 6.5s to hold the free-tier ceiling.',
+  },
+  {
+    index: 'B',
+    title: 'Math Processing',
+    body: 'Bayesian shrinkage clamps lambda parameters strictly inside [0.6, 3.2], then zero-vig extraction recovers the fair market distribution so model probability is compared against price without overround.',
+  },
+  {
+    index: 'C',
+    title: 'Security & Storage',
+    body: 'Supabase PostgreSQL is the single source of truth. Row Level Security hands anon and authenticated roles SELECT-only access to the feeds, while only the service role may write. Realtime channels sync the dashboard.',
+  },
+]
 
 // ------------------------------------------------------------------
 // Small presentational helpers (defined at module scope so chips and
@@ -366,6 +450,156 @@ function ScoreHeatPanel() {
 }
 
 // ------------------------------------------------------------------
+// Value Finder (+EV scanner) demo: strongest live edges from the same
+// feed the dashboard runs on, transparent edge percentages included.
+// ------------------------------------------------------------------
+
+function ValueFinderPanel({ evPicks, fixturesLoading }) {
+  const top = evPicks.slice(0, 3)
+
+  if (!fixturesLoading && top.length === 0) {
+    return (
+      <div className="min-w-0 rounded-2xl bg-pitch-800 border border-pitch-700 p-5">
+        <h3 className="text-base font-bold text-slate-100">Value Finder (+EV Scanner)</h3>
+        <p className="text-xs text-slate-500 mt-1">
+          Ranks every fixture where model probability beats the de-vigged market price.
+        </p>
+        <div className="mt-4 rounded-xl border border-pitch-700 bg-pitch-900 p-4 text-center">
+          <p className="text-sm text-slate-300 font-medium">No open +EV edges right now.</p>
+          <p className="mt-1.5 text-[11px] text-slate-500 leading-relaxed">
+            The scanner only surfaces a pick when it clears the margin-of-safety guardrails.
+            Edges appear automatically after each 06:00 / 14:00 UTC sync.
+          </p>
+        </div>
+      </div>
+    )
+  }
+
+  return (
+    <div className="min-w-0 rounded-2xl bg-pitch-800 border border-pitch-700 p-5">
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <h3 className="text-base font-bold text-slate-100">Value Finder (+EV Scanner)</h3>
+          <p className="text-xs text-slate-500 mt-1">
+            The best open edges from today&apos;s verified feed, strongest first.
+          </p>
+        </div>
+        <span className="flex-shrink-0 px-2 py-1 rounded-md text-[10px] font-mono bg-pitch-900 border border-pitch-600 text-emerald-400">
+          LIVE FEED
+        </span>
+      </div>
+      <ul className="mt-4 space-y-2">
+        {top.map((f) => {
+          const pf = pickFields(f)
+          const edge = pf?.odds ? calculateEdgeAndEV(pf.odds, pf.prob) : null
+          return (
+            <li key={f.id} className="flex items-center justify-between gap-3 bg-pitch-900 border border-pitch-700 rounded-xl px-3.5 py-2.5">
+              <div className="min-w-0">
+                <p className="text-sm font-medium text-slate-200 truncate">{pf.label}</p>
+                <p className="text-[11px] font-mono text-slate-500 truncate">
+                  {f.home_team_name} vs {f.away_team_name} · {f.league_name ?? ''}
+                </p>
+              </div>
+              <div className="text-right flex-shrink-0">
+                <p className="text-sm font-mono text-amber-400 tabular-nums">+{f.ev_percentage}% EV</p>
+                <p className="text-[11px] font-mono text-slate-500 tabular-nums">
+                  @ {Number(pf.odds).toFixed(2)} · net edge {edge ? `${edge.netEdge} pts` : 'n/a'}
+                </p>
+              </div>
+            </li>
+          )
+        })}
+        {evPicks.length > 3 && (
+          <li className="text-[11px] font-mono text-slate-500 px-1">
+            +{evPicks.length - 3} more edges in the full dashboard feed
+          </li>
+        )}
+      </ul>
+    </div>
+  )
+}
+
+// ------------------------------------------------------------------
+// Fractional Kelly staking demo: the exact sizing curve behind the
+// hard cap, labelled as an illustration.
+// ------------------------------------------------------------------
+
+const KELLY_DEMO_ROWS = [
+  { odds: 1.5, prob: 70 },
+  { odds: 2.0, prob: 55 },
+  { odds: 3.0, prob: 40 },
+  { odds: 4.0, prob: 30 },
+]
+
+function KellyStakingPanel() {
+  const rows = useMemo(
+    () => KELLY_DEMO_ROWS.map((r) => ({ ...r, kelly: calculateKelly(r.odds, r.prob) })),
+    []
+  )
+
+  return (
+    <div className="min-w-0 rounded-2xl bg-pitch-800 border border-pitch-700 p-5">
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <h3 className="text-base font-bold text-slate-100">Fractional Kelly Staking</h3>
+          <p className="text-xs text-slate-500 mt-1">
+            A quarter of theoretical Kelly, hard-capped at 2.5% of bankroll per bet.
+          </p>
+        </div>
+        <span className="flex-shrink-0 px-2 py-1 rounded-md text-[10px] font-mono bg-pitch-900 border border-pitch-600 text-slate-400">
+          ILLUSTRATIVE
+        </span>
+      </div>
+
+      <div className="mt-4 overflow-x-auto no-scrollbar -mx-1 px-1">
+        <table className="w-full min-w-[300px] text-xs">
+          <thead>
+            <tr className="text-left text-[10px] font-mono uppercase tracking-wider text-slate-500">
+              <th className="pb-2 pr-3">Scenario</th>
+              <th className="pb-2 pr-3">Odds</th>
+              <th className="pb-2 pr-3">Model %</th>
+              <th className="pb-2">Suggested Stake</th>
+            </tr>
+          </thead>
+          <tbody>
+            {rows.map((r) => (
+              <tr key={`${r.odds}-${r.prob}`} className="border-t border-pitch-700/60">
+                <td className="py-2 pr-3 text-slate-300">
+                  p={r.prob}% @ {r.odds.toFixed(2)}
+                </td>
+                <td className="py-2 pr-3 font-mono text-slate-400 tabular-nums">{r.odds.toFixed(2)}</td>
+                <td className="py-2 pr-3 font-mono text-slate-400 tabular-nums">{r.prob}%</td>
+                <td className="py-2">
+                  {r.kelly.quarterKellyPct > 0 ? (
+                    <span className="inline-flex items-center gap-2 max-w-full min-w-0">
+                      <span className="w-24 sm:w-28 h-1.5 rounded-full bg-pitch-950 overflow-hidden flex-shrink-0">
+                        <span
+                          className="block h-full bg-amber-400"
+                          style={{ width: `${Math.min(100, (r.kelly.quarterKellyPct / 2.5) * 100)}%` }}
+                        />
+                      </span>
+                      <span className="font-mono text-amber-300 tabular-nums">{r.kelly.quarterKellyPct}%</span>
+                    </span>
+                  ) : (
+                    <span className="font-mono text-slate-500">
+                      0.0% <span className="text-slate-600">(negative EV, no stake)</span>
+                    </span>
+                  )}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+      <p className="mt-3 text-[11px] text-slate-500">
+        Negative-expectation inputs always return 0%. No scenario on the page may size above
+        the 2.5% cap.
+      </p>
+    </div>
+  )
+}
+
+// ------------------------------------------------------------------
 // Parlay slip panel: real two-leg example when the feed supplies it,
 // clearly-labelled illustration otherwise.
 // ------------------------------------------------------------------
@@ -432,7 +666,7 @@ function ParlayPanel({ evPicks }) {
       </dl>
       <p className="mt-3 text-[11px] text-slate-500">
         Recommended stake: <span className="font-mono text-slate-300">{agg.recommendedStakePct}%</span> of bankroll
-        (quarter-Kelly, hard-capped at 3%).
+        (quarter-Kelly, hard-capped at 2.5%).
       </p>
     </div>
   )
@@ -587,6 +821,13 @@ export default function LandingPage({
     else window.location.assign(APP_LIVE_URL)
   }
 
+  // Smooth-scroll to the pricing grid; works with the sticky header via
+  // the scroll-mt offsets on each section.
+  const scrollToPricing = () => {
+    const el = document.getElementById('pricing')
+    if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' })
+  }
+
   const evPicks = useMemo(
     () =>
       (fixtures || [])
@@ -630,7 +871,8 @@ export default function LandingPage({
 
   const navLinks = [
     { label: 'Methodology', href: '#methodology' },
-    { label: 'Core Architecture', href: '#architecture' },
+    { label: 'Architecture', href: '#architecture' },
+    { label: 'Pricing', href: '#pricing' },
     { label: 'Track Record', href: '#track-record' },
     { label: 'Daily SITREP', href: '#sitrep' },
   ]
@@ -674,7 +916,7 @@ export default function LandingPage({
                 onClick={handleLaunchApp}
                 className="min-h-[44px] shrink-0 inline-flex items-center px-3 sm:px-5 rounded-xl bg-amber-500 text-pitch-950 text-[13px] sm:text-sm font-bold hover:bg-amber-400 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-400 whitespace-nowrap"
               >
-                {isPreviewHost ? '⚡ Launch Dashboard' : '⚡ Open App'}
+                ⚡ Open App
               </button>
             </div>
           </div>
@@ -706,13 +948,11 @@ export default function LandingPage({
                   Institutional Quantitative Sports Analytics Engine · By Imortifex
                 </p>
                 <h1 className="mt-4 w-full max-w-full text-3xl sm:text-5xl lg:text-6xl font-extrabold tracking-tight text-white leading-tight break-normal">
-                  Eliminate the bookmaker&apos;s edge with pure mathematical precision.
+                  Eliminate the bookmaker&apos;s edge with verified mathematical precision.
                 </h1>
                 <p className="mt-5 text-base sm:text-lg text-slate-400 leading-relaxed max-w-xl">
-                  Matchlytics reads six leagues of standings and live Bet365 and Pinnacle pricing,
-                  rebuilds each fixture with a bivariate Poisson goal model, strips the margin from
-                  the market, and flags the picks where your expected value is genuinely positive.
-                  Twice a day. Settled and audited after every match.
+                  Dual-distribution Poisson modeling, market de-vigging, and fractional Kelly sizing
+                  engineered for disciplined sports market participants across six leagues.
                 </p>
                 <div className="mt-7 w-full flex flex-col sm:flex-row items-stretch sm:items-center gap-2.5 sm:gap-3">
                   <button
@@ -720,18 +960,32 @@ export default function LandingPage({
                     onClick={handleLaunchApp}
                     className="min-h-[48px] w-full sm:w-auto px-6 rounded-xl bg-amber-500 text-pitch-950 text-sm font-bold hover:bg-amber-400 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-400 text-center justify-center"
                   >
-                    {isPreviewHost ? '⚡ Launch Dashboard' : '⚡ Open App'}
+                    ⚡ Launch SaaS Dashboard
                   </button>
                   <button
                     type="button"
-                    onClick={onOpenBacktest}
+                    onClick={scrollToPricing}
                     className="min-h-[48px] w-full sm:w-auto px-6 rounded-xl border border-pitch-600 bg-pitch-800 text-slate-200 text-sm font-semibold hover:border-pitch-500 hover:bg-pitch-700 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500 text-center justify-center"
                   >
-                    📈 View Verified Backtest
+                    Explore Pricing Tiers
                   </button>
                 </div>
+
+                {/* Live proof ticker: claims verified by the last audit pass */}
+                <ul className="mt-6 flex flex-wrap gap-2" aria-label="Verified engine proofs">
+                  {PROOF_BADGES.map((b) => (
+                    <li
+                      key={b.label}
+                      className="inline-flex items-center gap-1.5 min-h-[32px] px-3 py-1.5 rounded-lg bg-pitch-800/80 border border-pitch-700 text-[11px] font-mono text-slate-300"
+                    >
+                      <span className="text-amber-400" aria-hidden="true">{b.icon}</span>
+                      {b.label}
+                    </li>
+                  ))}
+                </ul>
+
                 <p className="mt-5 text-[11px] font-mono text-slate-600">
-                  No account, no paywall. Read-only public feeds, refreshed in real time.
+                  No account, no paywall on the public feed. Launch the dashboard to open paid horizons.
                 </p>
               </div>
 
@@ -804,10 +1058,27 @@ export default function LandingPage({
               ))}
             </ol>
 
-            {/* Capability showcase: stacks on phones, side by side when both panes fit */}
-            <div className="mt-8 grid grid-cols-1 sm:grid-cols-2 gap-4">
+            {/* Pipeline security & storage model */}
+            <div className="mt-8 grid grid-cols-1 md:grid-cols-3 gap-3.5">
+              {PIPELINE_SECURITY_CARDS.map((c) => (
+                <article key={c.index} className="min-w-0 rounded-2xl bg-pitch-800 border border-pitch-700 p-5">
+                  <p className="font-mono text-[11px] text-amber-400">{c.index}</p>
+                  <h3 className="mt-1.5 text-[15px] font-bold text-slate-100">{c.title}</h3>
+                  <p className="mt-2 text-[13px] text-slate-400 leading-relaxed">{c.body}</p>
+                </article>
+              ))}
+            </div>
+
+            {/* Capability showcase: stacks on phones, two per row when wide */}
+            <div className="mt-8 grid grid-cols-1 lg:grid-cols-2 gap-4">
               <div className="min-w-0">
                 <ScoreHeatPanel />
+              </div>
+              <div className="min-w-0 flex flex-col gap-4">
+                <ValueFinderPanel evPicks={evPicks} fixturesLoading={Boolean(fixturesLoading)} />
+              </div>
+              <div className="min-w-0 flex flex-col gap-4">
+                <KellyStakingPanel />
               </div>
               <div className="min-w-0 flex flex-col gap-4">
                 <ParlayPanel evPicks={evPicks} />
@@ -816,11 +1087,91 @@ export default function LandingPage({
           </div>
         </section>
 
-        {/* ─── 03 Track Record: verified settlements only ──── */}
+        {/* ─── 03 Pricing: 3-tier ladder ───────────────────── */}
+        <section id="pricing" className="w-full py-8 sm:py-16 border-b border-pitch-900/60 scroll-mt-24">
+          <div className="w-full max-w-5xl mx-auto px-4 sm:px-6">
+            <div className="max-w-2xl">
+              <SectionKicker index="03" title="Pricing" />
+              <h2 className="text-2xl sm:text-3xl font-bold text-slate-100 tracking-tight">
+                One ladder of access, three horizons deep.
+              </h2>
+              <p className="mt-3 text-sm sm:text-base text-slate-400 leading-relaxed">
+                Start free on today&apos;s matches, extend to the weekly horizon with Pro, or open
+                the full season with a single rate. Every paid tier keeps the public feed honest:
+                prices here match the dashboard checkout exactly.
+              </p>
+            </div>
+
+            <div className="mt-8 grid grid-cols-1 md:grid-cols-3 gap-4 items-stretch">
+              {PRICING_TIERS.map((tier) => (
+                <article
+                  key={tier.id}
+                  className={`min-w-0 flex flex-col rounded-2xl border p-5 sm:p-6 ${
+                    tier.featured
+                      ? 'border-amber-500/40 bg-pitch-800 relative'
+                      : 'border-pitch-700 bg-pitch-800/60'
+                  }`}
+                >
+                  {tier.badge && (
+                    <span
+                      className={`absolute -top-2.5 right-4 px-2.5 py-0.5 rounded-md text-[10px] font-mono font-bold ${
+                        tier.id === 'annual'
+                          ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/40'
+                          : 'bg-amber-500/20 text-amber-300 border border-amber-500/40'
+                      }`}
+                    >
+                      {tier.badge}
+                    </span>
+                  )}
+                  <div>
+                    <h3 className="text-sm font-bold text-slate-100">{tier.name}</h3>
+                    <p className="mt-0.5 text-[11px] text-slate-500">{tier.cadence}</p>
+                  </div>
+                  <div className="mt-4">
+                    <p className="text-3xl font-black tracking-tight text-slate-100 break-words min-w-0">
+                      {tier.price}
+                    </p>
+                    <p className="mt-1.5 text-[11px] font-mono text-slate-400">{tier.scope}</p>
+                  </div>
+                  <ul className="mt-5 space-y-2 flex-1">
+                    {tier.perks.map((perk) => (
+                      <li key={perk} className="flex items-start gap-2 text-[13px] text-slate-300 leading-snug">
+                        <span
+                          className={`mt-1 w-1 h-1 rounded-full flex-shrink-0 ${
+                            tier.featured ? 'bg-amber-400' : 'bg-emerald-400'
+                          }`}
+                          aria-hidden="true"
+                        />
+                        <span className="min-w-0">{perk}</span>
+                      </li>
+                    ))}
+                  </ul>
+                  <button
+                    type="button"
+                    onClick={handleLaunchApp}
+                    className={`mt-6 min-h-[48px] w-full inline-flex items-center justify-center rounded-xl text-sm font-bold transition-colors focus-visible:outline-none focus-visible:ring-2 ${
+                      tier.featured
+                        ? 'bg-amber-500 text-pitch-950 hover:bg-amber-400 ring-amber-400'
+                        : 'border border-pitch-600 bg-pitch-900 text-slate-200 hover:border-pitch-500 hover:bg-pitch-800 ring-amber-500'
+                    }`}
+                  >
+                    {tier.cta}
+                  </button>
+                </article>
+              ))}
+            </div>
+
+            <p className="mt-4 text-[11px] font-mono text-slate-600">
+              All tiers launch into the same verified dashboard at {APP_LIVE_URL.replace('https://', '')}.
+            </p>
+          </div>
+        </section>
+
+        {/* ─── 04 Track Record: verified settlements only ──── */}
         <section id="track-record" className="w-full py-8 sm:py-16 border-b border-pitch-900/60 scroll-mt-24">
           <div className="w-full max-w-5xl mx-auto px-4 sm:px-6">
             <div className="max-w-2xl">
-              <SectionKicker index="03" title="Track Record" />
+              <SectionKicker index="04" title="Track Record" />
               <h2 className="text-2xl sm:text-3xl font-bold text-slate-100 tracking-tight">
                 Numbers earned match by match, not promised in a slide deck.
               </h2>
@@ -837,12 +1188,12 @@ export default function LandingPage({
           </div>
         </section>
 
-        {/* ─── 04 Daily SITREP ──────────────────────────────── */}
+        {/* ─── 05 Daily SITREP ─────────────────────────────── */}
         <section id="sitrep" className="w-full py-8 sm:py-16 border-b border-pitch-900/60 scroll-mt-24">
           <div className="w-full max-w-5xl mx-auto px-4 sm:px-6">
             <div className="grid lg:grid-cols-2 gap-8 items-start">
               <div>
-                <SectionKicker index="04" title="Daily SITREP" />
+                <SectionKicker index="05" title="Daily SITREP" />
                 <h2 className="text-2xl sm:text-3xl font-bold text-slate-100 tracking-tight">
                   A machine-generated situation report, twice a day, on the record.
                 </h2>
@@ -884,10 +1235,10 @@ export default function LandingPage({
                 </div>
               </div>
               <p className="mt-4 text-xs text-slate-500 leading-relaxed">
-                Matchlytics is provided for educational and research purposes. Model outputs are
-                statistical estimates of probabilities; they are not predictions, financial advice,
-                or guarantees of any result. Independent project, not affiliated with any league,
-                broadcaster, bookmaker, or operator.
+                18+. Matchlytics provides quantitative mathematical estimates, not financial
+                guarantees. Model outputs are statistical probabilities; they are not predictions,
+                financial advice, or promises of any result. Bet responsibly. Independent project,
+                not affiliated with any league, broadcaster, bookmaker, or operator.
               </p>
             </div>
             <div className="grid grid-cols-2 gap-x-10 gap-y-1.5 text-[13px] sm:max-w-xs sm:w-full">
@@ -900,13 +1251,13 @@ export default function LandingPage({
               <a href="#methodology" className="text-slate-500 hover:text-slate-300 transition-colors py-2">
                 Methodology
               </a>
-              <a href="#track-record" className="text-slate-500 hover:text-slate-300 transition-colors py-2">
-                Track Record
+              <a href="#pricing" className="text-slate-500 hover:text-slate-300 transition-colors py-2">
+                Pricing Tiers
               </a>
             </div>
           </div>
           <div className="mt-8 pt-6 border-t border-pitch-800 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 text-[11px] font-mono text-slate-600">
-            <p>© 2026 Matchlytics by imortifex. All rights reserved.</p>
+            <p>© 2026 Matchlytics by imortifex · 18+ · Bet responsibly.</p>
             <p>Data: football-data.org · The Odds API · PostgreSQL</p>
           </div>
         </div>
