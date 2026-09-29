@@ -37,7 +37,7 @@ export default function Header({ lastUpdated }) {
             </p>
           )}
           <p className="text-xs text-slate-500 mt-0.5">
-            Model: Poisson / Bet365 Real Odds
+            Model: Bivariate Poisson · Consensus Sharp Odds
           </p>
         </div>
       </div>

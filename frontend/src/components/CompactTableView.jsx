@@ -229,7 +229,7 @@ export default function CompactTableView({
                             no-vig: {zeroVig.fairOddsHome.toFixed(2)} / {zeroVig.fairOddsDraw.toFixed(2)} / {zeroVig.fairOddsAway.toFixed(2)}
                           </span>
                         ) : (
-                          <span>{hasRealOdds ? '● Bet365' : '○ Model Fair'}</span>
+                          <span>{hasRealOdds ? '● Consensus Sharp' : '○ Model Fair'}</span>
                         )}
                       </div>
                     </div>

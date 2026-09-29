@@ -363,7 +363,7 @@ export function calculateParlayAggregates(legs) {
 }
 
 /**
- * Determine whether odds are real bookmaker odds (Bet365/Pinnacle)
+ * Determine whether odds are aggregated sharp-market consensus prices
  * or fallback model fair odds.
  */
 export function isRealMarketOdds(fixture) {

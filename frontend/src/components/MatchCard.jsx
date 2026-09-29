@@ -144,7 +144,7 @@ export default function MatchCard({
                 }`}
               >
                 <span>{hasRealOdds ? '●' : '○'}</span>
-                <span>{hasRealOdds ? 'Real Odds (Bet365)' : 'Fair Odds (Model)'}</span>
+                <span>{hasRealOdds ? '● Consensus Sharp Odds' : '○ Model Fair'}</span>
               </span>
             </div>
           </div>

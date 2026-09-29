@@ -745,7 +745,7 @@ const UPCOMING_STATUSES = ['NS', 'SCHEDULED', 'TIMED', 'IN_PLAY', 'PAUSED']
                     Realtime Active
                   </span>
                   <span className="text-slate-500 hidden sm:inline font-mono">
-                    Odds: The Odds API (Bet365 / Pinnacle)
+                    Market Feed: Consensus Sharp Aggregation
                   </span>
                 </div>
               </div>
