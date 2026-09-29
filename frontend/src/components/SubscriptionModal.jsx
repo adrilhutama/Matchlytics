@@ -1,25 +1,44 @@
 // ---- SubscriptionModal.jsx ----
 // Paywall shown on the app surface when the caller has a session but no
-// active subscription. The dashboard stays mounted behind it in a
-// blurred preview state; paying lifts the lock, no reload required
-// (AuthContext streams profile writes over realtime).
+// active subscription. Access is blocked until a subscription goes
+// active; paying lifts the lock live (AuthContext streams profile writes
+// over realtime, no reload).
 //
-// Checkout integration: the gateway redirect URL comes from env so the
-// deployer can wire Midtrans (Sanberpay) or Stripe payment links later
-// without touching this component. Until then the card is labelled
-// honestly as "rate pending publication" rather than inventing a
-// number.
+// Pricing: the official rates are built in as production defaults, so
+// the cards never render an empty price. VITE_PRICE_PRO / VITE_PRICE_SEASON
+// can override them for regional promos or currency changes.
+//
+// Checkout: when a gateway link is deployed (Midtrans/Sanberpay or Stripe
+// payment link via VITE_CHECKOUT_URL_*), the CTA redirects there with the
+// signed-in email attached as customer_email. Without one, a manual
+// payment card guides the buyer through bank transfer or QRIS, with a
+// pre-filled WhatsApp confirmation when the operator sets
+// VITE_ADMIN_WHATSAPP, and a real GitHub contact route as the standing
+// fallback. No dead admin numbers ship in the source.
 
 import { useState } from 'react'
 import { useAuth } from '../context/AuthContext'
+
+const PRICE_PRO = import.meta.env.VITE_PRICE_PRO || 'Rp 149.000 / bln'
+const PRICE_SEASON = import.meta.env.VITE_PRICE_SEASON || 'Rp 999.000 / thn'
+const SUBTEXT_PRO = 'Billing monthly · Cancel anytime'
+// Season pass covers the same engine for a whole year:
+// 12 x Rp 149.000 = Rp 1.788.000, so Rp 999.000 saves roughly 44%.
+const SUBTEXT_SEASON = 'Save ~44% · Full season coverage'
+
+// Operator-configured admin channel for manual activation confirmation.
+// International format without "+" prefix, e.g. 6281234567890.
+const ADMIN_WHATSAPP = import.meta.env.VITE_ADMIN_WHATSAPP
+const GITHUB_CONTACT_URL = 'https://github.com/adrilhutama/Matchlytics'
 
 const TIERS = [
   {
     id: 'pro',
     name: 'Pro Pass',
     cadence: 'Monthly',
-    priceEnv: import.meta.env.VITE_PRICE_PRO_MONTHLY,
-    checkoutEnv: import.meta.env.VITE_CHECKOUT_URL_PRO,
+    price: PRICE_PRO,
+    subtext: SUBTEXT_PRO,
+    checkoutUrl: import.meta.env.VITE_CHECKOUT_URL_PRO,
     blurb: 'The full engine, refreshed on schedule.',
     perks: [
       '+EV value feeds across six leagues',
@@ -33,8 +52,9 @@ const TIERS = [
     id: 'season',
     name: 'Season Pass',
     cadence: 'Annual',
-    priceEnv: import.meta.env.VITE_PRICE_SEASON_ANNUAL,
-    checkoutEnv: import.meta.env.VITE_CHECKOUT_URL_SEASON,
+    price: PRICE_SEASON,
+    subtext: SUBTEXT_SEASON,
+    checkoutUrl: import.meta.env.VITE_CHECKOUT_URL_SEASON,
     blurb: 'The whole season, at the discounted rate.',
     perks: [
       'Everything in Pro Pass',
@@ -53,16 +73,36 @@ export default function SubscriptionModal() {
   const statusLabel =
     profile?.subscription_status === 'past_due' ? 'PAST DUE' : 'INACTIVE'
 
-  const handleCheckout = () => {
-    if (!selected?.checkoutEnv) return
+  // Gateway path: redirect with the buyer's email attached so the
+  // provider can pre-bind the session.
+  const handleGatewayCheckout = () => {
+    if (!selected?.checkoutUrl) return
     setLeaving(true)
-    window.location.assign(selected.checkoutEnv)
+    try {
+      const target = new URL(selected.checkoutUrl)
+      if (user?.email) target.searchParams.set('customer_email', user.email)
+      window.location.assign(target.toString())
+    } catch {
+      window.location.assign(selected.checkoutUrl)
+    }
+  }
+
+  // Manual path: one pre-filled confirmation message to the operator,
+  // which triggers the service-role activation on the caller's row.
+  const handleWhatsappConfirmation = () => {
+    if (!ADMIN_WHATSAPP) return
+    setLeaving(true)
+    const message = `Halo Admin Matchlytics, saya ingin aktivasi langganan ${selected.name} untuk akun ${user?.email ?? ''}`
+    const url = `https://wa.me/${ADMIN_WHATSAPP}?text=${encodeURIComponent(message)}`
+    window.open(url, '_blank', 'noopener')
   }
 
   const handleSignOut = async () => {
     setLeaving(true)
     await signOut()
   }
+
+  const manualMode = !selected?.checkoutUrl
 
   return (
     <div
@@ -90,8 +130,8 @@ export default function SubscriptionModal() {
             </div>
           </div>
           <p className="mt-3 text-xs text-slate-400 leading-relaxed max-w-md">
-            Your account preview is active behind this screen. Choose a pass to open every
-            live feed, model, and simulator.
+            Choose a pass to open every live feed, model, and simulator. Your
+            access activates the moment payment is confirmed.
           </p>
         </div>
 
@@ -125,16 +165,12 @@ export default function SubscriptionModal() {
                 </div>
                 <p className="mt-1.5 text-xs text-slate-500">{t.blurb}</p>
 
-                <p className="mt-3 text-lg font-mono text-slate-100 tabular-nums">
-                  {t.priceEnv ? (
-                    <>
-                      {t.priceEnv}
-                      <span className="text-[11px] text-slate-500">/{t.id === 'pro' ? 'mo' : 'yr'}</span>
-                    </>
-                  ) : (
-                    <span className="text-xs font-normal text-slate-500">Rate pending publication</span>
-                  )}
-                </p>
+                <div className="mt-3">
+                  <div className="text-2xl font-black text-amber-400 tracking-tight break-words">
+                    {t.price}
+                  </div>
+                  <p className="mt-1 text-[11px] font-mono text-slate-500">{t.subtext}</p>
+                </div>
 
                 <ul className="mt-3 space-y-1.5">
                   {t.perks.map((perk) => (
@@ -151,32 +187,61 @@ export default function SubscriptionModal() {
 
         {/* ── Checkout footer ── */}
         <div className="px-4 sm:px-5 pb-4 sm:pb-5 space-y-3">
-          {selected?.checkoutEnv ? (
-            <button
-              type="button"
-              onClick={handleCheckout}
-              disabled={leaving}
-              className="w-full min-h-[48px] px-5 rounded-xl bg-amber-500 hover:bg-amber-400 disabled:opacity-50 text-pitch-950 text-sm font-bold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-400"
-            >
-              {leaving ? 'Opening secure checkout...' : 'Proceed to Checkout'}
-            </button>
+          {!manualMode ? (
+            <>
+              <button
+                type="button"
+                onClick={handleGatewayCheckout}
+                disabled={leaving}
+                className="w-full min-h-[48px] px-5 rounded-xl bg-amber-500 hover:bg-amber-400 disabled:opacity-50 text-pitch-950 text-sm font-bold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-400"
+              >
+                {leaving ? 'Opening secure checkout...' : `Proceed to Checkout · ${selected.name}`}
+              </button>
+              <p className="text-[11px] text-slate-500">
+                Secure payment window. Your account email is attached so the charge binds to
+                <span className="font-mono text-slate-400"> {user?.email} </span>
+                and activation applies immediately on success.
+              </p>
+            </>
           ) : (
-            <button
-              type="button"
-              onClick={handleCheckout}
-              disabled
-              className="w-full min-h-[48px] px-5 rounded-xl bg-pitch-800 border border-pitch-700 text-slate-500 text-sm font-semibold cursor-not-allowed"
-            >
-              Proceed to Checkout
-            </button>
-          )}
-          {!selected?.checkoutEnv && (
-            <p className="text-[11px] text-slate-500 leading-relaxed">
-              The payment gateway is not wired into this build yet. Deploying
-              <span className="font-mono text-slate-400"> VITE_CHECKOUT_URL_PRO </span> /
-              <span className="font-mono text-slate-400"> VITE_CHECKOUT_URL_SEASON </span>
-              activates the button above (Midtrans or Stripe payment link).
-            </p>
+            <div className="rounded-xl border border-pitch-700 bg-pitch-950 p-4">
+              <p className="text-xs font-bold text-slate-100">
+                Complete your {selected.name} manually
+              </p>
+              <ol className="mt-3 space-y-1.5 text-[11px] text-slate-400 list-decimal list-inside leading-relaxed">
+                <li>Transfer {selected.price} via QRIS or bank transfer to the operator.</li>
+                <li>Send your account email and receipt with the confirmation below.</li>
+                <li>Activation lands on this screen automatically. No reload.</li>
+              </ol>
+              <div className="mt-3 flex flex-col sm:flex-row gap-2">
+                <button
+                  type="button"
+                  onClick={handleWhatsappConfirmation}
+                  disabled={!ADMIN_WHATSAPP || leaving}
+                  className={`min-h-[44px] flex-1 px-4 rounded-xl text-xs font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500 ${
+                    ADMIN_WHATSAPP
+                      ? 'bg-emerald-500 hover:bg-emerald-400 text-pitch-950'
+                      : 'bg-pitch-800 text-slate-500 cursor-not-allowed'
+                  }`}
+                >
+                  {ADMIN_WHATSAPP ? 'Confirm via WhatsApp' : 'WhatsApp confirmation unavailable'}
+                </button>
+                <a
+                  href={GITHUB_CONTACT_URL}
+                  target="_blank"
+                  rel="noreferrer noopener"
+                  className="min-h-[44px] flex-1 px-4 rounded-xl border border-pitch-600 bg-pitch-800 hover:bg-pitch-700 text-xs font-semibold text-slate-200 transition-colors flex items-center justify-center focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500"
+                >
+                  Get help on GitHub
+                </a>
+              </div>
+              {!ADMIN_WHATSAPP && (
+                <p className="mt-2 text-[10px] font-mono text-slate-600">
+                  The WhatsApp confirmation line lights up once the operator ships
+                  <span className="text-slate-400"> VITE_ADMIN_WHATSAPP</span>. Until then, use GitHub.
+                </p>
+              )}
+            </div>
           )}
 
           <div className="flex items-center justify-between gap-3 pt-1">
@@ -188,7 +253,7 @@ export default function SubscriptionModal() {
             >
               Sign out instead
             </button>
-            <p className="text-[10px] font-mono text-slate-600">Secure checkout · 18+</p>
+            <p className="text-[10px] font-mono text-slate-600">Secure payment · 18+</p>
           </div>
         </div>
       </div>
