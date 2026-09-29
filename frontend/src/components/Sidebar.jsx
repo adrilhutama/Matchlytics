@@ -25,6 +25,9 @@ export default function Sidebar({
   deferredInstall,
   onOpenBacktest,
   onEcosystemVisit,      // opens the imortifex.me landing surface
+  userEmail,             // signed-in account (app view only)
+  subscriptionTier,     // 'free' | 'pro' | 'institutional'
+  onSignOut,
 }) {
   const timeStr = lastUpdated
     ? lastUpdated.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' })
@@ -196,8 +199,39 @@ export default function Sidebar({
         </ul>
       </nav>
 
-      {/* ---- System Status Footer ---- */}
-      <div className="mt-auto pt-4">
+      {/* ---- Account + System Status Footer ---- */}
+      <div className="mt-auto pt-4 space-y-3">
+        {userEmail && (
+          <div className="rounded-xl bg-pitch-900 border border-pitch-800 p-3">
+            <div className="flex items-center justify-between gap-2 min-w-0">
+              <div className="min-w-0">
+                <p className="text-[11px] text-slate-300 font-medium truncate">{userEmail}</p>
+                <span
+                  className={`inline-block mt-1 px-1.5 py-0.5 rounded-md text-[9px] font-mono font-bold tracking-wider ${
+                    subscriptionTier === 'free'
+                      ? 'bg-pitch-800 text-slate-500 border border-pitch-700'
+                      : 'bg-amber-500/15 text-amber-300 border border-amber-500/30'
+                  }`}
+                >
+                  {(subscriptionTier || 'free').toUpperCase()}
+                </span>
+              </div>
+              <button
+                type="button"
+                onClick={onSignOut}
+                title="Sign out of this device"
+                className="min-h-[32px] min-w-[32px] shrink-0 px-2 rounded-lg text-slate-500 hover:text-rose-400 hover:bg-pitch-800 transition-colors flex items-center justify-center focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500"
+              >
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                  <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
+                  <polyline points="16 17 21 12 16 7" />
+                  <line x1="21" y1="12" x2="9" y2="12" />
+                </svg>
+                <span className="sr-only">Sign out</span>
+              </button>
+            </div>
+          </div>
+        )}
         <div className="rounded-xl bg-pitch-900 border border-pitch-800 p-3 space-y-2">
           <div className="flex items-center gap-2 text-[11px] font-medium text-emerald-400">
             <span className="relative flex h-2.5 w-2.5" aria-hidden="true">

@@ -28,6 +28,9 @@ import MobileNav from './components/MobileNav'
 import MobileLeagueDrawer from './components/MobileLeagueDrawer'
 import InstallPrompt from './components/InstallPrompt'
 import LandingPage from './components/LandingPage'
+import LoginPage from './components/LoginPage'
+import SubscriptionModal from './components/SubscriptionModal'
+import { AuthProvider, useAuth } from './context/AuthContext'
 import {
   isDateInRange,
   matchesSearch,
@@ -84,13 +87,17 @@ function buildDateRange() {
 //   'watchlist'  -> showWatchlistOnly = true
 //   'matches'    -> same as 'all' (kept for mobile-nav consistency)
 
-export default function App() {
+function AppInner() {
   // Dual-domain routing: 'landing' renders the marketing surface,
   // 'dashboard' renders the operational app. All data fetching below
   // stays mounted for both views so the backtest ledger and the hero
   // monitor work without re-loading.
   const [currentView, setCurrentView] = useState(getInitialView)
 
+  // Authentication + subscription state for the operational surface.
+  // The landing view ignores it (public viewing stays open); the
+  // dashboard branch gates on it.
+  const { user, profile, loading: authLoading, hasActiveSubscription, signOut } = useAuth()
   const [fixtures,            setFixtures]            = useState([])
   const [standingsMap,        setStandingsMap]        = useState({})
   const [loading,             setLoading]             = useState(true)
@@ -398,6 +405,12 @@ export default function App() {
     syncUrlForView('landing')
   }, [syncUrlForView])
 
+  // ---- Subscription paywall state ----------------------------
+  // Signed in without an active subscription -> access is blocked by a
+  // locked paywall modal (the unlock path lifts the lock live when the
+  // profile write lands via AuthContext realtime).
+  const isDashboardLocked = Boolean(user) && !hasActiveSubscription
+
   // ---- Modals & Drawers (shared by BOTH views) ----------------
   // Rendered outside the view branch so the verified backtest ledger can
   // be opened straight from the landing page hero CTA.
@@ -458,6 +471,44 @@ export default function App() {
     )
   }
 
+  // ---- Dashboard surface: authentication + subscription gate ----
+  // The operational app requires a signed-in caller with an active
+  // subscription. Loading, unauthenticated, and locked states each
+  // render their own screen; only the unlocked path mounts the live
+  // dashboard.
+  if (authLoading) {
+    return (
+      <div className="w-full min-h-screen bg-pitch-950 flex items-center justify-center overflow-x-hidden">
+        <div className="flex flex-col items-center gap-4 animate-fade-in">
+          <span
+            className="inline-block w-9 h-9 rounded-lg border-2 border-pitch-700 border-t-amber-500 animate-spin"
+            aria-hidden="true"
+          />
+          <p className="text-xs font-mono text-slate-500">Verifying session...</p>
+        </div>
+      </div>
+    )
+  }
+
+  if (!user) {
+    return (
+      <div className="w-full min-h-screen bg-pitch-950 text-slate-100 overflow-x-hidden">
+        <LoginPage onBackToLanding={handleEcosystemVisit} />
+      </div>
+    )
+  }
+
+  if (isDashboardLocked) {
+    return (
+      <div className="w-full min-h-screen bg-pitch-900 overflow-x-hidden">
+        {/* Access blocked entirely until a subscription goes active. The
+            paywall floats over a plain canvas so no fixture data renders
+            behind the lock. */}
+        <SubscriptionModal />
+      </div>
+    )
+  }
+
   return (
     <div className="w-full min-h-screen bg-pitch-900 text-slate-100 flex overflow-x-hidden">
       {/* ─── Desktop Left Sidebar ────────────────────────────── */}
@@ -473,6 +524,9 @@ export default function App() {
         deferredInstall={deferredInstall}
         onOpenBacktest={() => setIsBacktestOpen(true)}
         onEcosystemVisit={handleEcosystemVisit}
+        userEmail={user?.email}
+        subscriptionTier={profile?.subscription_tier}
+        onSignOut={signOut}
       />
 
       {/* ─── Main Content Area ──────────────────────────────── */}
@@ -488,17 +542,44 @@ export default function App() {
             <p className="text-sm font-bold text-slate-100 tracking-tight leading-none">Matchlytics</p>
             <p className="text-[9px] font-mono text-slate-500 mt-0.5">by imortifex</p>
           </div>
-          <span className="ml-auto inline-flex items-center gap-1.5 text-[11px] text-emerald-400 font-mono flex-shrink-0">
-            <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" aria-hidden="true" />
-            Live
-          </span>
-          <button
-            type="button"
-            onClick={handleEcosystemVisit}
-            className="min-h-[36px] px-3 rounded-lg border border-pitch-700 bg-pitch-900 text-[11px] font-mono text-slate-300 hover:text-slate-100 transition-colors flex items-center flex-shrink-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500"
-          >
-            🌐 imortifex.me
-          </button>
+          <div className="ml-auto flex items-center gap-2 min-w-0">
+            {user && (
+              <div className="flex items-center gap-1.5 min-w-0 flex-shrink-0">
+                <p className="hidden sm:block text-[10px] font-mono text-slate-500 truncate max-w-[90px]">{user.email}</p>
+                <span
+                  className={`px-1.5 py-0.5 rounded-md text-[9px] font-mono font-bold tracking-wider ${
+                    profile?.subscription_tier === 'free'
+                      ? 'bg-pitch-800 text-slate-500 border border-pitch-700'
+                      : 'bg-amber-500/15 text-amber-300 border border-amber-500/30'
+                  }`}
+                >
+                  {(profile?.subscription_tier || 'free').toUpperCase()}
+                </span>
+                <button
+                  type="button"
+                  onClick={signOut}
+                  title="Sign out of this device"
+                  className="min-h-[32px] min-w-[32px] rounded-lg text-slate-500 hover:text-rose-400 hover:bg-pitch-900 transition-colors flex items-center justify-center focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500"
+                >
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                    <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
+                    <polyline points="16 17 21 12 16 7" />
+                    <line x1="21" y1="12" x2="9" y2="12" />
+                  </svg>
+                  <span className="sr-only">Sign out</span>
+                </button>
+              </div>
+            )}
+            <button
+              type="button"
+              onClick={handleEcosystemVisit}
+              className="min-h-[36px] sm:px-3 rounded-lg border border-pitch-700 bg-pitch-900 text-[11px] font-mono text-slate-300 hover:text-slate-100 transition-colors flex items-center gap-1.5 flex-shrink-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500"
+            >
+              <span aria-hidden="true">🌐</span>
+              <span className="hidden sm:inline">imortifex.me</span>
+              <span className="sr-only">Open imortifex.me landing surface</span>
+            </button>
+          </div>
         </div>
 
         {/* Sticky glassmorphism Filter Bar */}
@@ -669,5 +750,18 @@ export default function App() {
       {/* ─── Modals & Drawers (always rendered) ───────────── */}
       {sharedOverlays}
     </div>
+  )
+}
+
+// ---- Application root ------------------------------------------
+// AuthProvider supplies session + profile state to every screen.
+// AppInner decides what renders: the landing surface stays public,
+// while the operational dashboard runs through the authentication
+// and subscription gates above.
+export default function App() {
+  return (
+    <AuthProvider>
+      <AppInner />
+    </AuthProvider>
   )
 }
