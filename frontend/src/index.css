@@ -13,18 +13,30 @@
     box-sizing: border-box;
   }
 
+  /* Full-bleed guard: the document, the mount node, and every layout
+     branch must resolve to exactly the viewport width. A #root or body
+     that ends up narrower than the viewport makes iOS Safari zoom the
+     whole page out into a rigid narrow frame with side gutters. */
+  html,
+  body,
+  #root {
+    width: 100%;
+    min-height: 100%;
+    margin: 0;
+    padding: 0;
+    overflow-x: hidden;
+    position: relative;
+    box-sizing: border-box;
+  }
+
   html {
     -webkit-text-size-adjust: 100%;
     scroll-behavior: smooth;
-    width: 100%;
-    overflow-x: hidden;
   }
 
   body {
     @apply bg-pitch-950 text-slate-300 font-sans antialiased;
     min-height: 100dvh;
-    width: 100%;
-    overflow-x: hidden;
   }
 
   /* Accessible focus ring: visible, high-contrast indicator */

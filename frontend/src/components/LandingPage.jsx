@@ -289,7 +289,7 @@ function ScoreHeatPanel() {
   const outcomeOf = (h, a) => (h > a ? 'HOME WINS' : h === a ? 'DRAW' : 'AWAY WINS')
 
   return (
-    <div className="rounded-2xl bg-pitch-800 border border-pitch-700 p-5">
+    <div className="min-w-0 rounded-2xl bg-pitch-800 border border-pitch-700 p-5">
       <div className="flex items-start justify-between gap-3">
         <div>
           <h3 className="text-base font-bold text-slate-100">6×6 Score Matrix</h3>
@@ -387,7 +387,7 @@ function ParlayPanel({ evPicks }) {
   const agg = useMemo(() => calculateParlayAggregates(legs), [JSON.stringify(legs)])
 
   return (
-    <div className="rounded-2xl bg-pitch-800 border border-pitch-700 p-5">
+    <div className="min-w-0 rounded-2xl bg-pitch-800 border border-pitch-700 p-5">
       <div className="flex items-start justify-between gap-3">
         <div>
           <h3 className="text-base font-bold text-slate-100">Smart Parlay Slip</h3>
@@ -445,7 +445,7 @@ function ParlayPanel({ evPicks }) {
 
 function SitrepMock() {
   return (
-    <div className="rounded-2xl bg-pitch-950 border border-pitch-700 overflow-hidden font-mono">
+    <div className="min-w-0 rounded-2xl bg-pitch-950 border border-pitch-700 overflow-hidden font-mono">
       <div className="flex items-center justify-between px-4 py-2.5 border-b border-pitch-800 bg-pitch-900">
         <p className="text-[11px] text-slate-300">matchlytics-sitrep</p>
         <span className="text-[10px] text-slate-500">TEMPLATE PREVIEW</span>
@@ -636,10 +636,10 @@ export default function LandingPage({
   ]
 
   return (
-    <div className="w-full min-h-screen overflow-x-hidden bg-pitch-950 text-slate-100">
+    <div className="w-full min-h-screen bg-pitch-950 overflow-x-hidden flex flex-col">
       {/* ─── Sticky top navigation ─────────────────────────── */}
       <header className="sticky top-0 z-40 bg-pitch-950/95 backdrop-blur-sm border-b border-pitch-800">
-        <div className="w-full max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div className="w-full max-w-5xl mx-auto px-4 sm:px-6">
           <div className="flex items-center gap-3 h-16">
             <a href="#top" className="flex items-center gap-2.5 min-w-0" aria-label="Matchlytics by imortifex, back to top">
               <DiamondMark size={30} />
@@ -698,14 +698,14 @@ export default function LandingPage({
 
       <main id="top">
         {/* ─── Hero: pitch of claims + living monitor ──────── */}
-        <section className="relative bg-pitch-950">
-          <div className="w-full max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 pt-14 sm:pt-20 lg:pt-24 pb-12 sm:pb-16">
+        <section className="relative w-full border-b border-pitch-900/60">
+          <div className="w-full max-w-5xl mx-auto px-4 sm:px-6">
             <div className="grid lg:grid-cols-2 gap-10 lg:gap-14 items-center">
-              <div className="animate-fade-in">
+              <div className="min-w-0 animate-fade-in">
                 <p className="font-mono text-[11px] sm:text-xs text-slate-500 tracking-[0.14em] uppercase">
                   Institutional Quantitative Sports Analytics Engine · By Imortifex
                 </p>
-                <h1 className="mt-4 w-full max-w-full text-2xl sm:text-4xl md:text-5xl lg:text-6xl font-extrabold tracking-tight leading-tight sm:leading-tight break-words text-slate-100">
+                <h1 className="mt-4 w-full max-w-full text-3xl sm:text-5xl lg:text-6xl font-extrabold tracking-tight text-white leading-tight break-normal">
                   Eliminate the bookmaker&apos;s edge with pure mathematical precision.
                 </h1>
                 <p className="mt-5 text-base sm:text-lg text-slate-400 leading-relaxed max-w-xl">
@@ -735,7 +735,7 @@ export default function LandingPage({
                 </p>
               </div>
 
-              <div className="animate-slide-up">
+              <div className="min-w-0 animate-slide-up">
                 <HeroMonitor evPicks={evPicks} fixturesLoading={Boolean(fixturesLoading)} dataError={dataError} />
               </div>
             </div>
@@ -743,8 +743,8 @@ export default function LandingPage({
         </section>
 
         {/* ─── 01 Methodology: four quant pillars ──────────── */}
-        <section id="methodology" className="scroll-mt-24 bg-pitch-900/40 border-y border-pitch-800">
-          <div className="w-full max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-14 sm:py-20">
+        <section id="methodology" className="w-full py-8 sm:py-16 border-b border-pitch-900/60 scroll-mt-24">
+          <div className="w-full max-w-5xl mx-auto px-4 sm:px-6">
             <div className="max-w-2xl">
               <SectionKicker index="01" title="Methodology" />
               <h2 className="text-2xl sm:text-3xl font-bold text-slate-100 tracking-tight">
@@ -773,8 +773,8 @@ export default function LandingPage({
         </section>
 
         {/* ─── 02 Core Architecture: pipeline + capability ─── */}
-        <section id="architecture" className="scroll-mt-24">
-          <div className="w-full max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-14 sm:py-20">
+        <section id="architecture" className="w-full py-8 sm:py-16 border-b border-pitch-900/60 scroll-mt-24">
+          <div className="w-full max-w-5xl mx-auto px-4 sm:px-6">
             <div className="max-w-2xl">
               <SectionKicker index="02" title="Core Architecture" />
               <h2 className="text-2xl sm:text-3xl font-bold text-slate-100 tracking-tight">
@@ -804,10 +804,12 @@ export default function LandingPage({
               ))}
             </ol>
 
-            {/* Capability showcase */}
-            <div className="mt-8 grid lg:grid-cols-2 gap-4">
-              <ScoreHeatPanel />
-              <div className="flex flex-col gap-4">
+            {/* Capability showcase: stacks on phones, side by side when both panes fit */}
+            <div className="mt-8 grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div className="min-w-0">
+                <ScoreHeatPanel />
+              </div>
+              <div className="min-w-0 flex flex-col gap-4">
                 <ParlayPanel evPicks={evPicks} />
               </div>
             </div>
@@ -815,8 +817,8 @@ export default function LandingPage({
         </section>
 
         {/* ─── 03 Track Record: verified settlements only ──── */}
-        <section id="track-record" className="scroll-mt-24 bg-pitch-900/40 border-y border-pitch-800">
-          <div className="w-full max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-14 sm:py-20">
+        <section id="track-record" className="w-full py-8 sm:py-16 border-b border-pitch-900/60 scroll-mt-24">
+          <div className="w-full max-w-5xl mx-auto px-4 sm:px-6">
             <div className="max-w-2xl">
               <SectionKicker index="03" title="Track Record" />
               <h2 className="text-2xl sm:text-3xl font-bold text-slate-100 tracking-tight">
@@ -836,8 +838,8 @@ export default function LandingPage({
         </section>
 
         {/* ─── 04 Daily SITREP ──────────────────────────────── */}
-        <section id="sitrep" className="scroll-mt-24">
-          <div className="w-full max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-14 sm:py-20">
+        <section id="sitrep" className="w-full py-8 sm:py-16 border-b border-pitch-900/60 scroll-mt-24">
+          <div className="w-full max-w-5xl mx-auto px-4 sm:px-6">
             <div className="grid lg:grid-cols-2 gap-8 items-start">
               <div>
                 <SectionKicker index="04" title="Daily SITREP" />
@@ -871,7 +873,7 @@ export default function LandingPage({
 
       {/* ─── Trust, compliance & ecosystem footer ──────────── */}
       <footer className="border-t border-pitch-800 bg-pitch-950">
-        <div className="w-full max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-10 sm:py-14">
+        <div className="w-full max-w-5xl mx-auto px-4 sm:px-6 py-10 sm:py-14">
           <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-8">
             <div className="max-w-md">
               <div className="flex items-center gap-2.5">

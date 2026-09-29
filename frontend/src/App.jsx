@@ -443,7 +443,7 @@ export default function App() {
   // ---- View: Landing Surface (marketing, ecosystem showcase) ----
   if (currentView === 'landing') {
     return (
-      <div className="w-full min-h-screen bg-pitch-950 text-slate-100">
+      <div className="w-full min-h-screen bg-pitch-950 text-slate-100 overflow-x-hidden">
         <LandingPage
           onEnterApp={handleEnterApp}
           onOpenBacktest={() => setIsBacktestOpen(true)}
