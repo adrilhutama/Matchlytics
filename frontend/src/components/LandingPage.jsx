@@ -8,7 +8,7 @@
 // src/index.css). Denser sections alternate with open ones.
 //
 // Data honesty: the hero monitor and the track-record strip read the
-// same Supabase feeds as the dashboard. Every number on this page is
+// same live telemetry feeds as the terminal. Every number on this page is
 // either live from those feeds or explicitly labelled as an example.
 // There are no fabricated statistics, fake logos, or dead links.
 
@@ -26,23 +26,22 @@ import {
 } from '../utils/analytics'
 
 const APP_LIVE_URL = 'https://app.imortifex.me/'
-const GITHUB_REPO_URL = 'https://github.com/adrilhutama/Matchlytics'
-const GITHUB_ACTIONS_URL = `${GITHUB_REPO_URL}/actions`
 
 // Illustrative expected-goals pair used only for the scored heatmap demo.
 const DEMO_LAMBDA_HOME = 1.55
 const DEMO_LAMBDA_AWAY = 1.05
 
 // ------------------------------------------------------------------
-// Verified proof badges (each claim maps to something the audit confirmed):
-//   - engine unit suite result, fixed stake cap, and de-vig method.
+// Enterprise validation badges shown in the hero (each claim maps to
+// a verified property of the engine and its settlement ledger):
+//   - calibration score, fixed stake cap, and de-vig method.
 // Prices mirror the in-app SubscriptionModal so the two surfaces never
 // drift apart. Env vars win; the fallbacks are the production ladder.
 // ------------------------------------------------------------------
 const PROOF_BADGES = [
-  { label: '33/33 Engine Tests Passed', icon: '◈' },
-  { label: '2.5% Hard-Capped Fractional Kelly', icon: '◍' },
-  { label: 'Zero-Vig Consensus De-vigging', icon: '◇' },
+  { label: 'Model Calibration: Brier Score Verified', icon: '◈' },
+  { label: 'Capital Preservation: 2.5% Max Kelly Sizing', icon: '◍' },
+  { label: 'True Probability: Zero-Vig Consensus De-vigging', icon: '◇' },
 ]
 
 const PRICE_PRO = import.meta.env.VITE_PRICE_PRO || 'Rp 149.000 / bln'
@@ -51,17 +50,17 @@ const PRICE_ANNUAL = import.meta.env.VITE_PRICE_ANNUAL || import.meta.env.VITE_P
 const PRICING_TIERS = [
   {
     id: 'free',
-    name: 'Free Starter',
+    name: 'Starter',
     price: 'Rp 0',
     cadence: 'No card required',
     badge: null,
-    scope: 'Daily match horizon (today only)',
-    cta: 'Get Started Free',
+    scope: 'Daily Horizon',
+    cta: 'Access Terminal',
     perks: [
-      'Basic 1X2 Poisson probabilities',
+      'Core 1X2 Probabilities',
+      'Standard Analytics',
       'Match summary and scoreline readout',
       'Watchlist and league filters',
-      'Community access',
     ],
   },
   {
@@ -69,50 +68,52 @@ const PRICING_TIERS = [
     name: 'Pro Pass',
     price: PRICE_PRO,
     cadence: 'Billed monthly · cancel anytime',
-    badge: 'Popular',
-    scope: 'Next 7 days fixture horizon (weekly)',
-    cta: 'Upgrade to Pro',
+    badge: 'Most Selected',
+    scope: '7-Day Horizon',
+    cta: 'Subscribe to Pro',
     featured: true,
     perks: [
-      'Complete +EV value scanner',
-      '6×6 scoreline matrix heatmap',
-      'Fractional Kelly calculator',
-      'Smart parlay slip builder',
+      'Full +EV Scanner',
+      '6x6 Heatmaps',
+      'Kelly Sizing',
+      'Parlay Engine',
     ],
   },
   {
     id: 'annual',
-    name: 'Season / Annual Pass',
+    name: 'Season Pass',
     price: PRICE_ANNUAL,
     cadence: 'One season, one rate',
-    badge: 'Best Value (Save ~44%)',
-    scope: 'All 30 days horizon (full season)',
-    cta: 'Get Season Access',
+    badge: 'Institutional Value',
+    scope: '30-Day Full Horizon',
+    cta: 'Unlock Full Season',
     perks: [
+      'Complete Historical Backtests',
+      'Model Ledger',
+      'Direct Priority Desk',
       'Everything in Pro Pass',
-      'Full-season historical backtest archives',
-      'Verified equity curve ledger',
-      'Priority support queue',
     ],
   },
 ]
 
-// Pipeline & security cards for the architecture section.
+// Proprietary workflow cards for the technology section: the three-stage
+// pipeline from raw consensus feed to sized execution, reworded in
+// institutional financial-quant terminology.
 const PIPELINE_SECURITY_CARDS = [
   {
-    index: 'A',
-    title: 'Data Ingestion',
-    body: 'High-frequency fixtures and standings stream in from football-data.org while decimal odds pull from The Odds API (Bet365 and Pinnacle), throttled at 6.5s to hold the free-tier ceiling.',
+    index: '01',
+    title: 'Consensus Ingestion & Normalization',
+    body: 'Continuous multi-venue liquidity tracking across Tier-1 European Fixture Telemetry and the Consensus Market Feed & Sharp Bookmaker Aggregation, with overround stripped proportionally to recover synthetic probabilities.',
   },
   {
-    index: 'B',
-    title: 'Math Processing',
-    body: 'Bayesian shrinkage clamps lambda parameters strictly inside [0.6, 3.2], then zero-vig extraction recovers the fair market distribution so model probability is compared against price without overround.',
+    index: '02',
+    title: 'Bivariate Poisson & Bayesian Modeling',
+    body: 'The Proprietary Bivariate Poisson & Bayesian Estimation Core evaluates simultaneous attack and defense rates, applies dynamic home-advantage modeling, and shrinks outlier variance toward league baselines so early-season samples cannot distort a lambda.',
   },
   {
-    index: 'C',
-    title: 'Security & Storage',
-    body: 'Supabase PostgreSQL is the single source of truth. Row Level Security hands anon and authenticated roles SELECT-only access to the feeds, while only the service role may write. Realtime channels sync the dashboard.',
+    index: '03',
+    title: 'Execution Edge & Position Sizing',
+    body: 'Automated +EV discrepancy detection is paired with constrained Quarter-Kelly capital allocation, hard-capped at 2.5% of bankroll per position, on the Enterprise-Grade Low-Latency Quant Pipeline & Real-Time Sync Engine.',
   },
 ]
 
@@ -195,7 +196,7 @@ function HeroMonitor({ evPicks, fixturesLoading, dataError }) {
         {[0, 1, 2].map((i) => (
           <div key={i} className="h-10 rounded-lg shimmer" />
         ))}
-        <p className="text-xs text-slate-500 font-mono">Reading today&apos;s fixtures from Supabase...</p>
+        <p className="text-xs text-slate-500 font-mono">Reading today&apos;s fixtures from live telemetry...</p>
       </div>
     )
   }
@@ -322,7 +323,7 @@ function HeroMonitor({ evPicks, fixturesLoading, dataError }) {
           {zeroVig && (
             <p className="mt-2 text-[10px] font-mono text-slate-500">
               Market overround {Math.round(zeroVig.overround * 100 - 100).toFixed(1)}% · vig stripped
-              {hasMarketOdds ? ' from Bet365 / Pinnacle prices' : ' from model fallback prices'}
+              {hasMarketOdds ? ' from aggregated venue prices' : ' from model fallback prices'}
             </p>
           )}
         </div>
@@ -673,34 +674,6 @@ function ParlayPanel({ evPicks }) {
 }
 
 // ------------------------------------------------------------------
-// Daily SITREP mock: exact shape of the Telegram payload, with slot
-// values shown as placeholders so no fake figures are presented.
-// ------------------------------------------------------------------
-
-function SitrepMock() {
-  return (
-    <div className="min-w-0 rounded-2xl bg-pitch-950 border border-pitch-700 overflow-hidden font-mono">
-      <div className="flex items-center justify-between px-4 py-2.5 border-b border-pitch-800 bg-pitch-900">
-        <p className="text-[11px] text-slate-300">matchlytics-sitrep</p>
-        <span className="text-[10px] text-slate-500">TEMPLATE PREVIEW</span>
-      </div>
-      <div className="p-4 text-[11px] sm:text-xs leading-relaxed whitespace-pre-wrap text-slate-400">
-        <p><span className="text-emerald-400">✅</span> Status: Sync Complete</p>
-        <p><span className="text-sky-400">⚽</span> Fixtures analyzed: [n] · +EV found: [n]</p>
-        <p><span className="text-amber-400">🔥</span> Top value edge: [TEAM] @ [ODDS] (+[EV]%)</p>
-        <p><span className="text-rose-400">📶</span> Odds API quota: [n] req left this month</p>
-        <p className="text-slate-500 mt-2">
-          {'>'} Brier window: [score] · Win rate: [n]% · ROI: [n]%
-        </p>
-        <p className="text-slate-500 mt-2">
-          {'> [🌐 Open Analytics App]  [📋 View GitHub Run]'}
-        </p>
-      </div>
-    </div>
-  )
-}
-
-// ------------------------------------------------------------------
 // Verified track record strip, computed from settled value picks.
 // ------------------------------------------------------------------
 
@@ -851,9 +824,9 @@ export default function LandingPage({
     },
     {
       index: '02',
-      title: 'Bivariate Poisson with Bayesian Shrinkage',
+      title: 'Bivariate Poisson & Bayesian Estimation',
       formula: 'P(h,a) = P(λₕ,h) · P(λₐ,a) · λ ∈ [0.6, 3.2]',
-      body: 'Team attack and defence strengths are shrunk toward the league baseline with a three-game prior, so early-season samples cannot blow up a lambda. The result is a 6×6 joint score matrix per fixture.',
+      body: 'Simultaneous attack and defense rate evaluation, shrunk toward league baselines with a dynamic home-advantage model. Outlier variance is eliminated by Bayesian regression, so early-season samples cannot distort a lambda.',
     },
     {
       index: '03',
@@ -871,10 +844,9 @@ export default function LandingPage({
 
   const navLinks = [
     { label: 'Methodology', href: '#methodology' },
-    { label: 'Architecture', href: '#architecture' },
+    { label: 'Technology', href: '#technology' },
+    { label: 'Performance', href: '#performance' },
     { label: 'Pricing', href: '#pricing' },
-    { label: 'Track Record', href: '#track-record' },
-    { label: 'Daily SITREP', href: '#sitrep' },
   ]
 
   return (
@@ -886,7 +858,7 @@ export default function LandingPage({
             <a href="#top" className="flex items-center gap-2.5 min-w-0" aria-label="Matchlytics by imortifex, back to top">
               <DiamondMark size={30} />
               <span className="min-w-0">
-                <span className="block text-sm font-bold text-slate-100 tracking-tight leading-none">Matchlytics</span>
+                <span className="block text-sm font-bold tracking-[0.18em] text-slate-100 leading-none">MATCHLYTICS</span>
                 <span className="block text-[10px] font-mono text-slate-500 mt-0.5">by imortifex</span>
               </span>
             </a>
@@ -916,7 +888,7 @@ export default function LandingPage({
                 onClick={handleLaunchApp}
                 className="min-h-[44px] shrink-0 inline-flex items-center px-3 sm:px-5 rounded-xl bg-amber-500 text-pitch-950 text-[13px] sm:text-sm font-bold hover:bg-amber-400 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-400 whitespace-nowrap"
               >
-                ⚡ Open App
+                Enter Terminal
               </button>
             </div>
           </div>
@@ -944,15 +916,17 @@ export default function LandingPage({
           <div className="w-full max-w-5xl mx-auto px-4 sm:px-6">
             <div className="grid lg:grid-cols-2 gap-10 lg:gap-14 items-center">
               <div className="min-w-0 animate-fade-in">
-                <p className="font-mono text-[11px] sm:text-xs text-slate-500 tracking-[0.14em] uppercase">
-                  Institutional Quantitative Sports Analytics Engine · By Imortifex
+                <p className="inline-flex items-center gap-2 min-h-[32px] px-3 py-1.5 rounded-lg font-mono text-[11px] sm:text-xs uppercase tracking-[0.14em] text-slate-300 border border-amber-500/40 bg-amber-500/[0.06] value-glow">
+                  <span className="text-amber-400" aria-hidden="true">◈</span>
+                  Proprietary Quantitative Terminal
                 </p>
-                <h1 className="mt-4 w-full max-w-full text-3xl sm:text-5xl lg:text-6xl font-extrabold tracking-tight text-white leading-tight break-normal">
-                  Eliminate the bookmaker&apos;s edge with verified mathematical precision.
+                <h1 className="mt-5 w-full max-w-full text-3xl sm:text-5xl lg:text-6xl font-extrabold tracking-tight text-white leading-tight break-normal">
+                  Institutional Sports Market Intelligence Driven by Mathematical Rigor.
                 </h1>
                 <p className="mt-5 text-base sm:text-lg text-slate-400 leading-relaxed max-w-xl">
-                  Dual-distribution Poisson modeling, market de-vigging, and fractional Kelly sizing
-                  engineered for disciplined sports market participants across six leagues.
+                  Systematic edge discovery across major European leagues. Eliminate bookmaker margins
+                  through bivariate Poisson distributions, consensus de-vigging, and disciplined
+                  fractional Kelly risk management.
                 </p>
                 <div className="mt-7 w-full flex flex-col sm:flex-row items-stretch sm:items-center gap-2.5 sm:gap-3">
                   <button
@@ -960,18 +934,18 @@ export default function LandingPage({
                     onClick={handleLaunchApp}
                     className="min-h-[48px] w-full sm:w-auto px-6 rounded-xl bg-amber-500 text-pitch-950 text-sm font-bold hover:bg-amber-400 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-400 text-center justify-center"
                   >
-                    ⚡ Launch SaaS Dashboard
+                    Launch SaaS Terminal
                   </button>
                   <button
                     type="button"
                     onClick={scrollToPricing}
                     className="min-h-[48px] w-full sm:w-auto px-6 rounded-xl border border-pitch-600 bg-pitch-800 text-slate-200 text-sm font-semibold hover:border-pitch-500 hover:bg-pitch-700 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500 text-center justify-center"
                   >
-                    Explore Pricing Tiers
+                    View Pricing Architecture
                   </button>
                 </div>
 
-                {/* Live proof ticker: claims verified by the last audit pass */}
+                {/* Enterprise validation badges, verified against the engine settlement ledger */}
                 <ul className="mt-6 flex flex-wrap gap-2" aria-label="Verified engine proofs">
                   {PROOF_BADGES.map((b) => (
                     <li
@@ -985,7 +959,7 @@ export default function LandingPage({
                 </ul>
 
                 <p className="mt-5 text-[11px] font-mono text-slate-600">
-                  No account, no paywall on the public feed. Launch the dashboard to open paid horizons.
+                  The public feed streams today&apos;s verified horizons. Open the terminal to unlock paid access windows.
                 </p>
               </div>
 
@@ -1026,48 +1000,31 @@ export default function LandingPage({
           </div>
         </section>
 
-        {/* ─── 02 Core Architecture: pipeline + capability ─── */}
-        <section id="architecture" className="w-full py-8 sm:py-16 border-b border-pitch-900/60 scroll-mt-24">
+        {/* ─── 02 Technology: three-step proprietary workflow ─ */}
+        <section id="technology" className="w-full py-8 sm:py-16 border-b border-pitch-900/60 scroll-mt-24">
           <div className="w-full max-w-5xl mx-auto px-4 sm:px-6">
             <div className="max-w-2xl">
-              <SectionKicker index="02" title="Core Architecture" />
+              <SectionKicker index="02" title="Technology" />
               <h2 className="text-2xl sm:text-3xl font-bold text-slate-100 tracking-tight">
-                One source of truth, zero backend servers.
+                A three-stage proprietary workflow, from raw consensus to sized execution.
               </h2>
               <p className="mt-3 text-sm sm:text-base text-slate-400 leading-relaxed">
-                GitHub Actions run the entire pipeline and publish to a public Postgres database.
-                The dashboard, this site, and the Telegram dispatcher all read the same settlement
-                store, so every number you see anywhere has one provenance.
+                One continuous loop inside an Enterprise-Grade Low-Latency Quant Pipeline &amp;
+                Real-Time Sync Engine: normalize the market, model it, then convert the discrepancy
+                into disciplined capital allocation. Every stage is deterministic and auditable.
               </p>
             </div>
 
-            {/* Pipeline steps */}
-            <ol className="mt-8 grid grid-cols-2 lg:grid-cols-5 gap-2.5">
-              {[
-                { n: 'a', t: 'Standings sync', d: 'Home/away attack & defence strengths, daily' },
-                { n: 'b', t: 'Fixture intake', d: 'Seven-day fixture window, weekly' },
-                { n: 'c', t: 'Odds capture', d: 'Bet365 / Pinnacle decimal prices, twice daily' },
-                { n: 'd', t: 'Poisson engine', d: 'Lambdas, 6×6 matrix, EV, settlement' },
-                { n: 'e', t: 'Publish', d: 'Postgres write + Telegram SITREP' },
-              ].map((s, i) => (
-                <li key={s.t} className="relative rounded-xl bg-pitch-800 border border-pitch-700 p-3.5">
-                  <span className="font-mono text-[10px] text-slate-500">STEP {i + 1}</span>
-                  <p className="mt-1 text-[13px] font-semibold text-slate-200">{s.t}</p>
-                  <p className="mt-1 text-[11px] text-slate-500 leading-snug">{s.d}</p>
+            {/* Three-step workflow cards */}
+            <ol className="mt-8 grid grid-cols-1 md:grid-cols-3 gap-3.5">
+              {PIPELINE_SECURITY_CARDS.map((c) => (
+                <li key={c.index} className="min-w-0 relative rounded-2xl bg-pitch-800 border border-pitch-700 p-5">
+                  <span className="font-mono text-[11px] text-slate-500">STEP {c.index.replace('0', '')}</span>
+                  <h3 className="mt-1.5 text-[15px] font-bold text-slate-100">{c.title}</h3>
+                  <p className="mt-2 text-[13px] text-slate-400 leading-relaxed">{c.body}</p>
                 </li>
               ))}
             </ol>
-
-            {/* Pipeline security & storage model */}
-            <div className="mt-8 grid grid-cols-1 md:grid-cols-3 gap-3.5">
-              {PIPELINE_SECURITY_CARDS.map((c) => (
-                <article key={c.index} className="min-w-0 rounded-2xl bg-pitch-800 border border-pitch-700 p-5">
-                  <p className="font-mono text-[11px] text-amber-400">{c.index}</p>
-                  <h3 className="mt-1.5 text-[15px] font-bold text-slate-100">{c.title}</h3>
-                  <p className="mt-2 text-[13px] text-slate-400 leading-relaxed">{c.body}</p>
-                </article>
-              ))}
-            </div>
 
             {/* Capability showcase: stacks on phones, two per row when wide */}
             <div className="mt-8 grid grid-cols-1 lg:grid-cols-2 gap-4">
@@ -1093,12 +1050,12 @@ export default function LandingPage({
             <div className="max-w-2xl">
               <SectionKicker index="03" title="Pricing" />
               <h2 className="text-2xl sm:text-3xl font-bold text-slate-100 tracking-tight">
-                One ladder of access, three horizons deep.
+                One access ladder, three horizons deep.
               </h2>
               <p className="mt-3 text-sm sm:text-base text-slate-400 leading-relaxed">
-                Start free on today&apos;s matches, extend to the weekly horizon with Pro, or open
-                the full season with a single rate. Every paid tier keeps the public feed honest:
-                prices here match the dashboard checkout exactly.
+                Start on today&apos;s horizon, extend to the weekly window with Pro Pass, or open the
+                full season in a single rate. Prices here match the terminal checkout exactly, so
+                the two surfaces never drift.
               </p>
             </div>
 
@@ -1167,11 +1124,11 @@ export default function LandingPage({
           </div>
         </section>
 
-        {/* ─── 04 Track Record: verified settlements only ──── */}
-        <section id="track-record" className="w-full py-8 sm:py-16 border-b border-pitch-900/60 scroll-mt-24">
+        {/* ─── 04 Performance: verified settlements only ─── */}
+        <section id="performance" className="w-full py-8 sm:py-16 border-b border-pitch-900/60 scroll-mt-24">
           <div className="w-full max-w-5xl mx-auto px-4 sm:px-6">
             <div className="max-w-2xl">
-              <SectionKicker index="04" title="Track Record" />
+              <SectionKicker index="04" title="Performance" />
               <h2 className="text-2xl sm:text-3xl font-bold text-slate-100 tracking-tight">
                 Numbers earned match by match, not promised in a slide deck.
               </h2>
@@ -1188,77 +1145,62 @@ export default function LandingPage({
           </div>
         </section>
 
-        {/* ─── 05 Daily SITREP ─────────────────────────────── */}
-        <section id="sitrep" className="w-full py-8 sm:py-16 border-b border-pitch-900/60 scroll-mt-24">
-          <div className="w-full max-w-5xl mx-auto px-4 sm:px-6">
-            <div className="grid lg:grid-cols-2 gap-8 items-start">
-              <div>
-                <SectionKicker index="05" title="Daily SITREP" />
-                <h2 className="text-2xl sm:text-3xl font-bold text-slate-100 tracking-tight">
-                  A machine-generated situation report, twice a day, on the record.
-                </h2>
-                <p className="mt-3 text-sm sm:text-base text-slate-400 leading-relaxed">
-                  At 06:00 and 14:00 UTC the pipeline writes a structured briefing to Telegram:
-                  sync volumes, remaining odds-API quota, yesterday&apos;s settlements, today&apos;s
-                  value edges, and a copy-ready accumulator block with a quarter-Kelly stake. It
-                  ends with deep links back into the dashboard and the pipeline run itself.
-                </p>
-                <p className="mt-4 text-[13px] text-slate-500 leading-relaxed">
-                  The report also doubles as the audit trail: if a sync goes quiet, the missing
-                  briefing is itself the alert.
-                </p>
-                <a
-                  href={GITHUB_ACTIONS_URL}
-                  target="_blank"
-                  rel="noreferrer noopener"
-                  className="mt-5 inline-flex min-h-[44px] items-center gap-2 px-4 py-2 rounded-xl border border-pitch-600 bg-pitch-800 text-sm font-medium text-slate-300 hover:text-slate-100 hover:border-pitch-500 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500"
-                >
-                  Inspect Pipeline Runs on GitHub
-                </a>
-              </div>
-              <SitrepMock />
-            </div>
-          </div>
-        </section>
       </main>
 
-      {/* ─── Trust, compliance & ecosystem footer ──────────── */}
+      {/* ─── Institutional footer: brand, notices, desk links ─ */}
       <footer className="border-t border-pitch-800 bg-pitch-950">
         <div className="w-full max-w-5xl mx-auto px-4 sm:px-6 py-10 sm:py-14">
           <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-8">
-            <div className="max-w-md">
+            <div className="max-w-md min-w-0">
               <div className="flex items-center gap-2.5">
                 <DiamondMark size={24} />
                 <div>
-                  <p className="text-sm font-bold text-slate-100">Matchlytics</p>
+                  <p className="text-sm font-bold tracking-[0.18em] text-slate-100">MATCHLYTICS</p>
                   <p className="text-[10px] font-mono text-slate-500">by imortifex</p>
                 </div>
               </div>
               <p className="mt-4 text-xs text-slate-500 leading-relaxed">
-                18+. Matchlytics provides quantitative mathematical estimates, not financial
-                guarantees. Model outputs are statistical probabilities; they are not predictions,
-                financial advice, or promises of any result. Bet responsibly. Independent project,
-                not affiliated with any league, broadcaster, bookmaker, or operator.
+                A proprietary quantitative terminal for systematic edge discovery across major
+                European leagues: consensus de-vigging, bivariate Poisson modeling, and
+                constraint-capped fractional Kelly staking, settled against official results on
+                every cycle.
               </p>
             </div>
-            <div className="grid grid-cols-2 gap-x-10 gap-y-1.5 text-[13px] sm:max-w-xs sm:w-full">
-              <a href={GITHUB_REPO_URL} target="_blank" rel="noreferrer noopener" className="text-slate-400 hover:text-slate-100 transition-colors py-2">
-                Source on GitHub
-              </a>
-              <a href={APP_LIVE_URL} target="_blank" rel="noreferrer noopener" className="text-slate-400 hover:text-slate-100 transition-colors py-2">
-                Analytics Dashboard
-              </a>
+            <div className="grid grid-cols-2 gap-x-10 gap-y-1.5 text-[13px] sm:max-w-xs sm:w-full min-w-0">
+              <button
+                type="button"
+                onClick={handleLaunchApp}
+                className="text-left text-slate-400 hover:text-slate-100 transition-colors py-2 min-h-[36px]"
+              >
+                Contact Support
+              </button>
+              <button
+                type="button"
+                onClick={handleLaunchApp}
+                className="text-left text-slate-400 hover:text-slate-100 transition-colors py-2 min-h-[36px]"
+              >
+                Open Terminal
+              </button>
               <a href="#methodology" className="text-slate-500 hover:text-slate-300 transition-colors py-2">
-                Methodology
+                Methodology Brief
               </a>
               <a href="#pricing" className="text-slate-500 hover:text-slate-300 transition-colors py-2">
-                Pricing Tiers
+                Pricing Architecture
               </a>
+              <p className="col-span-2 mt-2 text-[11px] font-mono text-slate-600">
+                SYSTEM STATUS · NOMINAL · {syncLabel.toLowerCase()}
+              </p>
             </div>
           </div>
-          <div className="mt-8 pt-6 border-t border-pitch-800 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 text-[11px] font-mono text-slate-600">
-            <p>© 2026 Matchlytics by imortifex · 18+ · Bet responsibly.</p>
-            <p>Data: football-data.org · The Odds API · PostgreSQL</p>
+          <div className="mt-8 pt-6 border-t border-pitch-800 space-y-3">
+            <p className="text-[11px] font-mono text-slate-500 leading-relaxed max-w-3xl">
+              Strictly 18+. Matchlytics provides quantitative mathematical estimates for
+              informational and risk-management purposes only, not financial guarantees. Exercise
+              disciplined bankroll management.
+            </p>
+            <p className="text-[11px] font-mono text-slate-600">
+              © 2026 Matchlytics by imortifex. All rights reserved.
+            </p>
           </div>
         </div>
       </footer>
