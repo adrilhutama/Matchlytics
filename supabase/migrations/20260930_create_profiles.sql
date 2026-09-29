@@ -34,7 +34,7 @@ create table if not exists public.profiles (
   created_at timestamp with time zone default now(),
   updated_at timestamp with time zone default now(),
   constraint profiles_tier_check
-    check (subscription_tier in ('free', 'pro', 'institutional')),
+    check (subscription_tier in ('free', 'pro', 'annual', 'institutional')),
   constraint profiles_status_check
     check (subscription_status in ('inactive', 'active', 'past_due'))
 );

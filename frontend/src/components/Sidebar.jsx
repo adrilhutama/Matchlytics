@@ -26,7 +26,7 @@ export default function Sidebar({
   onOpenBacktest,
   onEcosystemVisit,      // opens the imortifex.me landing surface
   userEmail,             // signed-in account (app view only)
-  subscriptionTier,     // 'free' | 'pro' | 'institutional'
+  subscriptionTier,     // 'free' | 'pro' | 'annual' | 'institutional'
   onSignOut,
 }) {
   const timeStr = lastUpdated

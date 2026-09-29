@@ -65,7 +65,10 @@ export default function MatchCard({
   onToggleSlip,
   standingsMap = {},
   style,
+  quantLocked = false,
+  onTriggerUpgrade,
 }) {
+  const triggerUpgrade = quantLocked ? onTriggerUpgrade : null
   const {
     home_team_name, home_team_logo,
     away_team_name, away_team_logo,
@@ -284,75 +287,113 @@ export default function MatchCard({
 
       <div>
         {/* ---- Action Buttons: Matrix Heatmap & Quant Risk Modal ---- */}
+        {/* For Free callers both tools stay tappable but render a lock
+            mark; the tap falls into the same upgrade modal via the
+            gated handlers wired in App.jsx. */}
         <div className="grid grid-cols-2 gap-2 pt-2 mb-3">
           <button
             type="button"
-            onClick={() => onOpenMatrix(fixture)}
-            className="py-2.5 px-3 min-h-[44px] rounded-xl bg-pitch-900 hover:bg-pitch-700 text-slate-300 hover:text-amber-400 border border-pitch-700 font-medium text-xs flex items-center justify-center gap-1.5 transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500 w-full"
+            onClick={() => triggerUpgrade ? triggerUpgrade('Score Matrix requires a Pro pass') : onOpenMatrix(fixture)}
+            aria-disabled={quantLocked || undefined}
+            className={`py-2.5 px-3 min-h-[44px] rounded-xl border font-medium text-xs flex items-center justify-center gap-1.5 transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500 w-full ${
+              quantLocked
+                ? 'bg-pitch-900 text-slate-600 border-pitch-800 hover:border-amber-500/30 cursor-pointer'
+                : 'bg-pitch-900 hover:bg-pitch-700 text-slate-300 hover:text-amber-400 border-pitch-700'
+            }`}
           >
-            <span aria-hidden="true">📊</span>
-            <span>Score Matrix</span>
+            {quantLocked ? (
+              <span aria-hidden="true">🔒</span>
+            ) : (
+              <span aria-hidden="true">📊</span>
+            )}
+            <span>{quantLocked ? 'Score Matrix · Pro' : 'Score Matrix'}</span>
           </button>
 
           <button
             type="button"
-            onClick={() => onOpenQuantModal && onOpenQuantModal(fixture)}
-            className="py-2.5 px-3 min-h-[44px] rounded-xl bg-pitch-900 hover:bg-pitch-700 text-slate-300 hover:text-amber-400 border border-pitch-700 font-medium text-xs flex items-center justify-center gap-1.5 transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500 w-full"
+            onClick={() => triggerUpgrade ? triggerUpgrade('Quant and Kelly require a Pro pass') : onOpenQuantModal && onOpenQuantModal(fixture)}
+            aria-disabled={quantLocked || undefined}
+            className={`py-2.5 px-3 min-h-[44px] rounded-xl border font-medium text-xs flex items-center justify-center gap-1.5 transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500 w-full ${
+              quantLocked
+                ? 'bg-pitch-900 text-slate-600 border-pitch-800 hover:border-amber-500/30 cursor-pointer'
+                : 'bg-pitch-900 hover:bg-pitch-700 text-slate-300 hover:text-amber-400 border-pitch-700'
+            }`}
           >
-            <span aria-hidden="true">🧮</span>
-            <span>Quant & Kelly</span>
+            {quantLocked ? (
+              <span aria-hidden="true">🔒</span>
+            ) : (
+              <span aria-hidden="true">🧮</span>
+            )}
+            <span>{quantLocked ? 'Quant & Kelly · Pro' : 'Quant & Kelly'}</span>
           </button>
         </div>
 
         {/* ---- Value bet strip (when EV detected) ---- */}
+        {/* Free callers see the opportunity teased but not read: the
+            numbers blur behind a single unlock pill. Subscribers get the
+            real badge, the slip shortcut, and the margin indicator. */}
         {isValue && (
           <div className="pt-3 border-t border-pitch-700/60 flex flex-col gap-2">
-            <div className="flex flex-wrap items-center justify-between gap-2">
-              <ValueBadge
-                pick={value_pick}
-                evPct={ev_percentage}
-                odds={valueOdds}
-                modelProb={valueProb}
-                onClick={onOpenQuantModal ? () => onOpenQuantModal(fixture) : null}
-              />
+            {quantLocked ? (
+              <button
+                type="button"
+                onClick={() => triggerUpgrade && triggerUpgrade('Unlock +EV feeds with a Pro pass')}
+                aria-label="Unlock +EV badges with a Pro subscription"
+                className="w-full min-h-[44px] px-3 rounded-lg bg-pitch-950/70 border border-amber-500/30 text-xs font-bold text-amber-400 hover:border-amber-400/60 transition-colors flex items-center justify-center gap-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500 backdrop-blur-[2px]"
+              >
+                <span aria-hidden="true">🔒</span>
+                <span>Unlock +EV · Pro</span>
+              </button>
+            ) : (
+              <>
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <ValueBadge
+                    pick={value_pick}
+                    evPct={ev_percentage}
+                    odds={valueOdds}
+                    modelProb={valueProb}
+                    onClick={onOpenQuantModal ? () => onOpenQuantModal(fixture) : null}
+                  />
 
-              {/* Quick Add Value Pick to Parlay Slip */}
-              {onToggleSlip && valueOdds && (
-                <button
-                  type="button"
-                  onClick={() => onToggleSlip({
-                    fixtureId: fixture.id,
-                    homeTeam: home_team_name,
-                    awayTeam: away_team_name,
-                    pick: value_pick,
-                    pickLabel: valueLabel,
-                    odds: valueOdds,
-                    modelProb: valueProb,
-                    ev: ev_percentage,
-                    leagueName: league_name,
-                    matchDate: match_date,
-                  })}
-                  className={`px-3 py-1.5 min-h-[38px] rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500 ${
-                    isValuePickInSlip
-                      ? 'bg-amber-500 text-pitch-950 font-bold'
-                      : 'bg-pitch-900 border border-pitch-700 text-slate-300 hover:text-amber-400 hover:border-amber-500/40'
-                  }`}
-                >
-                  <span>{isValuePickInSlip ? '✓ Slip Added' : '+ Add EV to Slip'}</span>
-                </button>
-              )}
-            </div>
+                  {/* Quick Add Value Pick to Parlay Slip */}
+                  {onToggleSlip && valueOdds && (
+                    <button
+                      type="button"
+                      onClick={() => onToggleSlip({
+                        fixtureId: fixture.id,
+                        homeTeam: home_team_name,
+                        awayTeam: away_team_name,
+                        pick: value_pick,
+                        pickLabel: valueLabel,
+                        odds: valueOdds,
+                        modelProb: valueProb,
+                        ev: ev_percentage,
+                        leagueName: league_name,
+                        matchDate: match_date,
+                      })}
+                      className={`px-3 py-1.5 min-h-[38px] rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500 ${
+                        isValuePickInSlip
+                          ? 'bg-amber-500 text-pitch-950 font-bold'
+                          : 'bg-pitch-900 border border-pitch-700 text-slate-300 hover:text-amber-400 hover:border-amber-500/40'
+                      }`}
+                    >
+                      <span>{isValuePickInSlip ? '✓ Slip Added' : '+ Add EV to Slip'}</span>
+                    </button>
+                  )}
+                </div>
 
-            {/* Margin of Safety Indicator */}
-            {marginSafety && (
-              <div className="flex items-center justify-between text-[11px] text-slate-400 font-medium">
-                <span className={`px-2 py-0.5 rounded text-[10px] font-bold border ${marginSafety.colorClass}`}>
-                  {marginSafety.label}
-                </span>
-                <span className="font-mono text-slate-500">
-                  Target: <strong className="text-amber-300">{value_pick}</strong> @ {valueOdds ? Number(valueOdds).toFixed(2) : '-'}
-                </span>
-              </div>
+                {/* Margin of Safety Indicator */}
+                {marginSafety && (
+                  <div className="flex items-center justify-between text-[11px] text-slate-400 font-medium">
+                    <span className={`px-2 py-0.5 rounded text-[10px] font-bold border ${marginSafety.colorClass}`}>
+                      {marginSafety.label}
+                    </span>
+                    <span className="font-mono text-slate-500">
+                      Target: <strong className="text-amber-300">{value_pick}</strong> @ {valueOdds ? Number(valueOdds).toFixed(2) : '-'}
+                    </span>
+                  </div>
+                )}
+              </>
             )}
           </div>
         )}

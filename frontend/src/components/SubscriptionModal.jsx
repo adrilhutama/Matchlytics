@@ -1,89 +1,107 @@
 // ---- SubscriptionModal.jsx ----
-// Paywall shown on the app surface when the caller has a session but no
-// active subscription. Access is blocked until a subscription goes
-// active; paying lifts the lock live (AuthContext streams profile writes
-// over realtime, no reload).
+// Three-tier plan picker, surfaced from any locked control in the
+// dashboard. Free callers reach it while the full dashboard keeps
+// running underneath, so the modal doubles as their plan status
+// screen: it ships with a clean close path, not just a checkout.
 //
-// Pricing: the official rates are built in as production defaults, so
-// the cards never render an empty price. VITE_PRICE_PRO / VITE_PRICE_SEASON
-// can override them for regional promos or currency changes.
+// Tiers:
+//   Free    Rp 0           Today window, basic 1X2 probabilities
+//   Pro     Monthly pass   Next 7 days horizon, full feature set
+//   Annual  Season pass   Full 30 day horizon, everything in Pro
+//                          plus the complete backtest archives
 //
-// Checkout: when a gateway link is deployed (Midtrans/Sanberpay or Stripe
-// payment link via VITE_CHECKOUT_URL_*), the CTA redirects there with the
-// signed-in email attached as customer_email. Without one, a manual
-// payment card guides the buyer through bank transfer or QRIS, with a
-// pre-filled WhatsApp confirmation when the operator sets
-// VITE_ADMIN_WHATSAPP, and a real GitHub contact route as the standing
-// fallback. No dead admin numbers ship in the source.
+// Pricing falls back to the production defaults built into the app
+// (Rp 149.000 / bln and Rp 999.000 / thn); VITE_PRICE_PRO /
+// VITE_PRICE_SEASON override them for promos or currency changes.
+//
+// Checkout: when a gateway link is deployed (VITE_CHECKOUT_URL_*),
+// the upgrade CTA redirects there with the signed-in email attached
+// as customer_email. Without one, a manual payment card guides the
+// buyer through bank transfer or QRIS, with a pre-filled WhatsApp
+// confirmation once the operator ships VITE_ADMIN_WHATSAPP, and a
+// real GitHub contact route as the standing fallback. No dead admin
+// numbers ship in the source.
 
 import { useState } from 'react'
 import { useAuth } from '../context/AuthContext'
 
 const PRICE_PRO = import.meta.env.VITE_PRICE_PRO || 'Rp 149.000 / bln'
-const PRICE_SEASON = import.meta.env.VITE_PRICE_SEASON || 'Rp 999.000 / thn'
-const SUBTEXT_PRO = 'Billing monthly · Cancel anytime'
-// Season pass covers the same engine for a whole year:
-// 12 x Rp 149.000 = Rp 1.788.000, so Rp 999.000 saves roughly 44%.
-const SUBTEXT_SEASON = 'Save ~44% · Full season coverage'
+const PRICE_ANNUAL = import.meta.env.VITE_PRICE_ANNUAL || import.meta.env.VITE_PRICE_SEASON || 'Rp 999.000 / thn'
 
 // Operator-configured admin channel for manual activation confirmation.
 // International format without "+" prefix, e.g. 6281234567890.
 const ADMIN_WHATSAPP = import.meta.env.VITE_ADMIN_WHATSAPP
 const GITHUB_CONTACT_URL = 'https://github.com/adrilhutama/Matchlytics'
 
-const TIERS = [
+const PAID_PLANS = [
   {
     id: 'pro',
     name: 'Pro Pass',
     cadence: 'Monthly',
     price: PRICE_PRO,
-    subtext: SUBTEXT_PRO,
+    subtext: 'Billing monthly · Cancel anytime',
+    cta: 'Upgrade to Pro',
     checkoutUrl: import.meta.env.VITE_CHECKOUT_URL_PRO,
-    blurb: 'The full engine, refreshed on schedule.',
+    blurb: 'Everything except the season window.',
     perks: [
-      '+EV value feeds across six leagues',
-      '6×6 Scoreline Heatmaps per fixture',
-      'Kelly Criterion staking calculator',
-      'Monte Carlo bankroll simulations',
-      'Daily Telegram SITREP delivery',
+      'Next 7 days match horizon',
+      'Full +EV value scanner',
+      '6×6 Scoreline Heatmaps',
+      'Kelly Criterion staking',
+      'Parlay builder across six leagues',
     ],
   },
   {
-    id: 'season',
+    id: 'annual',
     name: 'Season Pass',
     cadence: 'Annual',
-    price: PRICE_SEASON,
-    subtext: SUBTEXT_SEASON,
+    price: PRICE_ANNUAL,
+    subtext: 'Save ~44% · One season, one rate',
+    cta: 'Upgrade to Annual',
     checkoutUrl: import.meta.env.VITE_CHECKOUT_URL_SEASON,
-    blurb: 'The whole season, at the discounted rate.',
+    blurb: 'The whole season at a discounted rate.',
     perks: [
+      'Full 30 day match horizon',
       'Everything in Pro Pass',
-      'Full-season backtest archives',
+      'Complete backtest archives',
       'Priority support queue',
     ],
   },
 ]
 
-export default function SubscriptionModal() {
+const FREE_PERKS = [
+  'Today match window only',
+  'Basic 1X2 probabilities',
+  'Watchlist and league filters',
+  '+EV, Matrix, Kelly and Parlay locked',
+]
+
+export default function SubscriptionModal({ onClose }) {
   const { user, profile, signOut } = useAuth()
-  const [tier, setTier] = useState('pro')
+  const [selected, setSelected] = useState('pro')
   const [leaving, setLeaving] = useState(false)
 
-  const selected = TIERS.find((t) => t.id === tier)
+  const currentPlan = profile?.subscription_tier || 'free'
   const statusLabel =
-    profile?.subscription_status === 'past_due' ? 'PAST DUE' : 'INACTIVE'
+    profile?.subscription_status === 'active'
+      ? 'ACTIVE'
+      : profile?.subscription_status === 'past_due'
+      ? 'PAST DUE'
+      : 'INACTIVE'
+
+  const chosen = PAID_PLANS.find((p) => p.id === selected)
 
   // Gateway path: redirect with the buyer's email attached so the
   // provider can pre-bind the session.
   const handleGatewayCheckout = () => {
-    if (!selected?.checkoutUrl) return
+    if (!chosen?.checkoutUrl) return
     setLeaving(true)
     try {
-      const target = new URL(selected.checkoutUrl)
+      const target = new URL(chosen.checkoutUrl)
       if (user?.email) target.searchParams.set('customer_email', user.email)
       window.location.assign(target.toString())
     } catch {
-      window.location.assign(selected.checkoutUrl)
+      window.location.assign(chosen.checkoutUrl)
     }
   }
 
@@ -92,7 +110,7 @@ export default function SubscriptionModal() {
   const handleWhatsappConfirmation = () => {
     if (!ADMIN_WHATSAPP) return
     setLeaving(true)
-    const message = `Halo Admin Matchlytics, saya ingin aktivasi langganan ${selected.name} untuk akun ${user?.email ?? ''}`
+    const message = `Halo Admin Matchlytics, saya ingin aktivasi langganan ${chosen.name} untuk akun ${user?.email ?? ''}`
     const url = `https://wa.me/${ADMIN_WHATSAPP}?text=${encodeURIComponent(message)}`
     window.open(url, '_blank', 'noopener')
   }
@@ -102,17 +120,22 @@ export default function SubscriptionModal() {
     await signOut()
   }
 
-  const manualMode = !selected?.checkoutUrl
+  const manualMode = !chosen?.checkoutUrl
+  const closeAction = onClose
+    ? () => {
+        if (!leaving) onClose()
+      }
+    : null
 
   return (
     <div
       className="fixed inset-0 z-50 overflow-y-auto bg-pitch-950/85 backdrop-blur-[3px] flex items-start sm:items-center justify-center p-4 sm:p-6"
       role="dialog"
       aria-modal="true"
-      aria-label="Unlock Matchlytics with a subscription"
+      aria-label="Choose your Matchlytics plan"
     >
-      <div className="w-full max-w-2xl my-4 rounded-2xl bg-pitch-900 border border-pitch-700 overflow-hidden animate-fade-in">
-        {/* ── Header ── */}
+      <div className="w-full max-w-4xl my-4 rounded-2xl bg-pitch-900 border border-pitch-700 overflow-hidden animate-fade-in">
+        {/* Header */}
         <div className="px-5 sm:px-6 pt-5 sm:pt-6 pb-4 border-b border-pitch-800">
           <div className="flex items-center gap-2.5">
             <span
@@ -122,70 +145,126 @@ export default function SubscriptionModal() {
             />
             <div className="min-w-0">
               <h2 className="text-base font-bold text-slate-100 tracking-tight leading-tight">
-                Unlock the quant engine
+                Choose your pass
               </h2>
               <p className="mt-0.5 text-[11px] font-mono text-slate-500 truncate">
-                Signed in as {user?.email ?? 'unknown'} · {statusLabel}
+                Signed in as {user?.email ?? 'unknown'} · {currentPlan.toUpperCase()} · {statusLabel}
               </p>
             </div>
           </div>
           <p className="mt-3 text-xs text-slate-400 leading-relaxed max-w-md">
-            Choose a pass to open every live feed, model, and simulator. Your
-            access activates the moment payment is confirmed.
+            Free covers today and the core model reads. Paid passes unlock
+            longer horizons and the full quant engine. Activation lands the
+            moment payment confirms, no reload.
           </p>
         </div>
 
-        {/* ── Tier cards ── */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 p-4 sm:p-5">
-          {TIERS.map((t) => {
-            const isSelected = tier === t.id
+        {/* Tier cards: three across on desktop, stacked on mobile */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-3 p-4 sm:p-5">
+          {/* Free */}
+          <div className={`rounded-xl border p-4 ${
+            currentPlan === 'free'
+              ? 'border-amber-500/40 bg-amber-500/[0.05]'
+              : 'border-pitch-700 bg-pitch-950'
+          }`}>
+            <div className="flex items-center justify-between gap-2">
+              <p className="text-sm font-bold text-slate-100">Free</p>
+              <span className="px-2 py-0.5 rounded-md text-[10px] font-mono bg-pitch-800 text-slate-400">
+                Included
+              </span>
+            </div>
+            {currentPlan === 'free' && (
+              <span className="mt-2 inline-block px-2 py-0.5 rounded-md text-[10px] font-bold bg-amber-500/20 text-amber-300">
+                CURRENT PLAN
+              </span>
+            )}
+            <div className="mt-3">
+              <div className="text-2xl font-black text-slate-200 tracking-tight">Rp 0</div>
+              <p className="mt-1 text-[11px] font-mono text-slate-500">No card required</p>
+            </div>
+            <ul className="mt-3 space-y-1.5">
+              {FREE_PERKS.map((perk) => (
+                <li key={perk} className="flex items-start gap-2 text-[11px] text-slate-400 leading-snug">
+                  <span className={`mt-1 w-1 h-1 rounded-full flex-shrink-0 ${perk.includes('locked') ? 'bg-rose-400/70' : 'bg-emerald-400'}`} aria-hidden="true" />
+                  <span className="min-w-0">{perk}</span>
+                </li>
+              ))}
+            </ul>
+          </div>
+
+          {/* Paid passes */}
+          {PAID_PLANS.map((plan) => {
+            const isSelected = selected === plan.id
+            const isCurrent = currentPlan === plan.id
             return (
               <button
-                key={t.id}
+                key={plan.id}
                 type="button"
-                onClick={() => setTier(t.id)}
+                onClick={() => setSelected(plan.id)}
                 aria-pressed={isSelected}
                 className={`min-h-[44px] w-full min-w-0 text-left rounded-xl border p-4 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500 ${
                   isSelected
                     ? 'border-amber-500/60 bg-amber-500/[0.06]'
+                    : isCurrent
+                    ? 'border-amber-500/40 bg-amber-500/[0.04] hover:border-amber-400'
                     : 'border-pitch-700 bg-pitch-950 hover:border-pitch-500'
                 }`}
               >
                 <div className="flex items-center justify-between gap-2">
                   <p className={`text-sm font-bold ${isSelected ? 'text-amber-300' : 'text-slate-100'}`}>
-                    {t.name}
+                    {plan.name}
                   </p>
                   <span
                     className={`px-2 py-0.5 rounded-md text-[10px] font-mono ${
                       isSelected ? 'bg-amber-500/20 text-amber-300' : 'bg-pitch-800 text-slate-500'
                     }`}
                   >
-                    {t.cadence}
+                    {plan.cadence}
                   </span>
                 </div>
-                <p className="mt-1.5 text-xs text-slate-500">{t.blurb}</p>
 
+                {(isCurrent || plan.id === 'annual') && (
+                  <span
+                    className={`mt-2 inline-block px-2 py-0.5 rounded-md text-[10px] font-bold ${
+                      isCurrent ? 'bg-amber-500/20 text-amber-300' : 'bg-emerald-500/15 text-emerald-300'
+                    }`}
+                  >
+                    {isCurrent ? 'CURRENT PLAN' : 'BEST VALUE'}
+                  </span>
+                )}
+
+                <p className="mt-2 text-xs text-slate-500">{plan.blurb}</p>
                 <div className="mt-3">
                   <div className="text-2xl font-black text-amber-400 tracking-tight break-words">
-                    {t.price}
+                    {plan.price}
                   </div>
-                  <p className="mt-1 text-[11px] font-mono text-slate-500">{t.subtext}</p>
+                  <p className="mt-1 text-[11px] font-mono text-slate-500">{plan.subtext}</p>
                 </div>
-
                 <ul className="mt-3 space-y-1.5">
-                  {t.perks.map((perk) => (
+                  {plan.perks.map((perk) => (
                     <li key={perk} className="flex items-start gap-2 text-[11px] text-slate-400 leading-snug">
                       <span className="mt-1 w-1 h-1 rounded-full bg-emerald-400 flex-shrink-0" aria-hidden="true" />
                       <span className="min-w-0">{perk}</span>
                     </li>
                   ))}
                 </ul>
+                <span
+                  className={`mt-4 inline-flex w-full min-h-[44px] items-center justify-center gap-1.5 px-3 rounded-xl text-xs font-bold transition-colors ${
+                    isSelected
+                      ? 'bg-amber-500 text-pitch-950'
+                      : isCurrent
+                      ? 'bg-emerald-500/15 text-emerald-300 border border-emerald-500/30'
+                      : 'bg-pitch-800 text-slate-300 hover:bg-pitch-700 border border-pitch-700'
+                  }`}
+                >
+                  {isCurrent ? '✓ Your active pass' : `✦ ${plan.cta}`}
+                </span>
               </button>
             )
           })}
         </div>
 
-        {/* ── Checkout footer ── */}
+        {/* Checkout footer: gateway redirect or manual payment card */}
         <div className="px-4 sm:px-5 pb-4 sm:pb-5 space-y-3">
           {!manualMode ? (
             <>
@@ -195,7 +274,7 @@ export default function SubscriptionModal() {
                 disabled={leaving}
                 className="w-full min-h-[48px] px-5 rounded-xl bg-amber-500 hover:bg-amber-400 disabled:opacity-50 text-pitch-950 text-sm font-bold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-400"
               >
-                {leaving ? 'Opening secure checkout...' : `Proceed to Checkout · ${selected.name}`}
+                {leaving ? 'Opening secure checkout...' : `${chosen.cta} · Proceed to Checkout`}
               </button>
               <p className="text-[11px] text-slate-500">
                 Secure payment window. Your account email is attached so the charge binds to
@@ -206,10 +285,10 @@ export default function SubscriptionModal() {
           ) : (
             <div className="rounded-xl border border-pitch-700 bg-pitch-950 p-4">
               <p className="text-xs font-bold text-slate-100">
-                Complete your {selected.name} manually
+                Complete your {chosen.name} manually
               </p>
               <ol className="mt-3 space-y-1.5 text-[11px] text-slate-400 list-decimal list-inside leading-relaxed">
-                <li>Transfer {selected.price} via QRIS or bank transfer to the operator.</li>
+                <li>Transfer {chosen.price} via QRIS or bank transfer to the operator.</li>
                 <li>Send your account email and receipt with the confirmation below.</li>
                 <li>Activation lands on this screen automatically. No reload.</li>
               </ol>
@@ -245,15 +324,29 @@ export default function SubscriptionModal() {
           )}
 
           <div className="flex items-center justify-between gap-3 pt-1">
-            <button
-              type="button"
-              onClick={handleSignOut}
-              disabled={leaving}
-              className="min-h-[36px] px-3 text-xs font-mono text-slate-500 hover:text-slate-200 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500"
-            >
-              Sign out instead
-            </button>
-            <p className="text-[10px] font-mono text-slate-600">Secure payment · 18+</p>
+            {closeAction ? (
+              <button
+                type="button"
+                onClick={closeAction}
+                disabled={leaving}
+                className="min-h-[36px] px-3 text-xs font-semibold text-slate-300 hover:text-slate-100 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500"
+              >
+                Close · keep exploring
+              </button>
+            ) : (
+              <span aria-hidden="true" />
+            )}
+            <div className="flex items-center gap-3">
+              <button
+                type="button"
+                onClick={handleSignOut}
+                disabled={leaving}
+                className="min-h-[36px] px-3 text-xs font-mono text-slate-500 hover:text-slate-200 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500"
+              >
+                Sign out instead
+              </button>
+              <p className="text-[10px] font-mono text-slate-600 hidden sm:block">Secure payment · 18+</p>
+            </div>
           </div>
         </div>
       </div>

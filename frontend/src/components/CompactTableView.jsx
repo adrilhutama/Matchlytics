@@ -24,7 +24,12 @@ export default function CompactTableView({
   slipLegs = [],
   onToggleSlip,
   standingsMap = {},
+  quantLocked = false,
+  onTriggerUpgrade,
 }) {
+  const lockedAction = (reason) => {
+    if (onTriggerUpgrade) onTriggerUpgrade(reason)
+  }
   return (
     <div className="w-full overflow-x-auto touch-pan-x rounded-xl border border-pitch-800 bg-pitch-950/40">
       <table className="w-full min-w-[700px] text-xs text-left border-collapse">
@@ -245,9 +250,22 @@ export default function CompactTableView({
                     )}
                   </td>
 
-                  {/* +EV Pick */}
+                  {/* +EV Pick (Free callers see a single unlock pill) */}
                   <td className="py-2.5 px-3 text-center whitespace-nowrap">
-                    {fixture.value_pick && fixture.ev_percentage ? (
+                    {quantLocked ? (
+                      fixture.value_pick && fixture.ev_percentage ? (
+                        <button
+                          type="button"
+                          onClick={() => lockedAction('Unlock +EV feeds with a Pro pass')}
+                          aria-label="Unlock +EV badges with a Pro subscription"
+                          className="min-h-[32px] px-2 py-1 rounded-lg bg-pitch-950/70 border border-amber-500/30 text-[10px] font-bold text-amber-400 hover:border-amber-400/60 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500"
+                        >
+                          🔒 Unlock +EV · Pro
+                        </button>
+                      ) : (
+                        <span className="text-slate-600 font-mono">-</span>
+                      )
+                    ) : fixture.value_pick && fixture.ev_percentage ? (
                       <ValueBadge
                         pick={fixture.value_pick}
                         evPct={fixture.ev_percentage}
@@ -260,28 +278,38 @@ export default function CompactTableView({
                     )}
                   </td>
 
-                  {/* Actions: Matrix, Quant & Slip */}
+                  {/* Actions: Matrix, Quant & Slip (locked for Free) */}
                   <td className="py-2.5 px-3 text-center whitespace-nowrap">
                     <div className="inline-flex items-center gap-1.5">
                       <button
                         type="button"
-                        onClick={() => onOpenMatrix(fixture)}
-                        className="px-2 py-1 min-h-[32px] text-[11px] font-semibold rounded-lg bg-pitch-800 hover:bg-pitch-700 text-slate-300 border border-pitch-700 transition-colors"
-                        title="View Poisson score matrix"
+                        onClick={() => quantLocked ? lockedAction('Score Matrix requires a Pro pass') : onOpenMatrix(fixture)}
+                        title={quantLocked ? 'Pro feature' : 'View Poisson score matrix'}
+                        aria-disabled={quantLocked || undefined}
+                        className={`px-2 py-1 min-h-[32px] text-[11px] font-semibold rounded-lg transition-colors ${
+                          quantLocked
+                            ? 'bg-pitch-900 text-slate-600 border border-pitch-800 hover:border-amber-500/30 cursor-pointer'
+                            : 'bg-pitch-800 hover:bg-pitch-700 text-slate-300 border border-pitch-700'
+                        }`}
                       >
-                        Matrix
+                        {quantLocked ? '🔒 Matrix · Pro' : 'Matrix'}
                       </button>
 
                       <button
                         type="button"
-                        onClick={() => onOpenQuantModal && onOpenQuantModal(fixture)}
-                        className="px-2 py-1 min-h-[32px] text-[11px] font-semibold rounded-lg bg-pitch-800 hover:bg-amber-500 hover:text-pitch-950 text-slate-300 border border-pitch-700 transition-colors"
-                        title="View quantitative risk and Kelly staking"
+                        onClick={() => quantLocked ? lockedAction('Quant and Kelly require a Pro pass') : onOpenQuantModal && onOpenQuantModal(fixture)}
+                        title={quantLocked ? 'Pro feature' : 'View quantitative risk and Kelly staking'}
+                        aria-disabled={quantLocked || undefined}
+                        className={`px-2 py-1 min-h-[32px] text-[11px] font-semibold rounded-lg transition-colors ${
+                          quantLocked
+                            ? 'bg-pitch-900 text-slate-600 border border-pitch-800 hover:border-amber-500/30 cursor-pointer'
+                            : 'bg-pitch-800 hover:bg-amber-500 hover:text-pitch-950 text-slate-300 border border-pitch-700'
+                        }`}
                       >
-                        Quant
+                        {quantLocked ? '🔒 Quant · Pro' : 'Quant'}
                       </button>
 
-                      {onToggleSlip && (valOdds || fixture.odds_home) && (
+                      {!quantLocked && onToggleSlip && (valOdds || fixture.odds_home) && (
                         <button
                           type="button"
                           onClick={() => {

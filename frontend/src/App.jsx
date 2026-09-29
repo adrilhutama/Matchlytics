@@ -96,8 +96,13 @@ function AppInner() {
 
   // Authentication + subscription state for the operational surface.
   // The landing view ignores it (public viewing stays open); the
-  // dashboard branch gates on it.
-  const { user, profile, loading: authLoading, hasActiveSubscription, signOut } = useAuth()
+  // dashboard branch reads the tier model below. Free callers still
+  // enter the dashboard; their horizons and quant features are
+  // gated component-by-component, not walled off here.
+  const {
+    user, profile, loading: authLoading, signOut,
+    tier, canAccessWeekly, canAccessMonthly, canAccessQuantFeatures,
+  } = useAuth()
   const [fixtures,            setFixtures]            = useState([])
   const [standingsMap,        setStandingsMap]        = useState({})
   const [loading,             setLoading]             = useState(true)
@@ -110,10 +115,39 @@ function AppInner() {
   const [activeLeague,        setActiveLeague]        = useState('all')
   const [showWatchlistOnly,   setShowWatchlistOnly]   = useState(false)
   const [valueOnly,           setValueOnly]           = useState(false)
-  const [dateRange,           setDateRange]           = useState('all')
+  const [dateRange,           setDateRangeState]      = useState('all')
+  // True once the caller manually picked a horizon; until then the
+  // tier-aware effect owns the default snap-up (pro -> week, annual -> all).
+  const [rangeTouched,        setRangeTouched]        = useState(false)
+  const setDateRange = useCallback((id) => {
+    setRangeTouched(true)
+    setDateRangeState(id)
+  }, [])
   const [searchQuery,         setSearchQuery]         = useState('')
   const [sortOption,          setSortOption]          = useState('kickoff_asc')
   const [viewMode,            setViewMode]            = useState('cards')
+
+  // Soft paywall: any locked control the Free tier taps opens the
+  // three-tier modal instead of blocking the whole dashboard.
+  const [showUpgradeModal,    setShowUpgradeModal]     = useState(false)
+
+  // Keep the active horizon inside the caller's tier ownership. The
+  // profile row lands after auth restore, so on each tier change we
+  // either snap an untouched range up to the tier's full entitlement
+  // or clamp a manual pick back down when the tier shrinks live.
+  const RANK = { today: 0, week: 1, all: 2 }
+  useEffect(() => {
+    const maxRange = canAccessMonthly ? 'all' : canAccessWeekly ? 'week' : 'today'
+    if (RANK[dateRange] > RANK[maxRange]) {
+      setDateRangeState(maxRange)
+      return
+    }
+    // Snap-ups are system actions, not caller picks: they must not
+    // mark rangeTouched, or a later live downgrade would stop
+    // clamping the horizon back to ownership.
+    if (!rangeTouched) setDateRangeState(maxRange)
+    // dateRange intentionally read outside deps: one pass per tier write
+  }, [tier, canAccessMonthly, canAccessWeekly])
 
   // Mobile-specific sheet state
   const [isLeagueDrawerOpen,  setIsLeagueDrawerOpen]  = useState(false)
@@ -338,15 +372,17 @@ function AppInner() {
     return sortFixtures(result, sortOption)
   }, [fixtures, activeLeague, showWatchlistOnly, watchlist, valueOnly, dateRange, searchQuery, sortOption])
 
-  // Clear all filters handler
+  // Clear all filters handler. The horizon resets to the caller's own
+  // top entitlement, not 'all', so Free clears back to Today.
   const handleClearFilters = useCallback(() => {
     setActiveLeague('all')
     setShowWatchlistOnly(false)
     setValueOnly(false)
-    setDateRange('all')
+    setDateRange(canAccessMonthly ? 'all' : canAccessWeekly ? 'week' : 'today')
+    setRangeTouched(true)
     setSearchQuery('')
     setSortOption('kickoff_asc')
-  }, [])
+  }, [setDateRange, canAccessMonthly, canAccessWeekly])
 
   const currentLeagueLabel = LEAGUES.find((l) => l.id === activeLeague)?.label
   const currentDateRangeLabel = DATE_RANGES.find((r) => r.id === dateRange)?.label
@@ -405,11 +441,37 @@ function AppInner() {
     syncUrlForView('landing')
   }, [syncUrlForView])
 
-  // ---- Subscription paywall state ----------------------------
-  // Signed in without an active subscription -> access is blocked by a
-  // locked paywall modal (the unlock path lifts the lock live when the
-  // profile write lands via AuthContext realtime).
-  const isDashboardLocked = Boolean(user) && !hasActiveSubscription
+  // ---- Soft subscription gate ----------------------------------
+  // Every signed-in caller enters the dashboard. Free callers meet
+  // locked controls inline: each one opens the same upgrade modal,
+  // and live fulfilment (profile writes over realtime) unlocks them
+  // without a reload.
+  const openUpgradeFor = useCallback(
+    (reason) => {
+      console.info('Upgrade prompt:', reason || 'tier lock')
+      setShowUpgradeModal(true)
+    },
+    []
+  )
+
+  // Quant tools + parlay slip are paid-tier features. Unlocked tiers
+  // get the real handlers; every other tier routes the tap into the
+  // upgrade modal instead. Cards paint lock marks from the same flag.
+  const openMatrixGated = canAccessQuantFeatures
+    ? (fixture) => setSelectedMatrixFixture(fixture)
+    : () => openUpgradeFor('Score Matrix requires a Pro pass')
+  const openQuantGated = canAccessQuantFeatures
+    ? (fixture) => setSelectedQuantFixture(fixture)
+    : () => openUpgradeFor('Quant & Kelly require a Pro pass')
+  const toggleSlipGated = canAccessQuantFeatures
+    ? handleToggleSlip
+    : () => openUpgradeFor('Parlay Builder requires a Pro pass')
+
+  // A live fulfilment unlocks the features under the open modal:
+  // close it so the caller sees what just came online.
+  useEffect(() => {
+    if (canAccessQuantFeatures && showUpgradeModal) setShowUpgradeModal(false)
+  }, [canAccessQuantFeatures, showUpgradeModal])
 
   // ---- Modals & Drawers (shared by BOTH views) ----------------
   // Rendered outside the view branch so the verified backtest ledger can
@@ -427,7 +489,7 @@ function AppInner() {
         fixture={selectedQuantFixture}
         isOpen={Boolean(selectedQuantFixture)}
         onClose={() => setSelectedQuantFixture(null)}
-        onAddToSlip={handleToggleSlip}
+        onAddToSlip={toggleSlipGated}
         isInSlip={parlaySlip.some(
           (l) => l.fixtureId === selectedQuantFixture?.id
         )}
@@ -450,6 +512,12 @@ function AppInner() {
 
       {/* PWA install prompt (mobile floating banner + iOS hint) */}
       <InstallPrompt />
+
+      {/* Soft paywall: opened by any locked Free-tier control; the live
+          unlock effect above closes it the moment a subscription lands. */}
+      {showUpgradeModal && (
+        <SubscriptionModal onClose={() => setShowUpgradeModal(false)} />
+      )}
     </>
   )
 
@@ -494,17 +562,6 @@ function AppInner() {
     return (
       <div className="w-full min-h-screen bg-pitch-950 text-slate-100 overflow-x-hidden">
         <LoginPage onBackToLanding={handleEcosystemVisit} />
-      </div>
-    )
-  }
-
-  if (isDashboardLocked) {
-    return (
-      <div className="w-full min-h-screen bg-pitch-900 overflow-x-hidden">
-        {/* Access blocked entirely until a subscription goes active. The
-            paywall floats over a plain canvas so no fixture data renders
-            behind the lock. */}
-        <SubscriptionModal />
       </div>
     )
   }
@@ -610,6 +667,8 @@ function AppInner() {
               onSortChange={setSortOption}
               viewMode={viewMode}
               onViewModeChange={setViewMode}
+              tier={tier}
+              onTriggerUpgrade={openUpgradeFor}
             />
           </div>
         </div>
@@ -682,12 +741,14 @@ function AppInner() {
                         fixture={fixture}
                         isPinned={watchlist.includes(fixture.id)}
                         onToggleWatchlist={handleToggleWatchlist}
-                        onOpenMatrix={setSelectedMatrixFixture}
-                        onOpenQuantModal={setSelectedQuantFixture}
+                        onOpenMatrix={openMatrixGated}
+                        onOpenQuantModal={openQuantGated}
                         slipPicks={fixtureSlipPicks}
-                        onToggleSlip={handleToggleSlip}
+                        onToggleSlip={toggleSlipGated}
                         standingsMap={standingsMap}
                         style={{ animationDelay: `${Math.min(idx * 30, 300)}ms` }}
+                        quantLocked={!canAccessQuantFeatures}
+                        onTriggerUpgrade={openUpgradeFor}
                       />
                     )
                   })}
@@ -700,11 +761,13 @@ function AppInner() {
                   fixtures={displayedFixtures}
                   watchlist={watchlist}
                   onToggleWatchlist={handleToggleWatchlist}
-                  onOpenMatrix={setSelectedMatrixFixture}
-                  onOpenQuantModal={setSelectedQuantFixture}
+                  onOpenMatrix={openMatrixGated}
+                  onOpenQuantModal={openQuantGated}
                   slipLegs={parlaySlip}
-                  onToggleSlip={handleToggleSlip}
+                  onToggleSlip={toggleSlipGated}
                   standingsMap={standingsMap}
+                  quantLocked={!canAccessQuantFeatures}
+                  onTriggerUpgrade={openUpgradeFor}
                 />
               )}
             </section>

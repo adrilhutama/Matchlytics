@@ -127,6 +127,21 @@ export function AuthProvider({ children }) {
 
   const hasActiveSubscription = profile?.subscription_status === 'active'
 
+  // ---- Tier model -----------------------------------------------
+  // Three tiers: free (today window + basic 1X2 only), pro (monthly
+  // pass, +7 day horizon, full feature set), annual (season pass,
+  // 30 day horizon + backtest archives). 'institutional' behaves as
+  // annual. Everything derives from the single row above.
+  const tier = profile?.subscription_tier || 'free'
+  const isSubscribed =
+    hasActiveSubscription && ['pro', 'annual', 'institutional'].includes(tier)
+  const isFree = !isSubscribed
+  const isPro = isSubscribed && tier === 'pro'
+  const isAnnual = isSubscribed && ['annual', 'institutional'].includes(tier)
+  const canAccessWeekly = isPro || isAnnual
+  const canAccessMonthly = isAnnual
+  const canAccessQuantFeatures = isSubscribed
+
   const value = useMemo(
     () => ({
       session,
@@ -134,13 +149,21 @@ export function AuthProvider({ children }) {
       profile,
       loading,
       hasActiveSubscription,
+      tier,
+      isSubscribed,
+      isFree,
+      isPro,
+      isAnnual,
+      canAccessWeekly,
+      canAccessMonthly,
+      canAccessQuantFeatures,
       signIn,
       signUp,
       requestMagicLink,
       signOut,
       refreshProfile,
     }),
-    [session, user, profile, loading, hasActiveSubscription, signIn, signUp, requestMagicLink, signOut, refreshProfile]
+    [session, user, profile, loading, hasActiveSubscription, tier, isSubscribed, isFree, isPro, isAnnual, canAccessWeekly, canAccessMonthly, canAccessQuantFeatures, signIn, signUp, requestMagicLink, signOut, refreshProfile]
   )
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>
@@ -156,6 +179,14 @@ export function useAuth() {
     profile: null,
     loading: false,
     hasActiveSubscription: false,
+    tier: 'free',
+    isSubscribed: false,
+    isFree: true,
+    isPro: false,
+    isAnnual: false,
+    canAccessWeekly: false,
+    canAccessMonthly: false,
+    canAccessQuantFeatures: false,
     signIn: async () => ({ data: null, error: new Error('Auth provider missing.') }),
     signUp: async () => ({ data: null, error: new Error('Auth provider missing.') }),
     requestMagicLink: async () => ({ data: null, error: new Error('Auth provider missing.') }),

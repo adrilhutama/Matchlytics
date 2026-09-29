@@ -440,6 +440,13 @@ export function isDateInRange(isoString, rangeKey) {
     return diffMs >= -3600 * 1000 * 3 && diffMs <= 72 * 3600 * 1000;
   }
 
+  if (rangeKey === 'week') {
+    // Pro horizon: everything from now through the next 7 days.
+    const end = new Date(now);
+    end.setDate(end.getDate() + 7);
+    return d.getTime() < end.getTime();
+  }
+
   if (rangeKey === 'weekend') {
     const day = now.getDay();
     const fri = new Date(now);

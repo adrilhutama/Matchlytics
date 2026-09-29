@@ -1,14 +1,33 @@
 // ---- FilterBar.jsx ----
-// Multi-dimensional filters: Search input, Granular Date Range,
+// Multi-dimensional filters: Search input, Tier-Gated Date Range,
 // League selector & Watchlist tab, +EV toggle, Sorting, and View Mode.
 // High usability, zero horizontal overflow, touch-target compliant.
+//
+// Date model (3-tier subscription):
+//   Today           -> every tier
+//   Next 7 Days     -> Pro horizon
+//   All (30 Days)   -> Annual / seasonal horizon
+// Locked pills carry an amber lock mark; tapping one surfaces the
+// upgrade modal instead of switching the horizon.
 
 export const DATE_RANGES = [
-  { id: 'all',       label: 'All (30 Days)' },
-  { id: 'today',     label: 'Today' },
-  { id: 'next3days', label: 'Next 3 Days' },
-  { id: 'weekend',   label: 'This Weekend' },
+  { id: 'today', label: 'Today' },
+  { id: 'week',  label: 'Next 7 Days (Weekly)' },
+  { id: 'all',   label: 'All (30 Days)' },
 ]
+
+// Which horizon key each tier can actually select. The FilterBar uses
+// this map to render locks and to refuse out-of-tier selections.
+const TIER_ACCESS = {
+  free:    ['today'],
+  pro:     ['today', 'week'],
+  annual:  ['today', 'week', 'all'],
+}
+
+const UPGRADE_HINTS = {
+  week: 'Upgrade to Pro to view weekly fixtures',
+  all:  'Upgrade to Annual to view the full 30-day season',
+}
 
 export const SORT_OPTIONS = [
   { id: 'kickoff_asc',    label: 'Kickoff Time (Asc)' },
@@ -34,7 +53,26 @@ export default function FilterBar({
   onSortChange,
   viewMode,
   onViewModeChange,
+  tier = 'free',
+  onTriggerUpgrade,
 }) {
+  const accessibleRanges = TIER_ACCESS[tier] || TIER_ACCESS.free
+  // The +EV scanner is a quant feature: Free sees the prompt instead.
+  const evLocked = !accessibleRanges.includes('week')
+  const handlePillClick = (r) => {
+    if (accessibleRanges.includes(r.id)) {
+      onDateRangeChange(r.id)
+      return
+    }
+    if (onTriggerUpgrade) onTriggerUpgrade(UPGRADE_HINTS[r.id])
+  }
+  const handleValueToggle = () => {
+    if (evLocked) {
+      if (onTriggerUpgrade) onTriggerUpgrade(UPGRADE_HINTS.week)
+      return
+    }
+    onValueOnlyChange(!valueOnly)
+  }
   return (
     <div className="space-y-2">
       {/* ---- Row 1: Search, Sort & View Mode ---- */}
@@ -148,29 +186,36 @@ export default function FilterBar({
           </span>
           {DATE_RANGES.map((r) => {
             const isActive = dateRange === r.id
+            const isLocked = !accessibleRanges.includes(r.id)
             return (
               <button
                 key={r.id}
                 type="button"
-                onClick={() => onDateRangeChange(r.id)}
+                onClick={() => handlePillClick(r)}
                 aria-pressed={isActive}
-                className={`flex-shrink-0 px-3 py-2 text-xs font-medium rounded-xl transition-all border focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500 min-h-[40px] ${
+                title={isLocked ? UPGRADE_HINTS[r.id] : undefined}
+                className={`flex-shrink-0 inline-flex items-center gap-1.5 px-3 py-2 text-xs font-medium rounded-xl transition-all border focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500 min-h-[40px] ${
                   isActive
                     ? 'bg-pitch-700 text-amber-300 border-amber-400/60 font-semibold'
+                    : isLocked
+                    ? 'bg-pitch-900 text-slate-500 border-amber-500/30 cursor-pointer hover:border-amber-500/50'
                     : 'bg-pitch-900 text-slate-400 border-pitch-700 hover:border-slate-500 hover:text-slate-200'
                 }`}
               >
-                {r.label}
+                {isLocked && (
+                  <span aria-hidden="true" className="text-amber-400">🔒</span>
+                )}
+                <span>{r.label}</span>
               </button>
             )
           })}
         </div>
 
-        {/* Value Bet Only Switch */}
+        {/* Value Bet Only Switch (quant feature; Free gets the prompt) */}
         <div className="flex items-center justify-end gap-3 flex-shrink-0 pt-1 sm:pt-0">
           <label
             htmlFor="value-only-toggle"
-            className="flex items-center gap-2 cursor-pointer select-none"
+            className={`flex items-center gap-2 select-none ${evLocked ? 'cursor-pointer' : 'cursor-pointer'}`}
           >
             <span className="text-xs text-slate-300 font-medium whitespace-nowrap">
               +EV Bets Only
@@ -179,14 +224,17 @@ export default function FilterBar({
               id="value-only-toggle"
               type="button"
               role="switch"
-              aria-checked={valueOnly}
-              onClick={() => onValueOnlyChange(!valueOnly)}
-              className="relative inline-flex h-6 w-11 items-center rounded-full transition-colors duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500 min-h-[44px] py-1"
+              aria-checked={evLocked ? false : valueOnly}
+              onClick={handleValueToggle}
+              title={evLocked ? 'Pro feature. Tap to unlock.' : undefined}
+              className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500 min-h-[44px] py-1 ${
+                evLocked ? 'bg-pitch-800 ring-1 ring-inset ring-amber-500/30' : ''
+              }`}
             >
               <span
                 className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform duration-200 ${
-                  valueOnly ? 'translate-x-6' : 'translate-x-1'
-                }`}
+                  !evLocked && valueOnly ? 'translate-x-6' : 'translate-x-1'
+                } ${evLocked ? 'opacity-40' : ''}`}
               />
             </button>
           </label>
