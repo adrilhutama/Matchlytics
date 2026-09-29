@@ -3,6 +3,8 @@
 // Interactive click trigger to open the quantitative Kelly calculator modal.
 // Touch target >= 44px for full mobile usability.
 
+import { calculateKelly } from '../utils/analytics'
+
 export default function ValueBadge({
   pick,
   evPct,
@@ -15,16 +17,13 @@ export default function ValueBadge({
   const labels = { HOME: 'Home Win', DRAW: 'Draw', AWAY: 'Away Win' }
   const numericEv = Number(evPct) || 0
 
-  // Quick Kelly approximation if odds and modelProb provided
+  // Quick Kelly approximation (shared util enforces the 2.5% hard cap)
   let kellyFraction = null
   if (odds && modelProb) {
     const o = Number(odds)
     const p = Number(modelProb) / 100
     if (o > 1 && p > 0) {
-      const b = o - 1
-      const q = 1 - p
-      const full = Math.max(0, (b * p - q) / b)
-      kellyFraction = Math.min(5.0, Math.max(0, full * 0.25 * 100)).toFixed(1)
+      kellyFraction = calculateKelly(o, Number(modelProb)).quarterKellyPct.toFixed(1)
     }
   }
 

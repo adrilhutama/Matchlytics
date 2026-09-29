@@ -108,7 +108,7 @@ export default function InstallPrompt() {
   if (showIOSHint) {
     return (
       <div
-        className="lg:hidden fixed bottom-4 inset-x-4 sm:inset-x-auto sm:right-4 z-50 animate-slide-up"
+        className="lg:hidden fixed bottom-[4rem] inset-x-4 sm:inset-x-auto sm:right-4 z-50 animate-slide-up"
         role="alert"
         aria-label="iOS install instruction"
       >
@@ -141,7 +141,7 @@ export default function InstallPrompt() {
 
   return (
     <div
-      className="lg:hidden fixed bottom-4 inset-x-4 sm:inset-x-auto sm:right-4 z-50 animate-slide-up"
+      className="lg:hidden fixed bottom-[4rem] inset-x-4 sm:inset-x-auto sm:right-4 z-50 animate-slide-up"
       role="alert"
       aria-live="polite"
     >

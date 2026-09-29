@@ -37,30 +37,49 @@ export function computePoissonMatrix(lambdaHome, lambdaAway, maxGoals = 5) {
   let sumAwayWin = 0;
   let sumOver25 = 0;
   let sumBtts = 0;
+  const cellMasses = [];
 
   for (let away = 0; away <= maxGoals; away++) {
     const row = [];
     for (let home = 0; home <= maxGoals; home++) {
-      const cellProb = probH[home] * probA[away] * 100;
+      // Raw joint mass before normalisation
+      const rawCell = (probH[home] * probA[away]) || 0;
+      cellMasses.push(rawCell);
       row.push({
         home,
         away,
-        prob: cellProb,
+        prob: rawCell,
       });
-
-      if (cellProb > maxProb) {
-        maxProb = cellProb;
-        mostProbable = { home, away, prob: cellProb };
-      }
-
-      if (home > away) sumHomeWin += cellProb;
-      else if (home === away) sumDraw += cellProb;
-      else sumAwayWin += cellProb;
-
-      if (home + away > 2.5) sumOver25 += cellProb;
-      if (home > 0 && away > 0) sumBtts += cellProb;
     }
     matrix.push(row);
+  }
+
+  // The truncated 0..5 grid loses Poisson tail mass; renormalise every
+  // cell by its own total so the heatmap strictly converges to 100%
+  // regardless of lambda pair (cells read as conditional probabilities).
+  const totalMass = cellMasses.reduce((acc, v) => acc + v, 0);
+  if (totalMass > 0) {
+    for (const row of matrix) {
+      for (const cell of row) {
+        cell.prob = (cell.prob / totalMass) * 100;
+      }
+    }
+  }
+
+  for (const row of matrix) {
+    for (const cell of row) {
+      if (cell.prob > maxProb) {
+        maxProb = cell.prob;
+        mostProbable = { home: cell.home, away: cell.away, prob: cell.prob };
+      }
+
+      if (cell.home > cell.away) sumHomeWin += cell.prob;
+      else if (cell.home === cell.away) sumDraw += cell.prob;
+      else sumAwayWin += cell.prob;
+
+      if (cell.home + cell.away > 2.5) sumOver25 += cell.prob;
+      if (cell.home > 0 && cell.away > 0) sumBtts += cell.prob;
+    }
   }
 
   return {
@@ -169,7 +188,9 @@ export function calculateKelly(odds, modelProbPercent) {
   const b = o - 1;
   const q = 1 - p;
   const fullKelly = Math.max(0, (b * p - q) / b);
-  const quarterKellyPct = Math.min(5.0, Math.max(0, fullKelly * 0.25 * 100));
+  // Hard-cap stake at 2.5% of bankroll (quarter-kelly fraction of full
+  // Kelly, floored at 0 so negative-EV scenarios allocate nothing).
+  const quarterKellyPct = Math.min(2.5, Math.max(0, fullKelly * 0.25 * 100));
 
   const ev = (p * o - 1) * 100;
   let tier = 'No Value';
@@ -327,7 +348,8 @@ export function calculateParlayAggregates(legs) {
     const p = jointProbDecimal;
     const q = 1 - p;
     const fullKelly = Math.max(0, (b * p - q) / b);
-    recommendedStakePct = Math.min(3.0, Math.max(0, fullKelly * 0.25 * 100));
+    // Same 2.5% hard cap as single-bet staking
+    recommendedStakePct = Math.min(2.5, Math.max(0, fullKelly * 0.25 * 100));
   }
 
   return {

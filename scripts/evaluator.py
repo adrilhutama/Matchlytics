@@ -92,10 +92,10 @@ def evaluate_full_history(supabase: Any) -> dict:
     suitable for the frontend Track Record dashboard.
 
     Returned keys:
-        stats    — total_bets, wins, losses, win_rate, roi_pct, brier_score
-        bets     — list of per-match result rows (chronological ASC)
-        equity   — running-equity points for flat staking (bankroll=100)
-        equity_k — running-equity points for quarter-Kelly (stake=2.5%)
+        stats    : total_bets, wins, losses, win_rate, roi_pct, brier_score
+        bets     : list of per-match result rows (chronological ASC)
+        equity   : running-equity points for flat staking (bankroll=100)
+        equity_k : running-equity points for quarter-Kelly (stake=2.5%)
     """
     defaults = {
         "stats": {"total_bets": 0, "wins": 0, "losses": 0,

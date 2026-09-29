@@ -33,6 +33,25 @@ class MatchAnalytics:
 # ---- Core math ---------------------------------------------
 
 MAX_GOALS = 6  # score matrix 0..5 for each team
+LAMBDA_MIN = 0.6
+LAMBDA_MAX = 3.2
+# Fallback used when a caller feeds NaN/Inf through: neutral prior.
+_BASELINE_LAMBDA = (LAMBDA_MIN + LAMBDA_MAX) / 2
+
+
+def _clamp_lambda(value: float) -> float:
+    """
+    Coerce any input to a finite Poisson mean inside [LAMBDA_MIN, LAMBDA_MAX].
+    NaN and Inf never leak into the matrix (would poison every derived
+    probability); they fall back to the mid-range baseline.
+    """
+    try:
+        value = float(value)
+    except (TypeError, ValueError):
+        return _BASELINE_LAMBDA
+    if not math.isfinite(value):
+        return _BASELINE_LAMBDA
+    return round(max(LAMBDA_MIN, min(value, LAMBDA_MAX)), 2)
 
 
 def score_matrix(lambda_home: float, lambda_away: float) -> np.ndarray:
@@ -40,10 +59,23 @@ def score_matrix(lambda_home: float, lambda_away: float) -> np.ndarray:
     Build a (MAX_GOALS x MAX_GOALS) joint probability matrix.
     Entry [i, j] = P(home scores i goals) * P(away scores j goals).
     Assumes goal distributions are independent Poisson variables.
+
+    The truncated PMF (0..5 goals) loses mass at the tails, so the
+    joint is normalised by its own total: cells are conditional
+    probabilities P(score | fewer than 6 goals per side) and the
+    whole 6x6 grid sums to 1.0 to floating-point precision.
+    Downstream argmax and win/draw splits are scale-invariant, so
+    this normalisation only tightens the convergence guarantee.
     """
-    home_pmf = np.array([poisson.pmf(g, lambda_home) for g in range(MAX_GOALS)])
-    away_pmf = np.array([poisson.pmf(g, lambda_away) for g in range(MAX_GOALS)])
-    return np.outer(home_pmf, away_pmf)
+    lh = _clamp_lambda(lambda_home)
+    la = _clamp_lambda(lambda_away)
+    home_pmf = np.array([poisson.pmf(g, lh) for g in range(MAX_GOALS)])
+    away_pmf = np.array([poisson.pmf(g, la) for g in range(MAX_GOALS)])
+    joint = np.outer(home_pmf, away_pmf)
+    total = joint.sum()
+    if total > 0:
+        joint = joint / total
+    return joint
 
 
 def calc_probabilities(
@@ -69,9 +101,9 @@ def calc_probabilities(
     -------
     MatchAnalytics dataclass with all computed fields.
     """
-    # Clamp Poisson lambdas strictly between 0.6 and 3.2
-    lambda_home = max(0.6, min(float(lambda_home), 3.2))
-    lambda_away = max(0.6, min(float(lambda_away), 3.2))
+    # Clamp Poisson lambdas strictly between LAMBDA_MIN and LAMBDA_MAX
+    lambda_home = _clamp_lambda(lambda_home)
+    lambda_away = _clamp_lambda(lambda_away)
 
     matrix = score_matrix(lambda_home, lambda_away)
 
@@ -80,11 +112,12 @@ def calc_probabilities(
     away_win = float(np.sum(np.triu(matrix, 1)))    # away score > home score
     draw     = float(np.sum(np.diag(matrix)))        # equal scores
 
-    # Normalise to handle floating-point drift
+    # Normalise to absorb any residual floating-point drift
     total = home_win + draw + away_win
-    home_win /= total
-    draw     /= total
-    away_win /= total
+    if total > 0:
+        home_win /= total
+        draw     /= total
+        away_win /= total
 
     # Over 2.5 goals: sum of cells where home + away > 2
     over_25 = 0.0
@@ -236,9 +269,9 @@ def compute_lambdas(
     """
     lambda_home = home_attack * away_defense * league_avg_for * home_advantage
     lambda_away = away_attack * home_defense * league_avg_for
-    lambda_home = max(0.6, min(float(lambda_home), 3.2))
-    lambda_away = max(0.6, min(float(lambda_away), 3.2))
-    return round(lambda_home, 2), round(lambda_away, 2)
+    lambda_home = _clamp_lambda(lambda_home)
+    lambda_away = _clamp_lambda(lambda_away)
+    return lambda_home, lambda_away
 
 
 def calculate_lambdas(
@@ -301,8 +334,9 @@ def calculate_lambdas(
     lh = home_attack * away_defense * league_home_avg
     la = away_attack * home_defense * league_away_avg
 
-    # Clamp strictly between 0.6 and 3.2
-    lambda_home = round(max(0.6, min(float(lh), 3.2)), 2)
-    lambda_away = round(max(0.6, min(float(la), 3.2)), 2)
+    # Clamp strictly between LAMBDA_MIN and LAMBDA_MAX; the clamp
+    # also guards against NaN/Inf from malformed split inputs.
+    lambda_home = _clamp_lambda(lh)
+    lambda_away = _clamp_lambda(la)
 
     return lambda_home, lambda_away

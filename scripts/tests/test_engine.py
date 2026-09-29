@@ -5,6 +5,7 @@
 # ============================================================
 
 import math
+import numpy as np
 import pytest
 from scripts.engine import (
     score_matrix,
@@ -23,8 +24,21 @@ class TestScoreMatrix:
         assert m.shape == (6, 6)
 
     def test_matrix_sums_to_one(self):
-        m = score_matrix(1.2, 0.9)
-        assert abs(m.sum() - 1.0) < 0.01  # small leak due to truncation at 6
+        # Joint is normalised by its own total, so every cell is a
+        # conditional probability and the full grid sums to 1.0 within
+        # floating-point tolerance at every lambda pair.
+        for lh in (0.8, 1.4, 2.0, 2.9):
+            for la in (0.7, 1.3, 2.2, 3.1):
+                assert abs(score_matrix(lh, la).sum() - 1.0) < 1e-9
+
+    def test_rejects_nan_and_inf_inputs(self):
+        for bad in (float("nan"), float("inf"), float("-inf")):
+            m = score_matrix(bad, 1.2)
+            assert np.isfinite(m).all()
+            assert abs(m.sum() - 1.0) < 1e-9
+            r = calc_probabilities(bad, 1.2)
+            assert 0.6 <= r.lambda_home <= 3.2
+            assert not any(v != v for v in (r.prob_home, r.prob_draw, r.prob_away))
 
     def test_symmetric_for_equal_lambdas(self):
         m = score_matrix(1.0, 1.0)

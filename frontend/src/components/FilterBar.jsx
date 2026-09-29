@@ -19,9 +19,11 @@ export const DATE_RANGES = [
 // Which horizon key each tier can actually select. The FilterBar uses
 // this map to render locks and to refuse out-of-tier selections.
 const TIER_ACCESS = {
-  free:    ['today'],
-  pro:     ['today', 'week'],
-  annual:  ['today', 'week', 'all'],
+  free:         ['today'],
+  pro:          ['today', 'week'],
+  annual:       ['today', 'week', 'all'],
+  // Institutional accounts carry full season entitlement, same as annual.
+  institutional: ['today', 'week', 'all'],
 }
 
 const UPGRADE_HINTS = {
