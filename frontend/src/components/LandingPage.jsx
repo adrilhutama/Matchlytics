@@ -732,7 +732,7 @@ export default function LandingPage({
                 </p>
               </div>
 
-              <div className="animate-slide-up motion-safe:delay-150">
+              <div className="animate-slide-up">
                 <HeroMonitor evPicks={evPicks} fixturesLoading={Boolean(fixturesLoading)} dataError={dataError} />
               </div>
             </div>
