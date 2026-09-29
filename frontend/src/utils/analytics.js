@@ -424,48 +424,42 @@ export function formatLocalizedMatchDate(isoString) {
 }
 
 /**
- * Check if fixture falls into specified date range
+ * Check if fixture falls into specified date range.
+ *
+ * Kickoff instants arrive as ISO strings (UTC, seconds or ms). Both
+ * sides parse through Date so the comparison is instant-based, not
+ * calendar-string based, which keeps the feed honest across timezones
+ * (a GMT+7 viewer never loses a UTC-afternoon kickoff to a midnight
+ * boundary mismatch).
  */
 export function isDateInRange(isoString, rangeKey) {
-  if (!isoString || rangeKey === 'all') return true;
-  const d = new Date(isoString);
+  if (!isoString) return false;
   const now = new Date();
+  const matchDate = new Date(isoString);
+  if (Number.isNaN(matchDate.getTime())) return false;
 
   if (rangeKey === 'today') {
-    return d.toDateString() === now.toDateString();
+    // Calendar-today in local time, widened to cover kicks that land
+    // within the next 24 hours (late-evening fixtures, timezone gap).
+    const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0);
+    const endOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59, 999);
+    const isCalendarToday = matchDate >= startOfToday && matchDate <= endOfToday;
+    const isNext24Hours = matchDate >= now && matchDate <= new Date(now.getTime() + 24 * 60 * 60 * 1000);
+    return isCalendarToday || isNext24Hours;
   }
 
-  if (rangeKey === 'next3days') {
-    const diffMs = d.getTime() - now.getTime();
-    return diffMs >= -3600 * 1000 * 3 && diffMs <= 72 * 3600 * 1000;
-  }
-
-  if (rangeKey === 'week') {
+  if (rangeKey === 'week' || rangeKey === 'weekly') {
     // Pro horizon: everything from now through the next 7 days.
-    const end = new Date(now);
-    end.setDate(end.getDate() + 7);
-    return d.getTime() < end.getTime();
+    const endOfWeek = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
+    return matchDate >= now && matchDate <= endOfWeek;
   }
 
-  if (rangeKey === 'weekend') {
-    const day = now.getDay();
-    const fri = new Date(now);
-
-    if (day === 5 || day === 6 || day === 0) {
-      const daysSinceFri = day === 0 ? 2 : day === 6 ? 1 : 0;
-      fri.setDate(now.getDate() - daysSinceFri);
-    } else {
-      const daysUntilFri = 5 - day;
-      fri.setDate(now.getDate() + daysUntilFri);
-    }
-    fri.setHours(12, 0, 0, 0);
-
-    const sun = new Date(fri);
-    sun.setDate(fri.getDate() + 2);
-    sun.setHours(23, 59, 59, 999);
-
-    const matchTime = d.getTime();
-    return matchTime >= fri.getTime() && matchTime <= sun.getTime();
+  if (rangeKey === 'all' || rangeKey === 'month' || rangeKey === '30days' || rangeKey === 'monthly') {
+    // Season horizon: full 30 day window with a short look-back so a
+    // live match that kicked off shortly before page load stays visible.
+    const startOfMonth = new Date(now.getTime() - 2 * 60 * 60 * 1000);
+    const endOfMonth = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000);
+    return matchDate >= startOfMonth && matchDate <= endOfMonth;
   }
 
   return true;

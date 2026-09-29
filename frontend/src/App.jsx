@@ -70,13 +70,17 @@ export const LEAGUES = [
 const LEAGUE_IDS = LEAGUES.filter((l) => l.id !== 'all').map((l) => l.id)
 
 const DAYS_AHEAD = 30
+// Look-back so a match already IN_PLAY at page load still falls
+// inside the server-side window; mirrors the isDateInRange 'all' floor.
+const LOOKBACK_HOURS = 2
 
 function buildDateRange() {
   const now = new Date()
+  const from = new Date(now.getTime() - LOOKBACK_HOURS * 60 * 60 * 1000)
   const end = new Date(now)
   end.setDate(end.getDate() + DAYS_AHEAD)
   return {
-    from: now.toISOString(),
+    from: from.toISOString(),
     to:   end.toISOString(),
   }
 }
@@ -131,13 +135,20 @@ function AppInner() {
   // three-tier modal instead of blocking the whole dashboard.
   const [showUpgradeModal,    setShowUpgradeModal]     = useState(false)
 
-  // Keep the active horizon inside the caller's tier ownership. The
-  // profile row lands after auth restore, so on each tier change we
-  // either snap an untouched range up to the tier's full entitlement
-  // or clamp a manual pick back down when the tier shrinks live.
+  // Keep the active horizon inside the caller's tier ownership. Runs
+  // only once auth has settled (session restored, profile read):
+  //   - pro snap-up default   -> 'week'   (never stranded on an empty Today)
+  //   - annual snap-up default -> 'all'   (full season window)
+  //   - free default          -> 'today'
+  // A manual pick clamps down when the tier shrinks live; untouched
+  // picks follow the tier's full entitlement.
   const RANK = { today: 0, week: 1, all: 2 }
   useEffect(() => {
+    if (authLoading) return
     const maxRange = canAccessMonthly ? 'all' : canAccessWeekly ? 'week' : 'today'
+    // Live downgrade: drop an owned-but-now-out-of-tier pick. Both
+    // branches are system actions (raw state setter) so neither
+    // pollutes rangeTouched and a later upgrade can still snap up.
     if (RANK[dateRange] > RANK[maxRange]) {
       setDateRangeState(maxRange)
       return
@@ -147,7 +158,7 @@ function AppInner() {
     // clamping the horizon back to ownership.
     if (!rangeTouched) setDateRangeState(maxRange)
     // dateRange intentionally read outside deps: one pass per tier write
-  }, [tier, canAccessMonthly, canAccessWeekly])
+  }, [tier, canAccessMonthly, canAccessWeekly, authLoading])
 
   // Mobile-specific sheet state
   const [isLeagueDrawerOpen,  setIsLeagueDrawerOpen]  = useState(false)
@@ -262,7 +273,14 @@ function AppInner() {
     }
   }, [])
 
-  // ---- Data fetching from Supabase --------------------------
+// ---- Data fetching from Supabase --------------------------
+// Upcoming-horizon statuses are inclusive: NS/SCHEDULED/TIMED rows are
+// pre-match, IN_PLAY/PAUSED rows stay visible while live so the feed
+// never drops a match mid-week. Finished statuses are the only ones
+// excluded. A short look-back covers kicks that started just before
+// page load.
+const UPCOMING_STATUSES = ['NS', 'SCHEDULED', 'TIMED', 'IN_PLAY', 'PAUSED']
+
   const fetchFixtures = useCallback(async (isSilent = false) => {
     if (!isSilent) setLoading(true)
     setError(null)
@@ -275,10 +293,12 @@ function AppInner() {
         .select('*')
         .gte('match_date', from)
         .lte('match_date', to)
-        .eq('status', 'NS')
+        .in('status', UPCOMING_STATUSES)
         .order('match_date', { ascending: true })
 
       if (sbErr) throw sbErr
+
+      console.info(`[fixtures] ${data?.length ?? 0} upcoming rows (${from.slice(0, 10)}..${to.slice(0, 10)})`)
 
       setFixtures(data || [])
       setLastUpdated(new Date())
@@ -361,9 +381,12 @@ function AppInner() {
       result = result.filter((f) => Boolean(f.value_pick))
     }
 
-    if (dateRange !== 'all') {
-      result = result.filter((f) => isDateInRange(f.match_date, dateRange))
-    }
+    // Every horizon is bounded server-side, so the range predicate
+    // runs uniformly: 'today' widens to the next 24 h, 'week' spans
+    // now..now+7d, 'all' spans now-2h..now+30d. A realtime refresh on
+    // a long-lived session can re-fetch rows past the season window,
+    // and the filter trims them back down.
+    result = result.filter((f) => isDateInRange(f.match_date, dateRange))
 
     if (searchQuery.trim()) {
       result = result.filter((f) => matchesSearch(f, searchQuery))
