@@ -212,23 +212,23 @@ function HeroMonitor({ evPicks, fixturesLoading, dataError }) {
           <p className="text-[10px] font-mono uppercase tracking-wider text-slate-500 mb-2">
             Model Probability vs Market Price
           </p>
-          <div className="grid grid-cols-3 gap-2 text-center">
-            {probRow.map(({ key, label, prob, odds, fair }) => (
+          <div className="w-full grid grid-cols-3 gap-1.5 sm:gap-3 text-center">
+            {probRow.map(({ key, prob, odds, fair }) => (
               <div
                 key={key}
-                className={`rounded-xl border p-2.5 ${
+                className={`rounded-xl border p-2 sm:p-3 min-w-0 ${
                   key === highlightedKey ? 'border-amber-500/40 bg-amber-500/[0.04]' : 'border-pitch-700 bg-pitch-900'
                 }`}
               >
-                <p className="text-[10px] text-slate-500 mb-1">{key === 'H' ? 'Home' : key === 'D' ? 'Draw' : 'Away'}</p>
-                <p className="text-sm font-mono font-medium text-slate-200 tabular-nums">
+                <p className="text-xs sm:text-sm font-semibold truncate text-slate-300 mb-1">{key === 'H' ? 'Home' : key === 'D' ? 'Draw' : 'Away'}</p>
+                <p className="text-xs sm:text-sm font-semibold truncate text-slate-200 font-mono tabular-nums">
                   {prob != null ? `${Math.round(Number(prob))}%` : 'n/a'}
                 </p>
-                <p className="text-[11px] font-mono text-slate-400 tabular-nums mt-1">
+                <p className="text-xs sm:text-sm font-semibold truncate text-slate-400 font-mono tabular-nums mt-1">
                   {odds != null ? Number(odds).toFixed(2) : 'n/a'}
                 </p>
                 {zeroVig && fair != null && (
-                  <p className="text-[10px] font-mono text-slate-500 tabular-nums">
+                  <p className="text-[10px] font-mono text-slate-500 tabular-nums truncate">
                     fair {Number(fair).toFixed(2)}
                   </p>
                 )}
@@ -302,53 +302,56 @@ function ScoreHeatPanel() {
         </span>
       </div>
 
-      {/* Header row: corner cell + home-goal column labels */}
-      <div
-        className="grid gap-1 mb-1"
-        style={{ gridTemplateColumns: `24px repeat(6, minmax(0, 1fr))` }}
-      >
-        <span aria-hidden="true" />
-        {[0, 1, 2, 3, 4, 5].map((k) => (
-          <span key={`ch${k}`} className="text-center text-[9px] font-mono text-slate-500">
-            H{k}
-          </span>
-        ))}
-      </div>
+      {/* Touch-scroll container: on narrow phones the full 6x6 panes
+          with a gentle swipe (the page itself stays overflow-free). */}
+      <div className="w-full overflow-x-auto no-scrollbar py-2 [touch-action:pan-x]">
+        <div className="min-w-[340px]">
+          {/* Header row: corner cell + home-goal column labels */}
+          <div className="flex gap-1 mb-1">
+            <span aria-hidden="true" className="w-8 flex-shrink-0" />
+            {[0, 1, 2, 3, 4, 5].map((k) => (
+              <span key={`ch${k}`} className="w-7 sm:w-10 flex items-center justify-center text-[9px] sm:text-xs font-mono text-slate-500">
+                H{k}
+              </span>
+            ))}
+          </div>
 
-      {/* Body rows: away-goal label + 6 cells */}
-      {demo.matrix.map((row, aRow) => (
-        <div
-          key={`row-${aRow}`}
-          className="grid gap-1 mb-1"
-          style={{ gridTemplateColumns: `24px repeat(6, minmax(0, 1fr))` }}
-        >
-          <span className="self-center text-[9px] font-mono text-slate-500">A{aRow}</span>
-          {row.map((c, hCol) => {
-            const isMax = c.prob === demo.maxProb
-            const dim = c.prob / demo.maxProb
-            const isHover = hoverCell && hoverCell.home === hCol && hoverCell.away === aRow
-            return (
-              <button
-                key={`cell-${hCol}-${aRow}`}
-                type="button"
-                onMouseEnter={() => setHoverCell(c)}
-                onFocus={() => setHoverCell(c)}
-                onBlur={() => setHoverCell(null)}
-                onClick={() => setHoverCell(c)}
-                aria-label={`Score ${hCol} to ${aRow}, probability ${c.prob.toFixed(1)} percent`}
-                className={`relative aspect-square rounded-[4px] border text-[9px] font-mono flex items-center justify-center transition-colors ${
-                  isHover ? 'border-amber-400 z-10' : isMax ? 'border-amber-500/60' : 'border-pitch-700'
-                }`}
-                style={{ backgroundColor: `rgba(251, 191, 36, ${0.04 + dim * 0.55})` }}
-              >
-                <span className={dim > 0.5 ? 'text-pitch-950 font-medium' : 'text-slate-500'}>
-                  {c.prob >= 1 ? Math.round(c.prob) : ''}
-                </span>
-              </button>
-            )
-          })}
+          {/* Body rows: away-goal label + 6 fixed-size cells */}
+          {demo.matrix.map((row, aRow) => (
+            <div key={`row-${aRow}`} className="flex gap-1 mb-1">
+              <span className="w-8 flex-shrink-0 self-center text-[9px] sm:text-xs font-mono text-slate-500 text-right pr-1">
+                A{aRow}
+              </span>
+              {row.map((c, hCol) => {
+                const isMax = c.prob === demo.maxProb
+                const dim = c.prob / demo.maxProb
+                const isHover = hoverCell && hoverCell.home === hCol && hoverCell.away === aRow
+                return (
+                  <button
+                    key={`cell-${hCol}-${aRow}`}
+                    type="button"
+                    onMouseEnter={() => setHoverCell(c)}
+                    onFocus={() => setHoverCell(c)}
+                    onBlur={() => setHoverCell(null)}
+                    onClick={() => setHoverCell(c)}
+                    aria-label={`Score ${hCol} to ${aRow}, probability ${c.prob.toFixed(1)} percent`}
+                    className={`relative w-7 h-7 sm:w-10 sm:h-10 text-[9px] sm:text-xs rounded border flex items-center justify-center transition-colors ${
+                      isHover ? 'border-amber-400 z-10' : isMax ? 'border-amber-500/60' : 'border-pitch-700'
+                    }`}
+                    style={{ backgroundColor: `rgba(251, 191, 36, ${0.04 + dim * 0.55})` }}
+                  >
+                    <span className={dim > 0.5 ? 'text-pitch-950 font-medium' : 'text-slate-500'}>
+                      {c.prob >= 1 ? Math.round(c.prob) : ''}
+                    </span>
+                  </button>
+                )
+              })}
+            </div>
+          ))}
+
+          <p className="sm:hidden mt-1 text-[10px] font-mono text-slate-600">Swipe horizontally to pan the full matrix.</p>
         </div>
-      ))}
+      </div>
 
       <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-1 text-[11px] font-mono">
         <span className="text-slate-400">
@@ -633,10 +636,10 @@ export default function LandingPage({
   ]
 
   return (
-    <div className="min-h-screen bg-pitch-950 text-slate-300 overflow-x-hidden">
+    <div className="w-full min-h-screen overflow-x-hidden bg-pitch-950 text-slate-100">
       {/* ─── Sticky top navigation ─────────────────────────── */}
       <header className="sticky top-0 z-40 bg-pitch-950/95 backdrop-blur-sm border-b border-pitch-800">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6">
+        <div className="w-full max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex items-center gap-3 h-16">
             <a href="#top" className="flex items-center gap-2.5 min-w-0" aria-label="Matchlytics by imortifex, back to top">
               <DiamondMark size={30} />
@@ -669,7 +672,7 @@ export default function LandingPage({
               <button
                 type="button"
                 onClick={handleLaunchApp}
-                className="min-h-[44px] inline-flex items-center px-4 sm:px-5 rounded-xl bg-amber-500 text-pitch-950 text-sm font-bold hover:bg-amber-400 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-400"
+                className="min-h-[44px] shrink-0 inline-flex items-center px-3 sm:px-5 rounded-xl bg-amber-500 text-pitch-950 text-[13px] sm:text-sm font-bold hover:bg-amber-400 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-400 whitespace-nowrap"
               >
                 {isPreviewHost ? '⚡ Launch Dashboard' : '⚡ Open App'}
               </button>
@@ -696,13 +699,13 @@ export default function LandingPage({
       <main id="top">
         {/* ─── Hero: pitch of claims + living monitor ──────── */}
         <section className="relative bg-pitch-950">
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 pt-14 sm:pt-20 lg:pt-24 pb-12 sm:pb-16">
+          <div className="w-full max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 pt-14 sm:pt-20 lg:pt-24 pb-12 sm:pb-16">
             <div className="grid lg:grid-cols-2 gap-10 lg:gap-14 items-center">
               <div className="animate-fade-in">
                 <p className="font-mono text-[11px] sm:text-xs text-slate-500 tracking-[0.14em] uppercase">
                   Institutional Quantitative Sports Analytics Engine · By Imortifex
                 </p>
-                <h1 className="mt-4 text-4xl sm:text-5xl xl:text-6xl font-bold text-slate-100 tracking-tight text-balance leading-[1.05]">
+                <h1 className="mt-4 w-full max-w-full text-2xl sm:text-4xl md:text-5xl lg:text-6xl font-extrabold tracking-tight leading-tight sm:leading-tight break-words text-slate-100">
                   Eliminate the bookmaker&apos;s edge with pure mathematical precision.
                 </h1>
                 <p className="mt-5 text-base sm:text-lg text-slate-400 leading-relaxed max-w-xl">
@@ -711,18 +714,18 @@ export default function LandingPage({
                   the market, and flags the picks where your expected value is genuinely positive.
                   Twice a day. Settled and audited after every match.
                 </p>
-                <div className="mt-7 flex flex-wrap gap-3">
+                <div className="mt-7 w-full flex flex-col sm:flex-row items-stretch sm:items-center gap-2.5 sm:gap-3">
                   <button
                     type="button"
                     onClick={handleLaunchApp}
-                    className="min-h-[48px] px-6 rounded-xl bg-amber-500 text-pitch-950 text-sm font-bold hover:bg-amber-400 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-400"
+                    className="min-h-[48px] w-full sm:w-auto px-6 rounded-xl bg-amber-500 text-pitch-950 text-sm font-bold hover:bg-amber-400 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-400 text-center justify-center"
                   >
                     {isPreviewHost ? '⚡ Launch Dashboard' : '⚡ Open App'}
                   </button>
                   <button
                     type="button"
                     onClick={onOpenBacktest}
-                    className="min-h-[48px] px-6 rounded-xl border border-pitch-600 bg-pitch-800 text-slate-200 text-sm font-semibold hover:border-pitch-500 hover:bg-pitch-700 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500"
+                    className="min-h-[48px] w-full sm:w-auto px-6 rounded-xl border border-pitch-600 bg-pitch-800 text-slate-200 text-sm font-semibold hover:border-pitch-500 hover:bg-pitch-700 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500 text-center justify-center"
                   >
                     📈 View Verified Backtest
                   </button>
@@ -741,7 +744,7 @@ export default function LandingPage({
 
         {/* ─── 01 Methodology: four quant pillars ──────────── */}
         <section id="methodology" className="scroll-mt-24 bg-pitch-900/40 border-y border-pitch-800">
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 py-14 sm:py-20">
+          <div className="w-full max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-14 sm:py-20">
             <div className="max-w-2xl">
               <SectionKicker index="01" title="Methodology" />
               <h2 className="text-2xl sm:text-3xl font-bold text-slate-100 tracking-tight">
@@ -771,7 +774,7 @@ export default function LandingPage({
 
         {/* ─── 02 Core Architecture: pipeline + capability ─── */}
         <section id="architecture" className="scroll-mt-24">
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 py-14 sm:py-20">
+          <div className="w-full max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-14 sm:py-20">
             <div className="max-w-2xl">
               <SectionKicker index="02" title="Core Architecture" />
               <h2 className="text-2xl sm:text-3xl font-bold text-slate-100 tracking-tight">
@@ -813,7 +816,7 @@ export default function LandingPage({
 
         {/* ─── 03 Track Record: verified settlements only ──── */}
         <section id="track-record" className="scroll-mt-24 bg-pitch-900/40 border-y border-pitch-800">
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 py-14 sm:py-20">
+          <div className="w-full max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-14 sm:py-20">
             <div className="max-w-2xl">
               <SectionKicker index="03" title="Track Record" />
               <h2 className="text-2xl sm:text-3xl font-bold text-slate-100 tracking-tight">
@@ -834,7 +837,7 @@ export default function LandingPage({
 
         {/* ─── 04 Daily SITREP ──────────────────────────────── */}
         <section id="sitrep" className="scroll-mt-24">
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 py-14 sm:py-20">
+          <div className="w-full max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-14 sm:py-20">
             <div className="grid lg:grid-cols-2 gap-8 items-start">
               <div>
                 <SectionKicker index="04" title="Daily SITREP" />
@@ -868,7 +871,7 @@ export default function LandingPage({
 
       {/* ─── Trust, compliance & ecosystem footer ──────────── */}
       <footer className="border-t border-pitch-800 bg-pitch-950">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 py-10 sm:py-14">
+        <div className="w-full max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-10 sm:py-14">
           <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-8">
             <div className="max-w-md">
               <div className="flex items-center gap-2.5">
