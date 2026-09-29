@@ -128,7 +128,7 @@ def send_daily_sitrep(
 
         # Assemble full SITREP message
         message = (
-            f"📊 <b>MATCHLYTICS DAILY SITREP</b>\n"
+            f"📊 <b>MATCHLYTICS by imortifex · DAILY SITREP</b>\n"
             f"📅 {current_date_utc} UTC\n"
             f"━━━━━━━━━━━━━━━━━━━━━\n"
             f"{quota_banner}"
@@ -144,13 +144,13 @@ def send_daily_sitrep(
             f"{top_picks_text}\n"
             f"{parlay_block}"
             f"━━━━━━━━━━━━━━━━━━━━━\n"
-            f"<i>Powered by Matchlytics Quant Engine.</i>"
+            f"<i>Powered by Matchlytics by imortifex.</i>"
         )
 
         # Inline Keyboard Buttons
         inline_buttons = [
             [
-                {"text": "🌐 Open Matchlytics Dashboard", "url": APP_BASE_URL}
+                {"text": "🌐 Open Analytics App", "url": APP_BASE_URL}
             ]
         ]
 

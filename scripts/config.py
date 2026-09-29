@@ -62,7 +62,7 @@ ODDS_SPORT_KEYS: dict[str, str] = {
 # ---- Telegram Bot & Notification Credentials ----------------
 TELEGRAM_BOT_TOKEN: str | None = os.getenv("TELEGRAM_BOT_TOKEN")
 TELEGRAM_CHAT_ID: str | None = os.getenv("TELEGRAM_CHAT_ID")
-APP_BASE_URL: str = os.getenv("APP_BASE_URL", "https://tips.imortifex.me/")
+APP_BASE_URL: str = os.getenv("APP_BASE_URL", "https://app.imortifex.me/")
 GITHUB_REPOSITORY: str | None = os.getenv("GITHUB_REPOSITORY")
 
 # ---- Supabase (service role: bypasses RLS) ------------------

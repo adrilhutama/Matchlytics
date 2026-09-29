@@ -24,6 +24,7 @@ export default function Sidebar({
   lastUpdated,
   deferredInstall,
   onOpenBacktest,
+  onEcosystemVisit,      // opens the imortifex.me landing surface
 }) {
   const timeStr = lastUpdated
     ? lastUpdated.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' })
@@ -51,6 +52,7 @@ export default function Sidebar({
         <div className="min-w-0">
           <h1 className="text-base font-bold text-slate-100 tracking-tight leading-none">
             Matchlytics
+            <span className="ml-1.5 text-[10px] font-mono font-normal text-slate-500">by imortifex</span>
           </h1>
           <p className="text-[11px] text-slate-500 mt-1">Pre-Match Quant Analytics</p>
         </div>
@@ -209,14 +211,15 @@ export default function Sidebar({
               Last sync: {timeStr}
             </p>
           )}
-          <a
-            href="https://tips.imortifex.me"
-            target="_blank"
-            rel="noreferrer noopener"
-            className="block text-[11px] font-mono text-slate-500 hover:text-slate-300 transition-colors truncate"
+          <button
+            type="button"
+            onClick={onEcosystemVisit}
+            className="w-full min-h-[36px] flex items-center gap-1.5 px-2 rounded-lg text-[11px] font-mono text-slate-400 hover:text-amber-300 hover:bg-pitch-800 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500"
+            title="Open the Matchlytics landing surface"
           >
-            tips.imortifex.me
-          </a>
+            <span aria-hidden="true">🌐</span>
+            <span className="truncate">imortifex.me · Landing</span>
+          </button>
           <button
             type="button"
             id="sidebar-install-btn"

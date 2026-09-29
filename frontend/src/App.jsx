@@ -27,6 +27,7 @@ import Sidebar from './components/Sidebar'
 import MobileNav from './components/MobileNav'
 import MobileLeagueDrawer from './components/MobileLeagueDrawer'
 import InstallPrompt from './components/InstallPrompt'
+import LandingPage from './components/LandingPage'
 import {
   isDateInRange,
   matchesSearch,
@@ -36,6 +37,21 @@ import {
   getParlaySlip,
   saveParlaySlip,
 } from './utils/analytics'
+
+// ---- Dual-domain routing --------------------------------------
+// The same SPA ships to two domains:
+//   imortifex.me        -> landing surface (product showcase)
+//   app.imortifex.me    -> live dashboard
+// Query param (?view=) and hash (#/) overrides take precedence, so
+// either domain can deep-link into the other surface without a reload.
+const getInitialView = () => {
+  const hostname = window.location.hostname
+  const searchParams = new URLSearchParams(window.location.search)
+  if (searchParams.get('view') === 'app' || window.location.hash === '#/app') return 'dashboard'
+  if (searchParams.get('view') === 'landing' || window.location.hash === '#/') return 'landing'
+  if (hostname.startsWith('app.') || hostname.startsWith('tips.')) return 'dashboard'
+  return 'landing'
+}
 
 // ---- League metadata (also imported by Sidebar when needed) --------
 export const LEAGUES = [
@@ -69,6 +85,12 @@ function buildDateRange() {
 //   'matches'    -> same as 'all' (kept for mobile-nav consistency)
 
 export default function App() {
+  // Dual-domain routing: 'landing' renders the marketing surface,
+  // 'dashboard' renders the operational app. All data fetching below
+  // stays mounted for both views so the backtest ledger and the hero
+  // monitor work without re-loading.
+  const [currentView, setCurrentView] = useState(getInitialView)
+
   const [fixtures,            setFixtures]            = useState([])
   const [standingsMap,        setStandingsMap]        = useState({})
   const [loading,             setLoading]             = useState(true)
@@ -351,6 +373,91 @@ export default function App() {
     else                        { setValueOnly(false); setShowWatchlistOnly(false) }
   }, [])
 
+  // Ecosystem view switchers. The landing surface offers "enter the app",
+  // the dashboard offers "view the landing" as a Sidebar/mobile-bar quick
+  // action. ?view= is kept in sync via replaceState so the chosen surface
+  // persists across a refresh on whichever domain you are on.
+  const syncUrlForView = useCallback((view) => {
+    try {
+      const url = new URL(window.location.href)
+      url.searchParams.set('view', view === 'dashboard' ? 'app' : 'landing')
+      url.hash = ''
+      window.history.replaceState(null, '', url.toString())
+    } catch {
+      /* non-fatal: URL sync is convenience only */
+    }
+  }, [])
+
+  const handleEnterApp = useCallback(() => {
+    setCurrentView('dashboard')
+    syncUrlForView('dashboard')
+  }, [syncUrlForView])
+
+  const handleEcosystemVisit = useCallback(() => {
+    setCurrentView('landing')
+    syncUrlForView('landing')
+  }, [syncUrlForView])
+
+  // ---- Modals & Drawers (shared by BOTH views) ----------------
+  // Rendered outside the view branch so the verified backtest ledger can
+  // be opened straight from the landing page hero CTA.
+  const sharedOverlays = (
+    <>
+      <ScoreMatrixModal
+        fixture={selectedMatrixFixture}
+        isOpen={Boolean(selectedMatrixFixture)}
+        onClose={() => setSelectedMatrixFixture(null)}
+        standingsMap={standingsMap}
+      />
+
+      <KellyCalculatorModal
+        fixture={selectedQuantFixture}
+        isOpen={Boolean(selectedQuantFixture)}
+        onClose={() => setSelectedQuantFixture(null)}
+        onAddToSlip={handleToggleSlip}
+        isInSlip={parlaySlip.some(
+          (l) => l.fixtureId === selectedQuantFixture?.id
+        )}
+      />
+
+      <ParlaySlipDrawer
+        legs={parlaySlip}
+        isOpen={isSlipDrawerOpen}
+        onToggleOpen={() => setIsSlipDrawerOpen(!isSlipDrawerOpen)}
+        onRemoveLeg={handleRemoveSlipLeg}
+        onClearSlip={handleClearSlip}
+      />
+
+      {/* Historical Bankroll Simulator & Settled Bets Ledger */}
+      <PerformanceModal
+        isOpen={isBacktestOpen}
+        onClose={() => setIsBacktestOpen(false)}
+        fixtures={settledFixtures}
+      />
+
+      {/* PWA install prompt (mobile floating banner + iOS hint) */}
+      <InstallPrompt />
+    </>
+  )
+
+  // ---- View: Landing Surface (marketing, ecosystem showcase) ----
+  if (currentView === 'landing') {
+    return (
+      <div className="w-full min-h-screen bg-pitch-950 text-slate-100">
+        <LandingPage
+          onEnterApp={handleEnterApp}
+          onOpenBacktest={() => setIsBacktestOpen(true)}
+          fixtures={fixtures}
+          settledFixtures={settledFixtures}
+          fixturesLoading={loading}
+          dataError={error}
+          lastUpdated={lastUpdated}
+        />
+        {sharedOverlays}
+      </div>
+    )
+  }
+
   return (
     <div className="w-full min-h-screen bg-pitch-900 text-slate-100 flex overflow-x-hidden">
       {/* ─── Desktop Left Sidebar ────────────────────────────── */}
@@ -365,6 +472,7 @@ export default function App() {
         lastUpdated={lastUpdated}
         deferredInstall={deferredInstall}
         onOpenBacktest={() => setIsBacktestOpen(true)}
+        onEcosystemVisit={handleEcosystemVisit}
       />
 
       {/* ─── Main Content Area ──────────────────────────────── */}
@@ -376,11 +484,21 @@ export default function App() {
             aria-hidden="true"
             style={{ clipPath: 'polygon(50% 0%, 100% 50%, 50% 100%, 0% 50%)' }}
           />
-          <h1 className="text-sm font-bold text-slate-100 tracking-tight">Matchlytics</h1>
-          <span className="ml-auto inline-flex items-center gap-1.5 text-[11px] text-emerald-400 font-mono">
+          <div className="min-w-0">
+            <p className="text-sm font-bold text-slate-100 tracking-tight leading-none">Matchlytics</p>
+            <p className="text-[9px] font-mono text-slate-500 mt-0.5">by imortifex</p>
+          </div>
+          <span className="ml-auto inline-flex items-center gap-1.5 text-[11px] text-emerald-400 font-mono flex-shrink-0">
             <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" aria-hidden="true" />
             Live
           </span>
+          <button
+            type="button"
+            onClick={handleEcosystemVisit}
+            className="min-h-[36px] px-3 rounded-lg border border-pitch-700 bg-pitch-900 text-[11px] font-mono text-slate-300 hover:text-slate-100 transition-colors flex items-center flex-shrink-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500"
+          >
+            🌐 imortifex.me
+          </button>
         </div>
 
         {/* Sticky glassmorphism Filter Bar */}
@@ -549,40 +667,7 @@ export default function App() {
       />
 
       {/* ─── Modals & Drawers (always rendered) ───────────── */}
-      <ScoreMatrixModal
-        fixture={selectedMatrixFixture}
-        isOpen={Boolean(selectedMatrixFixture)}
-        onClose={() => setSelectedMatrixFixture(null)}
-        standingsMap={standingsMap}
-      />
-
-      <KellyCalculatorModal
-        fixture={selectedQuantFixture}
-        isOpen={Boolean(selectedQuantFixture)}
-        onClose={() => setSelectedQuantFixture(null)}
-        onAddToSlip={handleToggleSlip}
-        isInSlip={parlaySlip.some(
-          (l) => l.fixtureId === selectedQuantFixture?.id
-        )}
-      />
-
-      <ParlaySlipDrawer
-        legs={parlaySlip}
-        isOpen={isSlipDrawerOpen}
-        onToggleOpen={() => setIsSlipDrawerOpen(!isSlipDrawerOpen)}
-        onRemoveLeg={handleRemoveSlipLeg}
-        onClearSlip={handleClearSlip}
-      />
-
-      {/* Historical Bankroll Simulator & Settled Bets Ledger */}
-      <PerformanceModal
-        isOpen={isBacktestOpen}
-        onClose={() => setIsBacktestOpen(false)}
-        fixtures={settledFixtures}
-      />
-
-      {/* PWA install prompt (mobile floating banner + iOS hint) */}
-      <InstallPrompt />
+      {sharedOverlays}
     </div>
   )
 }
