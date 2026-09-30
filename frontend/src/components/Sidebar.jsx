@@ -331,15 +331,20 @@ export default function Sidebar({
               Last sync: {timeStr}
             </p>
           )}
-          <button
-            type="button"
-            onClick={onEcosystemVisit}
-            className="w-full min-h-[36px] flex items-center gap-1.5 px-2 rounded-lg text-[11px] font-mono text-slate-400 hover:text-amber-300 hover:bg-pitch-800 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500"
-            title="Open the Matchlytics landing surface"
+          <a
+            href="https://imortifex.me/"
+            onClick={(e) => {
+              if (typeof window !== 'undefined' && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')) {
+                e.preventDefault()
+                if (onEcosystemVisit) onEcosystemVisit()
+              }
+            }}
+            className="w-full min-h-[36px] flex items-center gap-1.5 px-2 rounded-lg text-[11px] font-mono text-slate-400 hover:text-amber-300 hover:bg-pitch-800 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500 cursor-pointer"
+            title="Open the Matchlytics public landing showcase at imortifex.me"
           >
             <span aria-hidden="true">🌐</span>
             <span className="truncate">imortifex.me · Landing</span>
-          </button>
+          </a>
           <button
             type="button"
             id="sidebar-install-btn"

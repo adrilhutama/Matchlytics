@@ -752,8 +752,15 @@ export default function LandingPage({
   lastUpdated = null,
 }) {
   const handleLaunchApp = () => {
-    if (onEnterApp) onEnterApp()
-    else window.location.assign(APP_LIVE_URL)
+    if (typeof window !== 'undefined' && window.location.hostname === 'imortifex.me') {
+      window.location.assign(APP_LIVE_URL)
+      return
+    }
+    if (onEnterApp) {
+      onEnterApp()
+      return
+    }
+    window.location.assign(APP_LIVE_URL)
   }
 
   const scrollToPricing = () => {
@@ -815,7 +822,7 @@ export default function LandingPage({
       <header className="sticky top-0 z-40 bg-pitch-950/95 backdrop-blur-sm border-b border-pitch-800 pt-safe">
         <div className="w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex items-center gap-3 h-16">
-            <a href="#top" className="flex items-center gap-2.5 min-w-0" aria-label="Matchlytics by imortifex, back to top">
+            <a href="https://imortifex.me/" className="flex items-center gap-2.5 min-w-0" aria-label="Matchlytics by imortifex">
               <DiamondMark size={30} />
               <span className="min-w-0">
                 <span className="block text-sm font-bold tracking-[0.18em] text-slate-100 leading-none">MATCHLYTICS</span>
@@ -843,13 +850,18 @@ export default function LandingPage({
                 <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse flex-shrink-0" aria-hidden="true" />
                 Engine Active &middot; {syncLabel}
               </span>
-              <button
-                type="button"
-                onClick={handleLaunchApp}
+              <a
+                href={APP_LIVE_URL}
+                onClick={(e) => {
+                  if (typeof window !== 'undefined' && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')) {
+                    e.preventDefault()
+                    handleLaunchApp()
+                  }
+                }}
                 className="min-h-[44px] shrink-0 inline-flex items-center px-4 sm:px-5 rounded-xl bg-amber-500 text-pitch-950 text-[13px] sm:text-sm font-bold hover:bg-amber-400 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-400 whitespace-nowrap cursor-pointer shadow-sm shadow-amber-500/20"
               >
                 Enter Terminal
-              </button>
+              </a>
             </div>
           </div>
 
@@ -895,13 +907,18 @@ export default function LandingPage({
                   fractional Kelly risk management.
                 </p>
                 <div className="mt-7 w-full flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
-                  <button
-                    type="button"
-                    onClick={handleLaunchApp}
+                  <a
+                    href={APP_LIVE_URL}
+                    onClick={(e) => {
+                      if (typeof window !== 'undefined' && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')) {
+                        e.preventDefault()
+                        handleLaunchApp()
+                      }
+                    }}
                     className="min-h-[48px] w-full sm:w-auto px-6 rounded-xl bg-amber-500 text-pitch-950 text-sm font-bold hover:bg-amber-400 transition-all shadow-md shadow-amber-500/20 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-400 text-center inline-flex items-center justify-center cursor-pointer"
                   >
                     Launch SaaS Terminal
-                  </button>
+                  </a>
                   <button
                     type="button"
                     onClick={scrollToPricing}
@@ -1082,9 +1099,14 @@ export default function LandingPage({
                       ))}
                     </ul>
                   </div>
-                  <button
-                    type="button"
-                    onClick={handleLaunchApp}
+                  <a
+                    href={APP_LIVE_URL}
+                    onClick={(e) => {
+                      if (typeof window !== 'undefined' && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')) {
+                        e.preventDefault()
+                        handleLaunchApp()
+                      }
+                    }}
                     className={`mt-8 min-h-[48px] w-full inline-flex items-center justify-center rounded-xl text-sm font-bold transition-all focus-visible:outline-none focus-visible:ring-2 cursor-pointer ${
                       tier.featured
                         ? 'bg-amber-500 text-pitch-950 hover:bg-amber-400 shadow-md shadow-amber-500/20 ring-amber-400'
@@ -1092,7 +1114,7 @@ export default function LandingPage({
                     }`}
                   >
                     {tier.cta}
-                  </button>
+                  </a>
                 </article>
               ))}
             </div>
@@ -1152,13 +1174,18 @@ export default function LandingPage({
               >
                 Contact Support
               </button>
-              <button
-                type="button"
-                onClick={handleLaunchApp}
+              <a
+                href={APP_LIVE_URL}
+                onClick={(e) => {
+                  if (typeof window !== 'undefined' && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')) {
+                    e.preventDefault()
+                    handleLaunchApp()
+                  }
+                }}
                 className="text-left text-slate-400 hover:text-slate-100 transition-colors py-2 min-h-[44px] flex items-center cursor-pointer"
               >
                 Open Terminal
-              </button>
+              </a>
               <a href="#methodology" className="text-slate-500 hover:text-slate-300 transition-colors py-2 min-h-[44px] flex items-center">
                 Methodology Brief
               </a>

@@ -358,15 +358,20 @@ export default function LoginPage({ onBackToLanding }) {
         </div>
       </div>
 
-      {/* Return to overview navigation link */}
+      {/* Return to overview direct link */}
       <div className="p-4 md:mt-4 text-center z-10">
-        <button
-          type="button"
-          onClick={handleBackToLanding}
+        <a
+          href="https://imortifex.me/"
+          onClick={(e) => {
+            if (typeof window !== 'undefined' && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')) {
+              e.preventDefault()
+              handleBackToLanding()
+            }
+          }}
           className="min-h-[44px] px-4 text-xs font-mono text-slate-400 hover:text-amber-400 transition-colors inline-flex items-center gap-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500 rounded-lg cursor-pointer"
         >
           <span aria-hidden="true">&larr;</span> Return to Matchlytics Overview
-        </button>
+        </a>
       </div>
     </div>
   )

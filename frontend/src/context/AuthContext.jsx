@@ -101,15 +101,29 @@ export function AuthProvider({ children }) {
   }, [])
 
   const signUp = useCallback(async (email, password, fullName) => {
+    const redirectUrl = typeof window !== 'undefined' && window.location.hostname.includes('localhost')
+      ? `${window.location.origin}/?view=app`
+      : 'https://app.imortifex.me/'
     return supabase.auth.signUp({
       email,
       password,
-      options: { data: { full_name: fullName || '' } },
+      options: {
+        data: { full_name: fullName || '' },
+        emailRedirectTo: redirectUrl,
+      },
     })
   }, [])
 
   const requestMagicLink = useCallback(async (email) => {
-    return supabase.auth.signInWithOtp({ email })
+    const redirectUrl = typeof window !== 'undefined' && window.location.hostname.includes('localhost')
+      ? `${window.location.origin}/?view=app`
+      : 'https://app.imortifex.me/'
+    return supabase.auth.signInWithOtp({
+      email,
+      options: {
+        emailRedirectTo: redirectUrl,
+      },
+    })
   }, [])
 
   const signOut = useCallback(async () => {

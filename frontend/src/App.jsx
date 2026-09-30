@@ -545,11 +545,19 @@ function AppInner() {
   }, [])
 
   const handleEnterApp = useCallback(() => {
+    if (typeof window !== 'undefined' && window.location.hostname === 'imortifex.me') {
+      window.location.assign('https://app.imortifex.me/')
+      return
+    }
     setCurrentView('dashboard')
     syncUrlForView('dashboard')
   }, [syncUrlForView])
 
   const handleEcosystemVisit = useCallback(() => {
+    if (typeof window !== 'undefined' && window.location.hostname === 'app.imortifex.me') {
+      window.location.assign('https://imortifex.me/')
+      return
+    }
     setCurrentView('landing')
     syncUrlForView('landing')
   }, [syncUrlForView])
@@ -732,15 +740,21 @@ function AppInner() {
                 </button>
               </div>
             )}
-            <button
-              type="button"
-              onClick={handleEcosystemVisit}
-              className="min-h-[36px] sm:px-3 rounded-lg border border-pitch-700 bg-pitch-900 text-[11px] font-mono text-slate-300 hover:text-slate-100 transition-colors flex items-center gap-1.5 flex-shrink-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500"
+            <a
+              href="https://imortifex.me/"
+              onClick={(e) => {
+                if (typeof window !== 'undefined' && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')) {
+                  e.preventDefault()
+                  handleEcosystemVisit()
+                }
+              }}
+              className="min-h-[36px] px-2.5 sm:px-3 rounded-lg border border-pitch-700 bg-pitch-900 text-[11px] font-mono text-slate-300 hover:text-slate-100 transition-colors flex items-center gap-1.5 flex-shrink-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500 cursor-pointer"
+              title="Open imortifex.me landing surface"
             >
               <span aria-hidden="true">🌐</span>
               <span className="hidden sm:inline">imortifex.me</span>
               <span className="sr-only">Open imortifex.me landing surface</span>
-            </button>
+            </a>
           </div>
         </div>
 
