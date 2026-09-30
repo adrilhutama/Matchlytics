@@ -33,14 +33,23 @@ export default function CompactTableView({
     if (onTriggerUpgrade) onTriggerUpgrade(reason)
   }
   return (
-    <div className="w-full overflow-x-auto touch-pan-x rounded-xl border border-pitch-800 bg-pitch-950/40">
-      <table className="w-full min-w-[700px] text-xs text-left border-collapse">
+    <div className="w-full rounded-xl border border-pitch-800 bg-pitch-950/40 overflow-hidden">
+      {/* Mobile Swipe Hint Banner */}
+      <div className="md:hidden flex items-center justify-between px-3 py-2 text-[11px] font-mono text-slate-400 bg-pitch-950 border-b border-pitch-800">
+        <span className="flex items-center gap-1.5 text-amber-400 font-semibold">
+          <span>&larr;&rarr;</span>
+          <span>Swipe horizontally for full odds matrix</span>
+        </span>
+        <span className="text-slate-500 font-normal">Table view</span>
+      </div>
+      <div className="w-full overflow-x-auto touch-pan-x">
+      <table className="w-full min-w-[850px] text-xs text-left border-collapse">
           <thead>
             <tr className="border-b border-pitch-700/80 bg-pitch-950 text-[11px] uppercase tracking-wider text-slate-400">
-              <th scope="col" className="py-3 px-3 w-10 text-center sticky left-0 z-20 bg-pitch-950">Pin</th>
-              <th scope="col" className="py-3 px-3 w-32 sticky left-10 z-20 bg-pitch-950">Kickoff</th>
-              <th scope="col" className="py-3 px-3 sticky left-[168px] z-20 bg-pitch-950 shadow-[2px_0_5px_rgba(0,0,0,0.4)] border-r border-pitch-800">Fixture</th>
-              <th scope="col" className="py-3 px-3 w-28">League</th>
+              <th scope="col" className="py-3 px-2 w-12 text-center sticky left-0 z-20 bg-pitch-950 border-r border-pitch-800/80">Pin</th>
+              <th scope="col" className="py-3 px-3 w-36 md:sticky md:left-12 z-20 bg-pitch-950">Kickoff</th>
+              <th scope="col" className="py-3 px-3 md:sticky md:left-[176px] z-20 bg-pitch-950 md:shadow-[2px_0_5px_rgba(0,0,0,0.4)] md:border-r md:border-pitch-800">Fixture</th>
+              <th scope="col" className="py-3 px-3 w-32">League</th>
               <th scope="col" className="py-3 px-3 w-24 text-center">xG (λ)</th>
               <th scope="col" className="py-3 px-3 w-36 text-center">1 / X / 2 Prob</th>
               <th scope="col" className="py-3 px-3 w-44 text-center">Odds & No-Vig</th>
@@ -95,13 +104,13 @@ export default function CompactTableView({
                     fixture.value_pick ? 'bg-amber-500/[0.03]' : ''
                   }`}
                 >
-                  {/* Pin / Star Action */}
-                  <td className="py-2.5 px-3 text-center sticky left-0 z-10 bg-pitch-900">
+                  {/* Pin / Star Action - Finger-friendly 44px touch target */}
+                  <td className="py-2 px-1 text-center sticky left-0 z-10 bg-pitch-900 border-r border-pitch-800/80">
                     <button
                       type="button"
                       onClick={() => onToggleWatchlist(fixture.id)}
                       aria-label={isPinned ? `Remove ${fixture.home_team_name} vs ${fixture.away_team_name} from watchlist` : `Add ${fixture.home_team_name} vs ${fixture.away_team_name} to watchlist`}
-                      className="p-1 min-h-[32px] min-w-[32px] inline-flex items-center justify-center rounded text-slate-500 hover:text-amber-400 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-amber-500"
+                      className="p-2 min-h-[44px] min-w-[44px] inline-flex items-center justify-center rounded text-slate-500 hover:text-amber-400 active:scale-95 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-amber-500 touch-manipulation"
                     >
                       <svg
                         width="16"
@@ -119,13 +128,13 @@ export default function CompactTableView({
                   </td>
 
                   {/* Kickoff */}
-                  <td className="py-2.5 px-3 whitespace-nowrap sticky left-10 z-10 bg-pitch-900">
+                  <td className="py-2.5 px-3 whitespace-nowrap md:sticky md:left-12 z-10 bg-pitch-900">
                     <span className="font-medium text-slate-200 block">{relativeBadge}</span>
                     <span className="text-[11px] text-slate-500 font-mono">{timeStr}</span>
                   </td>
 
                   {/* Fixture (Teams) */}
-                  <td className="py-2.5 px-3 sticky left-[168px] z-10 bg-pitch-900 shadow-[2px_0_5px_rgba(0,0,0,0.4)] border-r border-pitch-800">
+                  <td className="py-2.5 px-3 md:sticky md:left-[176px] z-10 bg-pitch-900 md:shadow-[2px_0_5px_rgba(0,0,0,0.4)] md:border-r md:border-pitch-800">
                     <div className="flex flex-col gap-1.5 min-w-[210px]">
                       <div className="flex items-center justify-between gap-2">
                         <div className="flex items-center gap-2 min-w-0">
@@ -288,7 +297,7 @@ export default function CompactTableView({
                         onClick={() => quantLocked ? lockedAction('Score Matrix requires a Pro pass') : onOpenMatrix(fixture)}
                         title={quantLocked ? 'Pro feature' : 'View Poisson score matrix'}
                         aria-disabled={quantLocked || undefined}
-                        className={`px-2 py-1 min-h-[32px] text-[11px] font-semibold rounded-lg transition-colors ${
+                        className={`px-2 py-1 min-h-[40px] px-2.5 py-1.5 text-[11px] font-semibold rounded-lg touch-manipulation active:scale-95 transition-colors ${
                           quantLocked
                             ? 'bg-pitch-900 text-slate-600 border border-pitch-800 hover:border-amber-500/30 cursor-pointer'
                             : 'bg-pitch-800 hover:bg-pitch-700 text-slate-300 border border-pitch-700'
@@ -302,7 +311,7 @@ export default function CompactTableView({
                         onClick={() => quantLocked ? lockedAction('Quant and Kelly require a Pro pass') : onOpenQuantModal && onOpenQuantModal(fixture)}
                         title={quantLocked ? 'Pro feature' : 'View quantitative risk and Kelly staking'}
                         aria-disabled={quantLocked || undefined}
-                        className={`px-2 py-1 min-h-[32px] text-[11px] font-semibold rounded-lg transition-colors ${
+                        className={`px-2 py-1 min-h-[40px] px-2.5 py-1.5 text-[11px] font-semibold rounded-lg touch-manipulation active:scale-95 transition-colors ${
                           quantLocked
                             ? 'bg-pitch-900 text-slate-600 border border-pitch-800 hover:border-amber-500/30 cursor-pointer'
                             : 'bg-pitch-800 hover:bg-amber-500 hover:text-pitch-950 text-slate-300 border border-pitch-700'
@@ -317,7 +326,7 @@ export default function CompactTableView({
                           onClick={() => quantLocked ? lockedAction('Quant Lab requires a Pro pass') : onSelectForLab(fixture)}
                           title={quantLocked ? 'Pro feature' : 'Deep dive in Quant Lab workspace'}
                           aria-disabled={quantLocked || undefined}
-                          className={`px-2 py-1 min-h-[32px] text-[11px] font-semibold rounded-lg transition-colors ${
+                          className={`px-2 py-1 min-h-[40px] px-2.5 py-1.5 text-[11px] font-semibold rounded-lg touch-manipulation active:scale-95 transition-colors ${
                             quantLocked
                               ? 'bg-pitch-900 text-slate-600 border border-pitch-800 hover:border-amber-500/30 cursor-pointer'
                               : 'bg-indigo-500/20 hover:bg-indigo-500/30 text-indigo-300 border border-indigo-500/40'
@@ -348,7 +357,7 @@ export default function CompactTableView({
                               matchDate: fixture.match_date,
                             })
                           }}
-                          className={`px-2 py-1 min-h-[32px] text-[11px] font-bold rounded-lg transition-colors ${
+                          className={`px-2 py-1 min-h-[40px] px-2.5 py-1.5 text-[11px] font-bold rounded-lg touch-manipulation active:scale-95 transition-colors ${
                             isFixtureInSlip
                               ? 'bg-amber-500 text-pitch-950'
                               : 'bg-pitch-800 hover:bg-pitch-700 text-slate-400 hover:text-amber-400 border border-pitch-700'
@@ -366,5 +375,6 @@ export default function CompactTableView({
           </tbody>
         </table>
       </div>
+    </div>
   )
 }

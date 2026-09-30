@@ -311,7 +311,7 @@ function QuantLabWorkspace({
   }
 
   return (
-    <div className="space-y-6 animate-fade-in max-w-7xl mx-auto">
+    <div className="space-y-6 animate-fade-in max-w-7xl mx-auto pb-28 sm:pb-12">
       {/* Top Match Selector & Identity Header */}
       <div className="p-4 sm:p-5 rounded-2xl bg-pitch-900 border border-pitch-700/80 shadow-xl flex flex-col lg:flex-row lg:items-center justify-between gap-4">
         <div className="flex flex-col sm:flex-row sm:items-center gap-3 min-w-0">
@@ -339,9 +339,9 @@ function QuantLabWorkspace({
           </div>
         </div>
 
-        {/* Target Match Selector */}
+        {/* Target Match Selector - Finger-friendly 44px min height */}
         {matchPool.length > 0 && (
-          <div className="flex items-center gap-2 w-full lg:w-auto">
+          <div className="flex flex-col sm:flex-row sm:items-center gap-2 w-full lg:w-auto">
             <label htmlFor="quant-match-select" className="text-xs text-slate-400 font-mono whitespace-nowrap">
               Target Match:
             </label>
@@ -353,7 +353,7 @@ function QuantLabWorkspace({
                 const found = matchPool.find((f) => String(f.id) === String(targetId))
                 if (found && onSelectFixture) onSelectFixture(found)
               }}
-              className="bg-pitch-950 border border-pitch-700 hover:border-amber-500/50 rounded-xl px-3 py-1.5 text-xs text-slate-200 focus:outline-none focus:ring-1 focus:ring-amber-500 font-sans max-w-[280px] sm:max-w-[340px] truncate cursor-pointer transition-colors"
+              className="bg-pitch-950 border border-pitch-700 hover:border-amber-500/50 rounded-xl px-3 py-2 text-xs sm:text-sm text-slate-200 focus:outline-none focus:ring-2 focus:ring-amber-500 font-sans w-full lg:max-w-[340px] min-h-[44px] truncate cursor-pointer transition-colors touch-manipulation"
             >
               {matchPool.map((f) => {
                 const isVal = Boolean(f.value_pick)
@@ -387,15 +387,37 @@ function QuantLabWorkspace({
             </span>
           </div>
 
-          <input
-            type="range"
-            min="0.6"
-            max="3.2"
-            step="0.05"
-            value={customLambdaH}
-            onChange={(e) => setCustomLambdaH(parseFloat(e.target.value))}
-            className="w-full accent-sky-400 bg-pitch-950 cursor-pointer h-2 rounded-lg"
-          />
+          {/* Finger-friendly [-] and [+] Stepper Buttons for Mobile Precision */}
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => setCustomLambdaH(prev => Math.max(0.6, Number((prev - 0.05).toFixed(2))))}
+              className="w-11 h-11 min-w-[44px] min-h-[44px] rounded-xl bg-pitch-950 border border-pitch-700 hover:border-sky-500/50 active:bg-sky-500/20 text-sky-400 text-lg font-bold flex items-center justify-center transition-all select-none touch-manipulation active:scale-95"
+              aria-label="Decrease Home expected goals by 0.05"
+            >
+              &minus;
+            </button>
+            <div className="flex-1 relative flex items-center">
+              <input
+                type="range"
+                min="0.6"
+                max="3.2"
+                step="0.05"
+                value={customLambdaH}
+                onChange={(e) => setCustomLambdaH(parseFloat(e.target.value))}
+                className="w-full accent-sky-400 bg-pitch-950 cursor-pointer h-3 rounded-lg touch-pan-x"
+                aria-label="Home Expected Goals lambda slider"
+              />
+            </div>
+            <button
+              type="button"
+              onClick={() => setCustomLambdaH(prev => Math.min(3.2, Number((prev + 0.05).toFixed(2))))}
+              className="w-11 h-11 min-w-[44px] min-h-[44px] rounded-xl bg-pitch-950 border border-pitch-700 hover:border-sky-500/50 active:bg-sky-500/20 text-sky-400 text-lg font-bold flex items-center justify-center transition-all select-none touch-manipulation active:scale-95"
+              aria-label="Increase Home expected goals by 0.05"
+            >
+              +
+            </button>
+          </div>
 
           <div className="flex items-center justify-between text-[11px] font-mono text-slate-400">
             <span>Model baseline: {fixture.lambda_home ?? '1.45'}</span>
@@ -421,15 +443,37 @@ function QuantLabWorkspace({
             </span>
           </div>
 
-          <input
-            type="range"
-            min="0.6"
-            max="3.2"
-            step="0.05"
-            value={customLambdaA}
-            onChange={(e) => setCustomLambdaA(parseFloat(e.target.value))}
-            className="w-full accent-rose-400 bg-pitch-950 cursor-pointer h-2 rounded-lg"
-          />
+          {/* Finger-friendly [-] and [+] Stepper Buttons for Mobile Precision */}
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => setCustomLambdaA(prev => Math.max(0.6, Number((prev - 0.05).toFixed(2))))}
+              className="w-11 h-11 min-w-[44px] min-h-[44px] rounded-xl bg-pitch-950 border border-pitch-700 hover:border-rose-500/50 active:bg-rose-500/20 text-rose-400 text-lg font-bold flex items-center justify-center transition-all select-none touch-manipulation active:scale-95"
+              aria-label="Decrease Away expected goals by 0.05"
+            >
+              &minus;
+            </button>
+            <div className="flex-1 relative flex items-center">
+              <input
+                type="range"
+                min="0.6"
+                max="3.2"
+                step="0.05"
+                value={customLambdaA}
+                onChange={(e) => setCustomLambdaA(parseFloat(e.target.value))}
+                className="w-full accent-rose-400 bg-pitch-950 cursor-pointer h-3 rounded-lg touch-pan-x"
+                aria-label="Away Expected Goals lambda slider"
+              />
+            </div>
+            <button
+              type="button"
+              onClick={() => setCustomLambdaA(prev => Math.min(3.2, Number((prev + 0.05).toFixed(2))))}
+              className="w-11 h-11 min-w-[44px] min-h-[44px] rounded-xl bg-pitch-950 border border-pitch-700 hover:border-rose-500/50 active:bg-rose-500/20 text-rose-400 text-lg font-bold flex items-center justify-center transition-all select-none touch-manipulation active:scale-95"
+              aria-label="Increase Away expected goals by 0.05"
+            >
+              +
+            </button>
+          </div>
 
           <div className="flex items-center justify-between text-[11px] font-mono text-slate-400">
             <span>Model baseline: {fixture.lambda_away ?? '1.15'}</span>
@@ -502,7 +546,7 @@ function QuantLabWorkspace({
           </div>
 
           {/* Matrix Heatmap Grid */}
-          <div className="overflow-x-auto">
+          <div className="overflow-x-auto touch-pan-x">
             <table className="w-full text-center border-collapse text-xs font-mono select-none">
               <thead>
                 <tr>
@@ -803,7 +847,7 @@ function QuantLabWorkspace({
                         })
                       }
                     }}
-                    className={`w-full py-1.5 px-3 rounded-lg text-xs font-semibold transition-all flex items-center justify-center gap-1.5 ${
+                    className={`w-full min-h-[44px] py-2 px-3 rounded-xl text-xs font-semibold transition-all flex items-center justify-center gap-1.5 touch-manipulation active:scale-98 ${
                       evalItem.hasEdge
                         ? 'bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-300 border border-emerald-500/40'
                         : 'bg-pitch-900 hover:bg-pitch-800 text-slate-400 border border-pitch-800'

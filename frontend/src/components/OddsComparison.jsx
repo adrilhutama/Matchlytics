@@ -64,10 +64,10 @@ function OddsCell({
               e.stopPropagation()
               onToggleSlip()
             }}
-            className={`w-full py-1 px-1.5 min-h-[44px] rounded-lg text-[10px] font-bold transition-all focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-amber-500 ${
+            className={`w-full py-2 px-2 min-h-[44px] rounded-xl text-xs font-bold transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500 active:scale-95 touch-manipulation shadow-sm ${
               isInSlip
-                ? 'bg-amber-500 text-pitch-950'
-                : 'bg-pitch-800 text-slate-300 hover:bg-pitch-700 hover:text-amber-400'
+                ? 'bg-amber-500 text-pitch-950 font-extrabold'
+                : 'bg-pitch-800 text-slate-200 hover:bg-pitch-700 hover:text-amber-400'
             }`}
           >
             {isInSlip ? '✓ In Slip' : '+ Slip'}

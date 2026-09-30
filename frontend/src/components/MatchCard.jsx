@@ -171,7 +171,7 @@ export default function MatchCard({
               type="button"
               onClick={() => onToggleWatchlist(fixture.id)}
               aria-label={isPinned ? `Unpin ${home_team_name} vs ${away_team_name} from watchlist` : `Pin ${home_team_name} vs ${away_team_name} to watchlist`}
-              className="w-8 h-8 flex items-center justify-center rounded-lg bg-pitch-900/80 hover:bg-pitch-700 text-slate-400 hover:text-amber-400 border border-pitch-700 transition-all focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-amber-500"
+              className="w-11 h-11 min-w-[44px] min-h-[44px] flex items-center justify-center rounded-xl bg-pitch-900/80 hover:bg-pitch-700 text-slate-400 hover:text-amber-400 border border-pitch-700 transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500 active:scale-95 touch-manipulation"
             >
               <svg
                 width="15"
@@ -194,7 +194,7 @@ export default function MatchCard({
           {/* Home */}
           <div className="flex flex-col items-center gap-1 flex-1 text-center min-w-0">
             <TeamLogo src={home_team_logo} name={home_team_name} />
-            <span className="text-xs font-semibold text-slate-200 line-clamp-1 leading-tight">
+            <span className="text-xs font-semibold text-slate-200 line-clamp-2 leading-tight min-h-[2.4em] flex items-center justify-center">
               {home_team_name}
             </span>
             {homeStandings?.form && (
@@ -227,7 +227,7 @@ export default function MatchCard({
           {/* Away */}
           <div className="flex flex-col items-center gap-1 flex-1 text-center min-w-0">
             <TeamLogo src={away_team_logo} name={away_team_name} />
-            <span className="text-xs font-semibold text-slate-200 line-clamp-1 leading-tight">
+            <span className="text-xs font-semibold text-slate-200 line-clamp-2 leading-tight min-h-[2.4em] flex items-center justify-center">
               {away_team_name}
             </span>
             {awayStandings?.form && (
@@ -366,7 +366,7 @@ export default function MatchCard({
               <button
                 type="button"
                 onClick={() => onSelectForLab && onSelectForLab(fixture)}
-                className="min-h-[44px] py-2 px-3 rounded-xl bg-amber-500/15 hover:bg-amber-500/25 border border-amber-500/30 text-amber-300 font-semibold flex items-center justify-center gap-1.5 transition-colors active:scale-98"
+                className="min-h-[44px] py-2 px-3 rounded-xl bg-amber-500/15 hover:bg-amber-500/25 border border-amber-500/30 text-amber-300 font-semibold flex items-center justify-center gap-1.5 transition-colors active:scale-98 touch-manipulation"
                 title="Open fixture in Quant Lab"
               >
                 <span>⚅</span>
@@ -390,7 +390,7 @@ export default function MatchCard({
                     modelProb: valueProb || prob_home || 50,
                     evPercentage: ev_percentage || 0,
                   })}
-                  className="min-h-[44px] py-2 px-3 rounded-xl bg-pitch-950 hover:bg-pitch-800 border border-pitch-700 text-slate-200 flex items-center justify-center gap-1.5 transition-colors active:scale-98"
+                  className="min-h-[44px] py-2 px-3 rounded-xl bg-pitch-950 hover:bg-pitch-800 border border-pitch-700 text-slate-200 flex items-center justify-center gap-1.5 transition-colors active:scale-98 touch-manipulation"
                   title="Log position into Portfolio Tracker"
                 >
                   <span>⊞</span>
@@ -425,7 +425,7 @@ export default function MatchCard({
         <button
           type="button"
           onClick={() => setIsExpanded((prev) => !prev)}
-          className="w-full min-h-[44px] py-2 px-3 rounded-xl bg-pitch-950/70 hover:bg-pitch-800 text-slate-300 hover:text-amber-400 border border-pitch-800/80 text-xs font-mono transition-colors flex items-center justify-center gap-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500 active:scale-98"
+          className="w-full min-h-[44px] py-2 px-3 rounded-xl bg-pitch-950/70 hover:bg-pitch-800 text-slate-300 hover:text-amber-400 border border-pitch-800/80 text-xs font-mono transition-colors flex items-center justify-center gap-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500 active:scale-98 touch-manipulation"
         >
           <span>{isExpanded ? '▲ Collapse Deep Dive' : '▼ Deep Dive & Odds Matrix'}</span>
         </button>

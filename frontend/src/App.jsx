@@ -788,7 +788,7 @@ function AppInner() {
           {activeWorkspace === 'terminal' && (
             <div className="space-y-4">
               {/* Sticky glassmorphism Filter Bar */}
-              <div className="sticky top-16 z-30 backdrop-blur-md bg-pitch-950/80 border-b border-pitch-800 -mx-4 sm:-mx-6 lg:-mx-8 px-4 sm:px-6 lg:px-8 py-3 transition-all">
+              <div className="sticky top-14 sm:top-16 z-30 backdrop-blur-md bg-pitch-950/90 border-b border-pitch-800 -mx-4 sm:-mx-6 lg:-mx-8 px-3 sm:px-6 lg:px-8 py-2 sm:py-3 transition-all">
                 <div className="max-w-7xl mx-auto">
                   <FilterBar
                     searchQuery={searchQuery}
