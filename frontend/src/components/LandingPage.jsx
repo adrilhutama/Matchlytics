@@ -317,15 +317,15 @@ function HeroMonitor({ evPicks, fixturesLoading, dataError }) {
             <div className="flex items-center justify-between gap-2">
               <div>
                 <p className="text-lg font-mono font-medium text-amber-400 tabular-nums">
-                  +{edge.evPercent.toFixed(1)}% EV
+                  +{Number(edge.evPercent || 0).toFixed(1)}% EV
                 </p>
                 <p className="text-[11px] text-slate-400">
-                  {mos.tier} &middot; net edge {edge.netEdge.toFixed(1)} pts
+                  {mos?.tier || 'Edge'} &middot; net edge {Number(edge.netEdge || 0).toFixed(1)} pts
                 </p>
               </div>
               <span className="text-right">
                 <p className="text-sm font-mono text-slate-200 tabular-nums">{fields.label}</p>
-                <p className="text-[11px] font-mono text-slate-400 tabular-nums">@ {Number(fields.odds).toFixed(2)}</p>
+                <p className="text-[11px] font-mono text-slate-400 tabular-nums">@ {Number(fields.odds || 0).toFixed(2)}</p>
               </span>
             </div>
             <div className="mt-3 h-1.5 rounded-full bg-pitch-700 overflow-hidden">
@@ -334,7 +334,7 @@ function HeroMonitor({ evPicks, fixturesLoading, dataError }) {
                 style={{ width: `${barWidth}%` }}
               />
             </div>
-            <p className="mt-2 text-[10px] text-slate-500 leading-snug">{mos.description}</p>
+            <p className="mt-2 text-[10px] text-slate-500 leading-snug">{mos?.description || ''}</p>
           </div>
         )}
       </div>
@@ -481,7 +481,7 @@ function ValueFinderPanel({ evPicks, fixturesLoading }) {
                     {f.home_team_name} vs {f.away_team_name}
                   </p>
                   <p className="text-[10px] font-mono text-slate-500 mt-0.5">
-                    {pf?.label} @ {Number(pf?.odds).toFixed(2)} &middot; {f.league_name}
+                    {pf?.label} @ {Number(pf?.odds || 0).toFixed(2)} &middot; {f.league_name}
                   </p>
                 </div>
                 <div className="text-right flex-shrink-0">
@@ -507,9 +507,9 @@ function ValueFinderPanel({ evPicks, fixturesLoading }) {
 // ------------------------------------------------------------------
 
 const KELLY_DEMO_ROWS = [
-  { odds: 2.35, prob: 0.48, label: 'High Edge Pick', desc: 'Over 2.5 Goals' },
-  { odds: 1.95, prob: 0.56, label: 'Moderate Edge', desc: 'Home Draw No Bet' },
-  { odds: 3.10, prob: 0.36, label: 'Value Outlier', desc: 'Away Win Margin 1+' },
+  { odds: 1.50, prob: 70, label: 'High Probability', desc: 'Over 1.5 Goals' },
+  { odds: 2.00, prob: 55, label: 'Moderate Edge', desc: 'Home Draw No Bet' },
+  { odds: 3.00, prob: 40, label: 'Value Outlier', desc: 'Away Win Margin 1+' },
 ]
 
 function KellyStakingPanel() {
@@ -542,12 +542,12 @@ function KellyStakingPanel() {
               <div>
                 <p className="text-xs font-semibold text-slate-200">{r.desc}</p>
                 <p className="text-[10px] font-mono text-slate-500 mt-0.5">
-                  Odds {r.odds.toFixed(2)} &middot; Prob {(r.prob * 100).toFixed(0)}%
+                  Odds {Number(r.odds || 0).toFixed(2)} &middot; Prob {Number(r.prob || 0).toFixed(0)}%
                 </p>
               </div>
               <div className="text-right">
                 <span className="inline-block px-2.5 py-1 rounded-md bg-sky-500/10 border border-sky-500/30 text-sky-400 text-xs font-mono font-bold">
-                  {r.kelly.fractionalKellyPercent.toFixed(1)}% Stake
+                  {Number(r.kelly?.quarterKellyPct || 0).toFixed(1)}% Stake
                 </span>
               </div>
             </div>
@@ -604,7 +604,7 @@ function ParlayPanel({ evPicks }) {
             <div key={i} className="p-2.5 rounded-xl bg-pitch-900 border border-pitch-700 text-xs">
               <div className="flex justify-between items-center text-slate-300">
                 <span className="font-medium truncate pr-2">{leg.match}</span>
-                <span className="font-mono text-slate-400">@{Number(leg.odds).toFixed(2)}</span>
+                <span className="font-mono text-slate-400">@{Number(leg?.odds || 0).toFixed(2)}</span>
               </div>
               <p className="text-[10px] font-mono text-slate-500 mt-0.5">{leg.label}</p>
             </div>
@@ -615,7 +615,7 @@ function ParlayPanel({ evPicks }) {
       <div className="mt-4 pt-3 border-t border-pitch-700/80 flex items-center justify-between text-xs font-mono">
         <div>
           <span className="text-slate-400">Combined Odds: </span>
-          <span className="text-slate-200 font-bold">{combinedOdds.toFixed(2)}</span>
+          <span className="text-slate-200 font-bold">{Number(combinedOdds || 1).toFixed(2)}</span>
         </div>
         <div className="text-amber-400 font-bold">
           {parlayEV > 0 ? `+${parlayEV.toFixed(1)}% EV` : `${parlayEV.toFixed(1)}% EV`}
@@ -706,7 +706,7 @@ function TrackRecordPanel({ settledFixtures, onOpenBacktest }) {
         <div className="p-4 rounded-xl bg-pitch-900 border border-pitch-700">
           <p className="text-[10px] font-mono uppercase text-slate-500">Model Win Rate</p>
           <p className="mt-1 text-2xl font-mono font-bold text-emerald-400 tabular-nums">
-            {winRate.toFixed(1)}%
+            {Number(winRate || 0).toFixed(1)}%
           </p>
         </div>
         <div className="p-4 rounded-xl bg-pitch-900 border border-pitch-700">
