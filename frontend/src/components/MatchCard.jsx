@@ -366,7 +366,7 @@ export default function MatchCard({
               <button
                 type="button"
                 onClick={() => onSelectForLab && onSelectForLab(fixture)}
-                className="py-2 px-2 rounded-xl bg-amber-500/15 hover:bg-amber-500/25 border border-amber-500/30 text-amber-300 font-semibold flex items-center justify-center gap-1.5 transition-colors"
+                className="min-h-[44px] py-2 px-3 rounded-xl bg-amber-500/15 hover:bg-amber-500/25 border border-amber-500/30 text-amber-300 font-semibold flex items-center justify-center gap-1.5 transition-colors active:scale-98"
                 title="Open fixture in Quant Lab"
               >
                 <span>⚅</span>
@@ -390,7 +390,7 @@ export default function MatchCard({
                     modelProb: valueProb || prob_home || 50,
                     evPercentage: ev_percentage || 0,
                   })}
-                  className="py-2 px-2 rounded-xl bg-pitch-950 hover:bg-pitch-800 border border-pitch-700 text-slate-200 flex items-center justify-center gap-1.5 transition-colors"
+                  className="min-h-[44px] py-2 px-3 rounded-xl bg-pitch-950 hover:bg-pitch-800 border border-pitch-700 text-slate-200 flex items-center justify-center gap-1.5 transition-colors active:scale-98"
                   title="Log position into Portfolio Tracker"
                 >
                   <span>⊞</span>
@@ -404,14 +404,14 @@ export default function MatchCard({
               <button
                 type="button"
                 onClick={() => triggerUpgrade ? triggerUpgrade('Score Matrix requires a Pro pass') : onOpenMatrix(fixture)}
-                className="py-1.5 px-2 rounded-lg bg-pitch-950 hover:bg-pitch-800 border border-pitch-800 text-slate-400 hover:text-slate-200 text-center transition-colors"
+                className="min-h-[44px] py-2 px-2.5 rounded-xl bg-pitch-950 hover:bg-pitch-800 border border-pitch-800 text-slate-400 hover:text-slate-200 text-center transition-colors"
               >
                 Matrix Modal
               </button>
               <button
                 type="button"
                 onClick={() => triggerUpgrade ? triggerUpgrade('Quant and Kelly require a Pro pass') : onOpenQuantModal && onOpenQuantModal(fixture)}
-                className="py-1.5 px-2 rounded-lg bg-pitch-950 hover:bg-pitch-800 border border-pitch-800 text-slate-400 hover:text-slate-200 text-center transition-colors"
+                className="min-h-[44px] py-2 px-2.5 rounded-xl bg-pitch-950 hover:bg-pitch-800 border border-pitch-800 text-slate-400 hover:text-slate-200 text-center transition-colors"
               >
                 Kelly Modal
               </button>
@@ -425,7 +425,7 @@ export default function MatchCard({
         <button
           type="button"
           onClick={() => setIsExpanded((prev) => !prev)}
-          className="w-full py-1.5 rounded-lg bg-pitch-950/70 hover:bg-pitch-800 text-slate-400 hover:text-amber-400 border border-pitch-800/80 text-[11px] font-mono transition-colors flex items-center justify-center gap-1.5 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-amber-500"
+          className="w-full min-h-[44px] py-2 px-3 rounded-xl bg-pitch-950/70 hover:bg-pitch-800 text-slate-300 hover:text-amber-400 border border-pitch-800/80 text-xs font-mono transition-colors flex items-center justify-center gap-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500 active:scale-98"
         >
           <span>{isExpanded ? '▲ Collapse Deep Dive' : '▼ Deep Dive & Odds Matrix'}</span>
         </button>

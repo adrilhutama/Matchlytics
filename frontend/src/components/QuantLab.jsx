@@ -486,14 +486,19 @@ function QuantLabWorkspace({
                 Exact probability for each scoreline (0-5 goals).
               </p>
             </div>
-            {matrixData?.mostProbable && (
-              <div className="text-right">
-                <span className="text-[10px] font-mono text-slate-500 uppercase block">Model Mode</span>
-                <span className="text-xs font-mono font-bold text-amber-400">
-                  {matrixData.mostProbable.home}-{matrixData.mostProbable.away} ({matrixData.mostProbable.prob.toFixed(1)}%)
-                </span>
-              </div>
-            )}
+            {matrixData?.mostProbable && (() => {
+              const h = matrixData.mostProbable.home
+              const a = matrixData.mostProbable.away
+              const cell = matrixData.matrix?.[a]?.[h] || matrixData.mostProbable
+              return (
+                <div className="text-right">
+                  <span className="text-[10px] font-mono text-slate-500 uppercase block">Model Mode</span>
+                  <span className="text-xs font-mono font-bold text-amber-400">
+                    {h}-{a} ({cell.prob.toFixed(1)}%)
+                  </span>
+                </div>
+              )
+            })()}
           </div>
 
           {/* Matrix Heatmap Grid */}
@@ -532,19 +537,19 @@ function QuantLabWorkspace({
                       return (
                         <td
                           key={h}
-                          className="p-1.5 transition-transform hover:scale-105"
+                          className="p-0.5 sm:p-1.5 transition-transform hover:scale-105"
                           title={`${h}-${a}: ${cell.prob.toFixed(2)}%`}
                         >
                           <div
                             style={{ backgroundColor: bgStyle }}
-                            className={`py-2 px-1 rounded-lg flex flex-col items-center justify-center min-w-[38px] ${
+                            className={`aspect-square sm:aspect-auto py-1 sm:py-2 px-0.5 sm:px-1 rounded-lg flex flex-col items-center justify-center min-w-[32px] sm:min-w-[42px] ${
                               isMostProb ? 'ring-2 ring-amber-400 font-bold shadow-lg shadow-amber-500/20' : ''
                             }`}
                           >
-                            <span className="text-[11px] font-bold text-slate-100">
+                            <span className="text-[9px] sm:text-[11px] font-bold text-slate-100 leading-none">
                               {cell.prob.toFixed(1)}%
                             </span>
-                            <span className="text-[9px] text-slate-400 font-semibold">
+                            <span className="text-[8px] sm:text-[9px] text-slate-400 font-semibold mt-0.5 sm:mt-1 leading-none">
                               {h}-{a}
                             </span>
                           </div>
@@ -734,7 +739,7 @@ function QuantLabWorkspace({
                           setActiveMarketOdds((prev) => ({ ...prev, [item.key]: val }))
                         }
                       }}
-                      className="w-full bg-pitch-900 border border-pitch-700 rounded-lg px-2.5 py-1.5 text-sm font-mono font-bold text-slate-100 focus:outline-none focus:ring-1 focus:ring-amber-500"
+                      className="w-full min-h-[44px] bg-pitch-900 border border-pitch-700 rounded-xl px-3 py-2 text-sm font-mono font-bold text-slate-100 focus:outline-none focus:ring-1 focus:ring-amber-500"
                     />
                   </div>
 
@@ -753,9 +758,13 @@ function QuantLabWorkspace({
                     <span>Model Probability:</span>
                     <span className="text-slate-200 font-bold">{evalItem.prob ? evalItem.prob.toFixed(1) : '-'}%</span>
                   </div>
-                  <div className="flex justify-between text-slate-400">
-                    <span>Expected Value (EV):</span>
-                    <span className={`font-bold ${evalItem.expectedValuePct > 0 ? 'text-emerald-400' : 'text-slate-400'}`}>
+                  <div className="flex items-center justify-between text-slate-400">
+                    <span className="text-xs">Expected Value (EV):</span>
+                    <span className={`px-2 py-0.5 rounded text-xs font-mono font-bold transition-colors ${
+                      evalItem.expectedValuePct > 0
+                        ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'
+                        : 'bg-pitch-900 text-slate-500 border border-pitch-800'
+                    }`}>
                       {evalItem.expectedValuePct > 0 ? `+${evalItem.expectedValuePct.toFixed(1)}%` : `${(evalItem.expectedValuePct || 0).toFixed(1)}%`}
                     </span>
                   </div>

@@ -51,3 +51,7 @@ desktop.ini
 htmlcov/
 .coverage
 coverage.xml
+
+# Local AI Agent customizations
+.agents/
+

@@ -128,4 +128,27 @@
     -ms-overflow-style: none;
     scrollbar-width: none;
   }
+
+  /* Safe-area insets for modern mobile viewports (iOS Safari / WebKit Dynamic Island & Home indicator) */
+  .pt-safe {
+    padding-top: env(safe-area-inset-top, 0px);
+  }
+  .pb-safe {
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+  }
+  .pl-safe {
+    padding-left: env(safe-area-inset-left, 0px);
+  }
+  .pr-safe {
+    padding-right: env(safe-area-inset-right, 0px);
+  }
+
+  /* Support both no-scrollbar and scrollbar-none naming */
+  .scrollbar-none::-webkit-scrollbar {
+    display: none;
+  }
+  .scrollbar-none {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
 }

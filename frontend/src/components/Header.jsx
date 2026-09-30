@@ -8,8 +8,11 @@ export default function Header({ lastUpdated }) {
     : null
 
   return (
-    <header className="border-b border-pitch-800 bg-pitch-900">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 py-4 flex items-center justify-between gap-4">
+    <header
+      className="border-b border-pitch-800 bg-pitch-900 sticky top-0 z-30 pt-safe"
+      style={{ paddingTop: 'max(0.5rem, env(safe-area-inset-top, 0px))' }}
+    >
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 py-3.5 flex items-center justify-between gap-4">
         <div className="flex items-center gap-3">
           {/* Logo: product name in type, no generated asset (R-23) */}
           <div className="flex items-center gap-2">
@@ -33,11 +36,11 @@ export default function Header({ lastUpdated }) {
           {timeStr && (
             <p className="text-xs text-slate-500">
               Data refreshed at{' '}
-              <span className="text-slate-400 tabular-nums">{timeStr}</span>
+              <span className="text-slate-400 tabular-nums font-mono">{timeStr}</span>
             </p>
           )}
-          <p className="text-xs text-slate-500 mt-0.5">
-            Model: Bivariate Poisson · Consensus Sharp Odds
+          <p className="text-xs text-slate-500 mt-0.5 font-mono">
+            Model: Bivariate Poisson : Consensus Sharp Odds
           </p>
         </div>
       </div>

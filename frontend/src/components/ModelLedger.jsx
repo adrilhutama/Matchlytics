@@ -211,10 +211,10 @@ export default function ModelLedger({ settledFixtures = [] }) {
         <div className="p-4 rounded-2xl bg-pitch-900 border border-pitch-700/80 shadow-lg">
           <span className="text-[11px] text-slate-400 block mb-1">Brier Calibration Score</span>
           <p className="text-lg sm:text-xl font-bold text-sky-400 tabular-nums">
-            {activeStats?.brierScore != null ? activeStats.brierScore.toFixed(3) : '-'}
+            {activeStats?.brierScore != null ? activeStats.brierScore.toFixed(3) : '0.000'}
           </p>
           <span className="text-[10px] text-slate-500 mt-1 block">
-            {brierInfo ? brierInfo.label : 'Benchmark 0.18 to 0.22'}
+            {brierInfo ? brierInfo.label : 'Benchmark 0.18 to 0.22 (0.0% Calibrated)'}
           </span>
         </div>
       </div>
@@ -255,8 +255,8 @@ export default function ModelLedger({ settledFixtures = [] }) {
           <div className="w-full overflow-hidden">
             <svg
               viewBox={`0 0 ${chartW} ${chartH}`}
-              className="w-full h-auto text-xs font-mono select-none"
-              style={{ maxHeight: '280px' }}
+              className="w-full h-48 sm:h-64 text-xs font-mono select-none"
+              preserveAspectRatio="xMidYMid meet"
             >
               {/* Baseline (100 units) */}
               <line

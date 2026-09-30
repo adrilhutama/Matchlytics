@@ -514,9 +514,23 @@ function AppInner() {
 
   const handleMobileTab = useCallback((tab) => {
     setActiveMobileTab(tab)
-    if (tab === 'value')        { setValueOnly(true);  setShowWatchlistOnly(false); setActiveWorkspace('terminal') }
-    else if (tab === 'watchlist') { setValueOnly(false); setShowWatchlistOnly(true);  setActiveWorkspace('terminal') }
-    else                        { setValueOnly(false); setShowWatchlistOnly(false); setActiveWorkspace('terminal') }
+    if (tab === 'value') {
+      setValueOnly(true)
+      setShowWatchlistOnly(false)
+      setActiveWorkspace('terminal')
+    } else if (tab === 'watchlist') {
+      setValueOnly(false)
+      setShowWatchlistOnly(true)
+      setActiveWorkspace('terminal')
+    } else if (tab === 'portfolio') {
+      setActiveWorkspace('portfolio')
+    } else if (tab === 'track') {
+      setActiveWorkspace('ledger')
+    } else {
+      setValueOnly(false)
+      setShowWatchlistOnly(false)
+      setActiveWorkspace('terminal')
+    }
   }, [])
 
   const syncUrlForView = useCallback((view) => {
@@ -680,7 +694,7 @@ function AppInner() {
       {/* Main Content Area */}
       <div className="flex-1 lg:pl-64 flex flex-col min-w-0 pb-20 lg:pb-8">
         {/* Mobile top brand bar */}
-        <div className="lg:hidden sticky top-0 z-20 bg-pitch-950/90 backdrop-blur-md border-b border-pitch-800 px-4 py-3 flex items-center gap-2.5">
+        <div className="lg:hidden sticky top-0 z-20 bg-pitch-950/90 backdrop-blur-md border-b border-pitch-800 px-4 py-3 flex items-center gap-2.5 pt-safe" style={{ paddingTop: 'max(0.75rem, env(safe-area-inset-top, 0px))' }}>
           <span
             className="inline-block w-7 h-7 rounded-md bg-amber-500 flex-shrink-0"
             aria-hidden="true"
@@ -769,12 +783,12 @@ function AppInner() {
         )}
 
         {/* Main Workspace Body */}
-        <main className="w-full px-2 sm:px-4 lg:px-6 py-2 min-w-0" id="main-content">
+        <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 w-full py-3 min-w-0" id="main-content">
           {/* Workspace 1: Terminal / Scanner */}
           {activeWorkspace === 'terminal' && (
             <div className="space-y-4">
               {/* Sticky glassmorphism Filter Bar */}
-              <div className="sticky top-12 z-10 glass-filter -mx-2 sm:-mx-4 lg:-mx-6 px-3 sm:px-6 py-3">
+              <div className="sticky top-16 z-30 backdrop-blur-md bg-pitch-950/80 border-b border-pitch-800 -mx-4 sm:-mx-6 lg:-mx-8 px-4 sm:px-6 lg:px-8 py-3 transition-all">
                 <div className="max-w-7xl mx-auto">
                   <FilterBar
                     searchQuery={searchQuery}
@@ -975,11 +989,14 @@ function AppInner() {
         onTabChange={handleMobileTab}
         valueOnly={valueOnly}
         onToggleValueOnly={handleToggleValueOnly}
-        watchlistCount={watchlist.length}
+        activeFixtureCount={displayedFixtures.length}
+        valueCount={valueCount}
+        portfolioCount={portfolioPositions.length}
         slipCount={parlaySlip.length}
         onOpenLeagues={() => setIsLeagueDrawerOpen(true)}
         onOpenSlip={() => setIsSlipDrawerOpen(true)}
         onOpenBacktest={() => setIsBacktestOpen(true)}
+        onSelectWorkspace={handleSelectWorkspace}
       />
 
       {/* Mobile League Sheet */}

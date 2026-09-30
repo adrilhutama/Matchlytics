@@ -93,7 +93,7 @@ export default function FilterBar({
             onChange={(e) => onSearchChange(e.target.value)}
             placeholder="Search team or league..."
             aria-label="Search fixtures by team or league"
-            className="w-full pl-10 pr-9 py-1.5 min-h-[40px] rounded-xl bg-pitch-900 border border-pitch-700 text-xs text-slate-100 placeholder-slate-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500 focus-visible:border-transparent transition-all"
+            className="w-full pl-10 pr-9 py-1.5 min-h-[44px] rounded-xl bg-pitch-900 border border-pitch-700 text-xs text-slate-100 placeholder-slate-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500 focus-visible:border-transparent transition-all"
           />
           {searchQuery && (
             <button
@@ -120,7 +120,7 @@ export default function FilterBar({
               id="sort-dropdown"
               value={sortOption}
               onChange={(e) => onSortChange(e.target.value)}
-              className="w-full min-h-[40px] px-2.5 py-1.5 rounded-xl bg-pitch-900 border border-pitch-700 text-xs font-medium text-slate-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500"
+              className="w-full min-h-[44px] px-2.5 py-1.5 rounded-xl bg-pitch-900 border border-pitch-700 text-xs font-medium text-slate-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500"
             >
               {SORT_OPTIONS.map((opt) => (
                 <option key={opt.id} value={opt.id} className="bg-pitch-900 text-slate-200">
@@ -196,7 +196,7 @@ export default function FilterBar({
                 onClick={() => handlePillClick(r)}
                 aria-pressed={isActive}
                 title={isLocked ? UPGRADE_HINTS[r.id] : undefined}
-                className={`flex-shrink-0 inline-flex items-center gap-1.5 px-3 py-2 text-xs font-medium rounded-xl transition-all border focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500 min-h-[40px] ${
+                className={`flex-shrink-0 inline-flex items-center gap-1.5 px-3 py-2 text-xs font-medium rounded-xl transition-all border focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500 min-h-[44px] ${
                   isActive
                     ? 'bg-pitch-700 text-amber-300 border-amber-400/60 font-semibold'
                     : isLocked
@@ -251,7 +251,7 @@ export default function FilterBar({
           type="button"
           onClick={onToggleWatchlistTab}
           aria-pressed={showWatchlistOnly}
-          className={`flex-shrink-0 min-h-[40px] px-3 py-2 text-xs font-semibold rounded-xl transition-all border flex items-center gap-1.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500 ${
+          className={`flex-shrink-0 min-h-[44px] px-3 py-2 text-xs font-semibold rounded-xl transition-all border flex items-center gap-1.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500 ${
             showWatchlistOnly
               ? 'bg-amber-500 text-pitch-950 border-amber-500 shadow'
               : 'bg-pitch-900 text-amber-400 border-amber-500/40 hover:bg-amber-500/10'
@@ -278,7 +278,7 @@ export default function FilterBar({
               id={`filter-${league.id}`}
               onClick={() => onLeagueChange(league.id)}
               aria-pressed={isActive}
-              className={`flex-shrink-0 min-h-[40px] px-3 py-2 text-xs font-medium rounded-xl transition-all border focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500 ${
+              className={`flex-shrink-0 min-h-[44px] px-3 py-2 text-xs font-medium rounded-xl transition-all border focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500 ${
                 isActive
                   ? 'bg-amber-500 text-pitch-950 border-amber-500 font-semibold'
                   : 'bg-pitch-900 text-slate-400 border-pitch-700 hover:border-slate-500 hover:text-slate-200'

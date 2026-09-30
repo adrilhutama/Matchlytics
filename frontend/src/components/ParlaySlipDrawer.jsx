@@ -97,12 +97,12 @@ export default function ParlaySlipDrawer({
         <button
           type="button"
           onClick={onToggleOpen}
-          aria-label="Close parlay slip"
-          className="w-8 h-8 flex items-center justify-center rounded-lg bg-pitch-800 text-slate-400 hover:text-slate-100"
+          aria-label="Collapse parlay slip"
+          className="min-w-[44px] min-h-[44px] flex items-center justify-center rounded-xl bg-pitch-800 hover:bg-pitch-700 text-slate-400 hover:text-slate-100 transition-colors"
+          title="Collapse slip"
         >
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-            <line x1="18" y1="6" x2="6" y2="18" />
-            <line x1="6" y1="6" x2="18" y2="18" />
+            <polyline points="6 9 12 15 18 9" />
           </svg>
         </button>
       </div>
@@ -258,7 +258,7 @@ export default function ParlaySlipDrawer({
     <>
       {/* Docked-widget trigger pill, desktop only, hidden while the panel is open */}
       {!isOpen && (
-        <div className="hidden md:flex fixed bottom-20 lg:bottom-6 right-6 z-40">
+        <div className="hidden md:flex fixed bottom-6 right-6 z-50">
           <button
             type="button"
             onClick={onToggleOpen}
@@ -295,8 +295,8 @@ export default function ParlaySlipDrawer({
             id="parlay-drawer"
             role="dialog"
             aria-label="Parlay slip"
-            className="fixed z-50 inset-x-0 bottom-0 w-full max-w-full flex flex-col max-h-[90vh] bg-pitch-900 border-t border-pitch-700 rounded-t-3xl shadow-2xl animate-fade-in md:inset-x-auto md:left-auto md:top-auto md:right-6 md:bottom-20 lg:bottom-6 md:w-96 md:max-w-md md:max-h-[85vh] md:rounded-2xl md:border md:bg-pitch-950/95 md:backdrop-blur-xl"
-            style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}
+            className="fixed z-50 inset-x-0 bottom-0 w-full max-w-full flex flex-col max-h-[85vh] bg-pitch-900 border-t border-pitch-700 rounded-t-3xl shadow-2xl animate-fade-in md:inset-x-auto md:left-auto md:top-auto md:right-6 md:bottom-6 md:w-96 md:max-w-md md:max-h-[80vh] md:rounded-2xl md:border md:border-pitch-700 md:bg-pitch-950/95 md:backdrop-blur-xl"
+            style={{ paddingBottom: 'max(1rem, env(safe-area-inset-bottom, 0px))' }}
             onClick={(e) => e.stopPropagation()}
           >
             {/* Mobile drag handle */}

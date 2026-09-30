@@ -239,18 +239,18 @@ export default function PortfolioTracker({
             </p>
           </div>
         ) : (
-          <div className="overflow-x-auto">
+          <div className="overflow-x-auto -mx-3 sm:mx-0 px-3 sm:px-0 scrollbar-none">
             <table className="w-full text-left border-collapse text-xs font-mono">
               <thead>
-                <tr className="border-b border-pitch-800 text-[11px] uppercase tracking-wider text-slate-400">
-                  <th className="py-2.5 px-3">Date</th>
-                  <th className="py-2.5 px-3">Fixture</th>
-                  <th className="py-2.5 px-3">Selection</th>
-                  <th className="py-2.5 px-3 text-center">Odds</th>
-                  <th className="py-2.5 px-3 text-center">Stake</th>
-                  <th className="py-2.5 px-3 text-center">Status</th>
-                  <th className="py-2.5 px-3 text-center">P&L</th>
-                  <th className="py-2.5 px-3 text-right">Quick Settle</th>
+                <tr className="border-b border-pitch-800 text-[11px] uppercase tracking-wider text-slate-400 font-mono">
+                  <th className="py-3 px-3 min-w-[80px]">Date</th>
+                  <th className="py-3 px-3 min-w-[140px]">Fixture</th>
+                  <th className="py-3 px-3 min-w-[160px]">Selection</th>
+                  <th className="py-3 px-3 text-center min-w-[70px]">Odds</th>
+                  <th className="py-3 px-3 text-center min-w-[90px]">Stake</th>
+                  <th className="py-3 px-3 text-center min-w-[70px]">Status</th>
+                  <th className="py-3 px-3 text-center min-w-[90px]">P&L</th>
+                  <th className="py-3 px-3 text-right min-w-[120px]">Actions</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-pitch-800/60">
@@ -295,16 +295,16 @@ export default function PortfolioTracker({
                     pnlStr = `-${currencyCode} ${Math.round(stake).toLocaleString()}`
                     pnlColor = 'text-rose-400 font-bold'
                   } else if (pos.status === 'VOID') {
-                    pnlStr = '0 (Refund)'
+                    pnlStr = '{currencyCode} 0 (Void)'
                     pnlColor = 'text-slate-400'
                   }
 
                   return (
                     <tr key={pos.id} className="hover:bg-pitch-800/40 transition-colors">
-                      <td className="py-3 px-3 text-slate-400 text-[11px] whitespace-nowrap">
+                      <td className="py-3 px-3 text-slate-400 text-[11px] whitespace-nowrap min-w-[80px] font-mono">
                         {dateStr}
                       </td>
-                      <td className="py-3 px-3 font-semibold text-slate-200">
+                      <td className="py-3 px-3 font-semibold text-slate-200 min-w-[140px]">
                         <div>
                           <span className="block truncate max-w-[240px] sm:max-w-[320px]" title={fixtureTitle}>
                             {fixtureTitle}
@@ -340,10 +340,10 @@ export default function PortfolioTracker({
                           </span>
                         )}
                       </td>
-                      <td className="py-3 px-3 text-center text-slate-200 font-bold font-mono">
-                        {odds.toFixed(2)}
+                      <td className="py-3 px-3 text-center text-slate-200 font-bold font-mono min-w-[70px]">
+                        {Number(odds).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                       </td>
-                      <td className="py-3 px-3 text-center text-slate-300 whitespace-nowrap font-mono">
+                      <td className="py-3 px-3 text-center text-slate-300 whitespace-nowrap font-mono min-w-[90px]">
                         {currencyCode} {Math.round(stake).toLocaleString()}
                       </td>
                       <td className="py-3 px-3 text-center">
@@ -369,7 +369,7 @@ export default function PortfolioTracker({
                               <button
                                 type="button"
                                 onClick={() => handleUpdate && handleUpdate(pos.id, 'WON')}
-                                className="px-2.5 py-1 rounded-lg bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-300 border border-emerald-500/40 text-[11px] font-bold transition-all shadow-sm active:scale-95 flex items-center gap-1"
+                                className="min-h-[40px] px-3 py-1.5 rounded-lg bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-300 border border-emerald-500/40 text-xs font-bold transition-all shadow-sm active:scale-95 flex items-center gap-1 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-emerald-400"
                                 title="Mark position as won (realize profit)"
                               >
                                 <span>✓</span>
@@ -378,7 +378,7 @@ export default function PortfolioTracker({
                               <button
                                 type="button"
                                 onClick={() => handleUpdate && handleUpdate(pos.id, 'LOST')}
-                                className="px-2.5 py-1 rounded-lg bg-rose-500/20 hover:bg-rose-500/30 text-rose-300 border border-rose-500/40 text-[11px] font-bold transition-all shadow-sm active:scale-95 flex items-center gap-1"
+                                className="min-h-[40px] px-3 py-1.5 rounded-lg bg-rose-500/20 hover:bg-rose-500/30 text-rose-300 border border-rose-500/40 text-xs font-bold transition-all shadow-sm active:scale-95 flex items-center gap-1 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-rose-400"
                                 title="Mark position as lost"
                               >
                                 <span>✗</span>
@@ -387,7 +387,7 @@ export default function PortfolioTracker({
                               <button
                                 type="button"
                                 onClick={() => handleUpdate && handleUpdate(pos.id, 'VOID')}
-                                className="px-2 py-1 rounded-lg bg-pitch-900 hover:bg-pitch-800 text-slate-400 hover:text-slate-200 border border-pitch-700 text-[11px] font-semibold transition-all active:scale-95"
+                                className="min-h-[40px] px-2.5 py-1.5 rounded-lg bg-pitch-900 hover:bg-pitch-800 text-slate-400 hover:text-slate-200 border border-pitch-700 text-xs font-semibold transition-all active:scale-95 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-slate-400"
                                 title="Mark position as void (refund stake)"
                               >
                                 Void
