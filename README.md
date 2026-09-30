@@ -1,19 +1,24 @@
 <div align="center">
 
-# Matchlytics
+# MATCHLYTICS BY IMORTIFEX
 
-**Production-ready football match pre-analysis platform**
+```
+Institutional Sports Market Intelligence Driven by Mathematical Rigor.
+```
 
-Calculate Poisson probabilities, expected goals (xG), Over/Under 2.5, BTTS, and detect +EV value bets against Bet365 odds  -  entirely on a free-tier stack.
+| Indicator | State |
+| --- | --- |
+| Engine Calibration | Brier Verified |
+| Risk Control | 2.5% Kelly Cap |
+| Build | Production Ready |
+| Architecture | 3-Tier SaaS |
 
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-[![Python](https://img.shields.io/badge/Python-3.10%2B-3776AB?logo=python&logoColor=white)](https://python.org)
-[![React](https://img.shields.io/badge/React-18-61DAFB?logo=react&logoColor=black)](https://react.dev)
-[![Vite](https://img.shields.io/badge/Vite-5-646CFF?logo=vite&logoColor=white)](https://vitejs.dev)
-[![Tailwind CSS](https://img.shields.io/badge/Tailwind-3-06B6D4?logo=tailwindcss&logoColor=white)](https://tailwindcss.com)
-[![Supabase](https://img.shields.io/badge/Supabase-PostgreSQL-3ECF8E?logo=supabase&logoColor=white)](https://supabase.com)
-[![Vercel](https://img.shields.io/badge/Deployed-Vercel-000000?logo=vercel&logoColor=white)](https://vercel.com)
-[![GitHub Actions](https://img.shields.io/badge/CI-GitHub%20Actions-2088FF?logo=github-actions&logoColor=white)](https://github.com/features/actions)
+**Live Endpoints**
+
+| Surface | Address |
+| --- | --- |
+| Public Terminal Showcase | [https://imortifex.me](https://imortifex.me) |
+| SaaS Application | [https://app.imortifex.me](https://app.imortifex.me) |
 
 </div>
 
@@ -21,310 +26,218 @@ Calculate Poisson probabilities, expected goals (xG), Over/Under 2.5, BTTS, and 
 
 ## Overview
 
-Matchlytics is a zero-cost statistical football analytics platform that automates the full pipeline from raw league data to actionable pre-match insights. It pulls standings from the API-Football free tier, computes Poisson-distribution score matrices to derive win/draw/loss probabilities, fetches Bet365 decimal odds, and flags bets where the model's implied probability exceeds the bookmaker's price by more than 5%  -  a positive expected value (+EV) signal.
+Matchlytics is a decoupled, institutional sports market intelligence platform. It automates the
+full path from Tier-1 European Fixture Telemetry and Direct Consensus Market Feeds through a
+proprietary bivariate Poisson engine, expected value detection, and constrained fractional Kelly
+capital allocation, and settles every flagged position against official results on a continuous
+calibration loop.
 
-The frontend is a responsive dark-mode dashboard that reads directly from Supabase via a public anon key (no backend server required), deploys to Vercel in one click, and displays fixtures for the next 7 days filtered by league or value-bet status.
-
-**Everything runs within free-tier limits:** API-Football (100 req/day), Supabase (500 MB, unlimited reads), GitHub Actions (2,000 min/month), and Vercel (100 GB bandwidth/month).
-
----
-
-## Key Features
-
-### Poisson Distribution Engine
-- Builds a 6×6 score matrix for scorelines 0–0 through 5–5.
-- Each cell is the joint probability of `P(home=i) × P(away=j)` using independent Poisson distributions.
-- Derives Home Win %, Draw %, Away Win %, Over 2.5 Goals %, and BTTS % in a single pass.
-
-### Expected Value (+EV) Detection
-- Computes `EV = (model_probability × decimal_odds) − 1` for each of the three 1X2 outcomes.
-- Flags a **Value Bet** when EV > 5%, identifying odds that are mathematically mispriced in your favour.
-- Surfaces the pick with the highest EV when multiple outcomes qualify.
-
-### Dual-Pipeline GitHub Actions Automation
-- **Monthly fixture sync** (`monthly_fixtures.yml`)  -  runs on the 1st of each month, pulling the next 30 days of scheduled matches. Uses ~5 API calls. Keeps fixture metadata current without burning daily quota.
-- **Daily analytics sync** (`daily_sync.yml`)  -  runs at 06:00 UTC. Fetches standings (5 calls) and today's Bet365 odds (1 call per fixture, ~15 calls), then computes and upserts all analytical metrics. Total: ~20 calls/day, well within the 100/day free limit.
-
-### Dark-Mode Analytics Dashboard
-- Vite + React 18 + Tailwind CSS 3  -  no backend server, reads Supabase directly via `@supabase/supabase-js`.
-- League filter pills (All, EPL, La Liga, Serie A, Bundesliga, Ligue 1) and a **+EV Value Bets Only** toggle.
-- Each match card shows: team logos, predicted scoreline, probability bars (home/draw/away), Over 2.5 and BTTS badges, Bet365 odds vs model fair odds, and a glowing amber +EV badge for value picks.
-- Fully responsive  -  tested at 375 px mobile through 1280 px desktop.
-- Accessible: WCAG AA contrast, keyboard-navigable, ARIA roles on all interactive elements.
+The system ships **without an application backend**: scheduled cloud pipelines write into a
+hardened PostgreSQL datastore, and two static surfaces (the public showcase terminal and the SaaS
+application) hydrate directly through it in real time. Every quantitative claim below is backed
+by a shipped, tested mechanism, not a projection.
 
 ---
 
-## Architecture & Data Flow
+## 1. System Architecture
 
-```
-┌─────────────────────────┐
-│     API-Football        │  (RapidAPI  -  free tier, 100 req/day)
-│  /standings  /fixtures  │
-│  /odds (Bet365 ID=8)    │
-└────────────┬────────────┘
-             │  HTTPS (Python requests)
-             ▼
-┌─────────────────────────────────────────────┐
-│          GitHub Actions (free tier)          │
-│                                             │
-│  monthly_fixtures.yml  ─── 1st of month    │
-│    sync_monthly_fixtures.py                 │
-│    Upserts: id, teams, league, match_date   │
-│                                             │
-│  daily_sync.yml  ──────── 06:00 UTC daily  │
-│    sync_daily.py                            │
-│    1. Fetch standings → strength table      │
-│    2. Compute λ_home, λ_away (Poisson)      │
-│    3. Fetch Bet365 odds per fixture         │
-│    4. engine.py → probs, EV, value_pick     │
-│    5. Upsert to Supabase                    │
-└────────────────────┬────────────────────────┘
-                     │  supabase-py (service role)
-                     ▼
-┌─────────────────────────┐
-│   Supabase PostgreSQL   │  (free tier  -  500 MB)
-│   Table: fixtures       │
-│   RLS: anon = SELECT    │
-└────────────┬────────────┘
-             │  @supabase/supabase-js (anon key)
-             ▼
-┌─────────────────────────┐
-│  Vite + React Frontend  │
-│  Deployed on Vercel     │  (free tier)
-│  No backend server      │
-└─────────────────────────┘
-```
+### 1.1 Dual-Domain Segregation
 
----
+| Domain | Role |
+| --- | --- |
+| `imortifex.me` | Public showcase terminal: institutional marketing surface, live edge monitor, verified track record, pricing architecture. |
+| `app.imortifex.me` | SaaS application: the operational dashboard, tier-gated horizons, quant suite, parlay desk, and backtest ledger. |
 
-## Math & Analytics Pipeline
+Both are served from a single deployable SPA that resolves its view from the request hostname.
+Cross-surface navigation is direct in production and handled as an in-place view switch in
+development environments.
 
-### 1. Attack and Defense Strength
+### 1.2 Automated Ingestion Pipeline
 
-```
-Attack Strength  (team) = (goals_for  / games_played) / league_avg_goals_for_per_game
-Defense Strength (team) = (goals_against / games_played) / league_avg_goals_against_per_game
-```
+Three scheduled, idempotent pipeline stages run autonomously:
 
-A value > 1 means above-average attack or a worse-than-average defense.
+1. **Standings & Form Normalization** (daily) - league tables resolve into per-team home and away
+   attack/defense strengths, normalized against league averages and written to the form store.
+2. **Fixture Intake** (weekly) - the rolling forward fixture window for major European competitions
+   is ingested and upserted to the match store.
+3. **Consensus Market Capture & Quant Loop** (twice daily) - decimal prices stream in from Direct
+   Consensus Market Feeds, are joined against normalized form state, and pass through the
+   proprietary bivariate Poisson engine. Positive expected value positions are detected, finished
+   matches are settled at official results, and a structured situation report is emitted each cycle.
 
-### 2. Expected Goals (Lambda)
+All stages publish through a single write path, so every number displayed anywhere in the product
+carries one provenance.
 
-```
-λ_home = home_attack × away_defense × league_avg_goals × 1.10 (home advantage)
-λ_away = away_attack × home_defense × league_avg_goals
-```
+### 1.3 Real-Time Client Hydration
 
-The **1.10 home advantage multiplier** is a standard empirical factor derived from long-run home/away goal ratios in top European leagues.
+Frontend clients read the datastore exclusively through the read-only anonymous channel and
+subscribe to realtime change notifications, so dashboard state tracks pipeline settlements without
+polling. The application ships as a PWA with service worker precaching and offline capability.
 
-### 3. Score Matrix
+### 1.4 Data Layer: Hardened Cloud Datastore
 
-```
-P[i, j] = Poisson(i | λ_home) × Poisson(j | λ_away)   for i, j ∈ {0, 1, 2, 3, 4, 5}
-```
+- Encrypted PostgreSQL as the single source of truth.
+- **Row-level security**: anonymous and authenticated client roles are restricted to SELECT on
+  every pipeline-managed table; all writes execute under the service role, which bypasses RLS.
+- **Trigger-hardened entitlement protection**: subscription entitlements live on the per-user
+  profile row, provisioned by a security-definer trigger on account creation and maintained by a
+  timestamp trigger. Client-side self-updates are permitted only for display fields; the
+  hardened RLS policy ("Users can update own profile, entitlement columns frozen", migration
+  `20261002_rls_hardening.sql`) freezes every entitlement column in the `WITH CHECK` clause, so
+  tier, status, and period end cannot be escalated from any client surface.
+- Housekeeping RPCs (stale-fixture pruning) are revocable from client roles and service-role only.
 
-Each cell is the joint probability that the home team scores exactly `i` goals and the away team scores exactly `j` goals.
-
-### 4. Outcome Probabilities
-
-```
-P(Home Win) = Σ P[i,j]  where i > j
-P(Draw)     = Σ P[i,i]
-P(Away Win) = Σ P[i,j]  where j > i
-P(Over 2.5) = Σ P[i,j]  where i + j > 2
-P(BTTS)     = Σ P[i,j]  where i ≥ 1 and j ≥ 1
-```
-
-### 5. Expected Value & Value Bet Detection
-
-```
-EV = (model_probability × decimal_odds) − 1
-
-Value Bet flagged when: EV > 0.05  (threshold: 5%)
-```
-
-A positive EV means the model believes the bookmaker has underpriced this outcome relative to its true probability.
+Migration history lives in `supabase/migrations/` and applies sequentially through the Supabase
+SQL editor.
 
 ---
 
-## Project Structure
+## 2. Quantitative Engine & Methodology
 
+### 2.1 Bivariate Poisson Distribution
+
+Attack and defense strengths derive from normalized home and away form splits. Expected goal rates
+combine the pair with Bayesian shrinkage toward the league baseline, so early-season samples
+cannot distort the output:
+
+```text
+λ_home = f(home_attack, away_defense, league averages)
+λ_away = f(away_attack, home_defense, league averages)
+shrinkage:  (raw_strength × games_played + baseline × 3) / (games_played + 3)
+clamp:      λ strictly within [0.6, 3.2], finite-input guarded
 ```
-Matchlytics/
-│
-├── .env.example                         # Python env vars template
-├── .gitignore
-├── vercel.json                          # Vercel build config (root: frontend/)
-│
-├── supabase/
-│   └── migrations/
-│       └── 001_init.sql                 # fixtures table + RLS + indexes
-│
-├── scripts/
-│   ├── requirements.txt                 # requests, supabase, scipy, numpy, python-dotenv
-│   ├── config.py                        # Env vars, Supabase client, league IDs
-│   ├── engine.py                        # Poisson engine + EV detector
-│   ├── sync_monthly_fixtures.py         # Pull next 30 days of fixtures
-│   ├── sync_daily.py                    # Daily: standings → lambdas → odds → analytics
-│   └── tests/
-│       └── test_engine.py              # 16 pytest unit tests
-│
-├── .github/
-│   └── workflows/
-│       ├── daily_sync.yml               # Cron: 06:00 UTC daily
-│       └── monthly_fixtures.yml         # Cron: 1st of month at 05:00 UTC
-│
-└── frontend/
-    ├── package.json
-    ├── vite.config.js
-    ├── tailwind.config.js
-    ├── postcss.config.js
-    ├── index.html
-    ├── .env.example                     # Frontend Supabase env vars template
-    └── src/
-        ├── main.jsx
-        ├── App.jsx                      # Data fetching, filter state, routing
-        ├── index.css                    # Design tokens, shimmer, glass, card variants
-        ├── lib/
-        │   └── supabase.js             # Supabase anon client
-        └── components/
-            ├── Header.jsx
-            ├── FilterBar.jsx           # League pills + value-bet toggle
-            ├── MatchCard.jsx           # Main data display card
-            ├── ProbabilityBar.jsx      # Home/Draw/Away visual bars
-            ├── OddsComparison.jsx      # Bookmaker vs model fair odds
-            ├── ValueBadge.jsx          # Amber +EV badge (the single glow element)
-            ├── LoadingState.jsx        # Shimmer skeleton cards
-            ├── EmptyState.jsx          # No results  -  named cause + action
-            └── ErrorState.jsx          # Supabase error  -  named cause + Retry
+
+The engine builds the joint 6×6 bivariate score matrix `P(i, j) = P(home = i) × P(away = j)` for
+goal counts 0 to 5, renormalized to unit mass. From this single surface it derives 1X2
+probabilities, Over 2.5 goals, Both Teams To Score, and the modal scoreline in one pass. The
+same kernel runs in the Python pipeline and the in-browser JS utility so the
+public terminal and the SaaS application can never diverge.
+
+### 2.2 Market De-Vigging
+
+Consensus decimal prices carry bookmaker overround. The engine strips it proportionally to recover
+synthetic true probabilities:
+
+```text
+p_outcome = (1 / o_outcome) / Σ (1 / o_j) over all outcomes
+EV        = p_model × o_market − 1
 ```
+
+A position is flagged only when the model probability beats the de-vigged market price through a
+margin-of-safety screen. Guardrails bound every flag: decimal odds within `[1.25, 12.0]`, model
+probability at least 15%, and expected value confined to the `[2%, 35%]` credibility band.
+Calibration is scored on the record: the engine computes the multi-class Brier score over
+settled 1X2 probabilities and aggregates win rate and ROI across rolling settlement windows.
+
+### 2.3 Fractional Kelly Capital Allocation
+
+Position sizing follows constrained Quarter-Kelly:
+
+```text
+f*  = (b·p − q) / b                b = decimal odds − 1, p = model probability, q = 1 − p
+stake = min( ¼ · f*, 2.5% )       hard cap on every call site
+negative EV ⇒ stake = 0%          absolute truncation
+```
+
+The 2.5% bankroll cap is enforced identically in the pipeline, the Kelly calculator, and the parlay
+engine. Negative-expectation inputs always resolve to a zero stake.
+
+### 2.4 Scoreline Variance & Bankroll Simulation
+
+Two mechanisms make risk legible rather than asserted:
+
+- **Joint scoreline variance**: the same 6×6 surface that produces probabilities assigns explicit
+  mass to each of the 36 possible outcomes, which the in-app heatmap renders for inspection.
+- **Bankroll simulation on settled history**: the replay engine sorts every settled value pick
+  chronologically and reconstructs the equity curve under two regimes, flat 1-unit staking and
+  quarter-Kelly sizing. The resulting win rate, ROI, and Brier figures are deterministic replays
+  of official results, not projections or simulated histories.
 
 ---
 
-## Local Setup & Installation
+## 3. Subscription Tier Ladder
 
-### Prerequisites
+Access is derived server-side from a single protected profile row; no client state can upgrade a
+tier. Pricing displays are driven by environment configuration shared between the pricing
+architecture page and the in-app subscription desk, with production defaults built in.
 
-- Python 3.10+
-- Node.js 18+
-- A [Supabase](https://supabase.com) project (free tier)
-- An [API-Football](https://rapidapi.com/api-sports/api/api-football) key on RapidAPI (free tier)
+| Tier | Default Rate | Horizon | Quant Suite |
+| --- | --- | --- | --- |
+| **Starter** | Rp 0 | Daily horizon (today) | Core 1X2 probabilities, standard analytics, community telemetry. |
+| **Pro Pass** | Rp 149.000 / bln | 7-day horizon (weekly) | Full +EV scanner, 6×6 scoreline heatmaps, fractional Kelly calculator, smart parlay engine. |
+| **Season Pass** | Rp 999.000 / thn | 30-day full horizon | Complete historical backtest archives, model ledger, direct priority support desk. |
 
-### 1. Database Migration
+Activation routes through configured payment gateway links (with the signed-in email attached as
+the customer identifier) or a manual confirmation flow, and completes exclusively under the
+service role.
 
-1. Open your Supabase project dashboard.
-2. Navigate to **SQL Editor > New Query**.
-3. Paste and run the contents of [`supabase/migrations/001_init.sql`](supabase/migrations/001_init.sql).
-4. Confirm the `fixtures` table appears in **Table Editor**.
+---
 
-### 2. Python Pipeline
+## 4. Local Development & Quality Verification
+
+### 4.1 Environment Configuration
+
+Pipeline configuration mirrors `.env.example` at the repository root:
+
+| Key | Purpose |
+| --- | --- |
+| `FOOTBALL_DATA_TOKEN` | Fixture telemetry credential |
+| `ODDS_API_KEY` | Consensus market feed credential |
+| `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY` | Datastore address and privileged write credential |
+| `TELEGRAM_BOT_TOKEN`, `TELEGRAM_CHAT_ID` | Situation report delivery (optional; omit to disable) |
+
+Frontend configuration mirrors `frontend/.env.example`: `VITE_SUPABASE_URL` and
+`VITE_SUPABASE_ANON_KEY` are required; subscription pricing, gateway links, and the confirmation
+channel are optional and documented inline in that file.
+
+### 4.2 Test Gates
 
 ```bash
-# Install dependencies
 pip install -r scripts/requirements.txt
 
-# Set up environment variables
-cp .env.example .env
-# Edit .env and fill in: RAPIDAPI_KEY, SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY
-
-# Step A: populate fixture metadata for the next 30 days (run once per month)
-cd scripts
-python sync_monthly_fixtures.py
-
-# Step B: run the daily analytics sync (normally handled by GitHub Actions)
-python sync_daily.py
-```
-
-### 3. Frontend Development
-
-```bash
-cd frontend
-
-# Set up environment variables
-cp .env.example .env
-# Edit .env and fill in: VITE_SUPABASE_URL, VITE_SUPABASE_ANON_KEY
-
-# Install dependencies
-npm install
-
-# Start the development server
-npm run dev
-# → http://localhost:5173
-
-# Production build (optional local check)
-npm run build
-```
-
-### 4. Run Tests
-
-```bash
-# From the project root
+# Full suite: 33 tests (engine integrity + settlement/calibration evaluators)
 python -m pytest scripts/tests/ -v
+
+# Single file, or single test
+python -m pytest scripts/tests/test_engine.py -v
+python -m pytest scripts/tests/test_evaluator.py::test_name -v
 ```
 
----
+The engine suite locks the invariant surface: bounded finite lambdas, unit-normalized joint
+matrices, guarded divisions, EV guardrail boundaries, and the 2.5% Kelly cap at every entry point.
 
-## GitHub Actions Secrets
+```bash
+# Frontend
+cd frontend
+npm install
+npm run dev     # http://localhost:5173 (showcase view in development)
+npm run build   # production build gate, service worker + PWA manifest generated
+```
 
-Add these in **Repository Settings > Secrets and variables > Actions > New repository secret**:
-
-| Secret Name | Description |
-|---|---|
-| `RAPIDAPI_KEY` | Your API-Football key from RapidAPI |
-| `SUPABASE_URL` | `https://<your-project-ref>.supabase.co` |
-| `SUPABASE_SERVICE_ROLE_KEY` | Service role key (bypasses RLS  -  backend only) |
-
-The `daily_sync.yml` workflow fires automatically at **06:00 UTC** every day. You can also trigger it manually via **Actions > Daily Analytics Sync > Run workflow**.
-
-The `monthly_fixtures.yml` workflow fires on the **1st of each month at 05:00 UTC**, or manually.
-
----
-
-## Vercel Deployment
-
-1. Import this repository at [vercel.com/new](https://vercel.com/new).
-2. Vercel detects `vercel.json` automatically  -  the build root is set to `frontend/`.
-3. Add the following **Environment Variables** in the Vercel project settings:
-
-| Variable | Description |
-|---|---|
-| `VITE_SUPABASE_URL` | `https://<your-project-ref>.supabase.co` |
-| `VITE_SUPABASE_ANON_KEY` | Public anon key (safe for browser  -  RLS enforces read-only) |
-
-4. Deploy. Every push to `main` triggers an automatic redeploy.
+Pipeline entry points for local runs from `scripts/`: `sync_standings.py`,
+`sync_monthly_fixtures.py`, and `sync_daily.py` (complete quant loop: market capture, engine,
+value detection, settlement, situation report). The market capture step enforces its own call-rate
+throttle for the upstream free tier; preserve it when running locally.
 
 ---
 
-## API Quota Management
+## 5. Regulatory & Responsible Analytics Notice
 
-The free tier of API-Football provides **100 requests per day**. Matchlytics is designed to consume approximately 20:
-
-| Source | Calls |
-|---|---|
-| Standings (5 leagues × 1) | 5 |
-| Bet365 odds (up to ~15 fixtures/day) | ≤ 15 |
-| **Total daily** | **~20** |
-
-The monthly fixture sync consumes an additional ~5–10 calls and runs only once per month.
-
----
-
-## Disclaimer
-
-> Matchlytics provides **mathematical model outputs** based on historical league standing data and Poisson distribution theory. Probabilities, predicted scores, and Expected Value calculations are **statistical estimates** and do not guarantee any betting outcome. Past model accuracy does not predict future results.
->
-> **Bet responsibly.** This tool is intended for educational and analytical purposes only. Always comply with your local gambling regulations.
-
----
-
-## License
-
-MIT License  -  see [LICENSE](LICENSE) for details.
+Strictly 18+. Matchlytics provides quantitative mathematical estimates for informational and
+risk-management purposes only, not financial guarantees. Model outputs are statistical risk
+estimations derived from historical results and consensus market structure; they are not
+predictions, investment advice, or promises of any outcome. Exercise disciplined bankroll
+management: the sizing framework published in Section 2 caps exposure precisely because variance
+is the dominant risk in outcome markets. Matchlytics is an independent project and is not
+affiliated with any league, broadcaster, operator, or market maker.
 
 ---
 
 <div align="center">
 
-Built with Python, React, Supabase, and GitHub Actions on a 100% free-tier stack.
+© 2026 Matchlytics by imortifex. All rights reserved.
+
+[Public Terminal Showcase](https://imortifex.me) · [SaaS Application](https://app.imortifex.me) ·
+[License (MIT)](LICENSE)
 
 </div>
