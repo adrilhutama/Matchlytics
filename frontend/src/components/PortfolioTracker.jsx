@@ -117,70 +117,70 @@ export default function PortfolioTracker({
   }
 
   return (
-    <div className="space-y-6 animate-fade-in max-w-7xl mx-auto">
+    <div className="space-y-5 sm:space-y-6 animate-fade-in max-w-7xl mx-auto pb-24 md:pb-6">
       {/* ---- Top KPI Cards ---- */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4 font-mono">
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-2.5 sm:gap-4 font-mono">
         {/* Current Bankroll / Equity */}
-        <div className="p-4 rounded-2xl bg-pitch-900 border border-pitch-700/80 shadow-lg">
-          <div className="flex items-center justify-between text-[11px] text-slate-400 mb-1">
-            <span>Portfolio Equity</span>
+        <div className="p-3 sm:p-4 rounded-xl sm:rounded-2xl bg-pitch-900 border border-pitch-700/80 shadow-lg min-w-0 flex flex-col justify-between">
+          <div className="flex items-center justify-between text-[11px] text-slate-400 mb-1 gap-1">
+            <span className="truncate">Portfolio Equity</span>
             <button
               type="button"
               onClick={() => {
                 const val = prompt('Set Initial Bankroll Amount:', String(bankrollAmount))
                 if (val && !isNaN(val)) onUpdateBankroll(Number(val))
               }}
-              className="text-[10px] text-amber-400 hover:underline"
+              className="text-[10px] text-amber-400 hover:underline shrink-0"
             >
               Edit Base
             </button>
           </div>
-          <p className="text-lg sm:text-xl font-bold text-slate-100 tabular-nums">
+          <p className="text-sm sm:text-base md:text-lg lg:text-xl font-bold text-slate-100 tabular-nums truncate leading-tight">
             {currencyCode} {Math.round(stats.currentEquity).toLocaleString()}
           </p>
-          <span className="text-[10px] text-slate-500 mt-1 block">
+          <span className="text-[10px] text-slate-500 mt-1 block truncate">
             Base: {currencyCode} {bankrollAmount.toLocaleString()}
           </span>
         </div>
 
         {/* Net Profit & Loss */}
-        <div className="p-4 rounded-2xl bg-pitch-900 border border-pitch-700/80 shadow-lg">
-          <span className="text-[11px] text-slate-400 block mb-1">
+        <div className="p-3 sm:p-4 rounded-xl sm:rounded-2xl bg-pitch-900 border border-pitch-700/80 shadow-lg min-w-0 flex flex-col justify-between">
+          <span className="text-[11px] text-slate-400 block mb-1 truncate">
             Net Realized P&L
           </span>
-          <p className={`text-lg sm:text-xl font-bold tabular-nums ${
+          <p className={`text-sm sm:text-base md:text-lg lg:text-xl font-bold tabular-nums truncate leading-tight ${
             stats.netPnl >= 0 ? 'text-emerald-400' : 'text-rose-400'
           }`}>
             {stats.netPnl >= 0 ? `+${currencyCode} ` : `-${currencyCode} `}
             {Math.abs(Math.round(stats.netPnl)).toLocaleString()}
           </p>
-          <span className={`text-[10px] font-bold mt-1 inline-block ${stats.roiPct >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
+          <span className={`text-[10px] font-bold mt-1 block truncate ${stats.roiPct >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
             {stats.roiPct >= 0 ? `+${stats.roiPct}% ROI` : `${stats.roiPct}% ROI`}
           </span>
         </div>
 
         {/* Win Rate on Settled Picks */}
-        <div className="p-4 rounded-2xl bg-pitch-900 border border-pitch-700/80 shadow-lg">
-          <span className="text-[11px] text-slate-400 block mb-1">
+        <div className="p-3 sm:p-4 rounded-xl sm:rounded-2xl bg-pitch-900 border border-pitch-700/80 shadow-lg min-w-0 flex flex-col justify-between">
+          <span className="text-[11px] text-slate-400 block mb-1 truncate">
             Settled Win Rate
           </span>
-          <p className="text-lg sm:text-xl font-bold text-slate-100 tabular-nums">
+          <p className="text-sm sm:text-base md:text-lg lg:text-xl font-bold text-slate-100 tabular-nums truncate leading-tight">
             {stats.winRate}%
           </p>
-          <span className="text-[10px] text-slate-400 mt-1 block">
+          <span className="text-[10px] text-slate-400 mt-1 block truncate">
             {stats.wins}W / {stats.losses}L {stats.voids > 0 ? `(${stats.voids}V)` : ''}
           </span>
         </div>
 
         {/* Active Market Exposure */}
-        <div className="p-4 rounded-2xl bg-pitch-900 border border-pitch-700/80 shadow-lg">
-          <span className="text-[11px] text-slate-400 block mb-1">
+        <div className="p-3 sm:p-4 rounded-xl sm:rounded-2xl bg-pitch-900 border border-pitch-700/80 shadow-lg min-w-0 flex flex-col justify-between">
+          <span className="text-[11px] text-slate-400 block mb-1 truncate">
             Active Exposure
           </span>
-          <p className="text-lg sm:text-xl font-bold text-amber-400 tabular-nums">
+          <p className="text-sm sm:text-base md:text-lg lg:text-xl font-bold text-amber-400 tabular-nums truncate leading-tight">
             {currencyCode} {Math.round(stats.pendingExposure).toLocaleString()}
           </p>
-          <span className="text-[10px] text-slate-400 mt-1 block">
+          <span className="text-[10px] text-slate-500 mt-1 block truncate">
             {stats.pending} Pending Position(s)
           </span>
         </div>

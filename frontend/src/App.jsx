@@ -783,7 +783,7 @@ function AppInner() {
         )}
 
         {/* Main Workspace Body */}
-        <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 w-full py-3 min-w-0" id="main-content">
+        <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 w-full py-3 min-w-0 pb-28 md:pb-8" id="main-content">
           {/* Workspace 1: Terminal / Scanner */}
           {activeWorkspace === 'terminal' && (
             <div className="space-y-4">

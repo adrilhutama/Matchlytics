@@ -141,6 +141,15 @@ function pickFields(fixture) {
 // Hero live monitor: real fixture odds, zero-vig fairness, net edge
 // ------------------------------------------------------------------
 
+function getShortPickLabel(fixture) {
+  if (!fixture || !fixture.value_pick) return 'Edge'
+  if (fixture.value_pick === 'DRAW') return 'Draw'
+  const team = fixture.value_pick === 'HOME' ? fixture.home_team_name : fixture.away_team_name
+  if (!team) return fixture.value_pick === 'HOME' ? 'Home' : 'Away'
+  const clean = team.replace(/\s+(FC|AFC|CF|SSC|BC)$/i, '').trim()
+  return clean.length > 13 ? clean.slice(0, 11) + '...' : clean
+}
+
 function HeroMonitor({ evPicks, fixturesLoading, dataError }) {
   const [activeIdx, setActiveIdx] = useState(0)
   const safeIdx = evPicks.length > 0 ? Math.min(activeIdx, evPicks.length - 1) : 0
@@ -237,9 +246,9 @@ function HeroMonitor({ evPicks, fixturesLoading, dataError }) {
           <span className="text-[11px] text-slate-500 font-mono">{fixture.league_name ?? ''}</span>
         </div>
 
-        {/* Pick switcher */}
+        {/* Pick switcher: 2-column grid on mobile, horizontal wrap on sm+ */}
         {evPicks.length > 1 && (
-          <div className="flex flex-wrap gap-1.5" role="tablist" aria-label="Positive-EV picks">
+          <div className="grid grid-cols-2 gap-1.5" role="tablist" aria-label="Positive-EV picks">
             {evPicks.slice(0, 4).map((p, i) => (
               <button
                 key={p.id ?? i}
@@ -247,14 +256,14 @@ function HeroMonitor({ evPicks, fixturesLoading, dataError }) {
                 role="tab"
                 aria-selected={i === safeIdx}
                 onClick={() => setActiveIdx(i)}
-                className={`min-h-[44px] px-3.5 rounded-xl text-xs font-mono border transition-all cursor-pointer flex items-center ${
+                className={`min-h-[40px] px-2.5 py-1.5 rounded-xl text-xs font-mono border transition-all cursor-pointer flex items-center justify-between min-w-0 ${
                   i === safeIdx
                     ? 'border-amber-500/50 bg-amber-500/10 text-amber-300 font-bold shadow-sm'
                     : 'border-pitch-700 bg-pitch-900 text-slate-400 hover:text-slate-200'
                 }`}
               >
-                <span>{pickFields(p)?.label ?? 'Edge'}</span>
-                <span className="ml-1.5 opacity-80 text-amber-400">+{p.ev_percentage}%</span>
+                <span className="truncate mr-1">{getShortPickLabel(p)}</span>
+                <span className="shrink-0 text-amber-400 font-bold text-[11px]">+{Number(p.ev_percentage || 0).toFixed(1)}%</span>
               </button>
             ))}
           </div>
@@ -357,7 +366,7 @@ function ScoreHeatPanel() {
   const outcomeOf = (h, a) => (h > a ? 'HOME WINS' : h === a ? 'DRAW' : 'AWAY WINS')
 
   return (
-    <div className="min-w-0 h-full flex flex-col justify-between rounded-2xl bg-pitch-800 border border-pitch-700 p-5 sm:p-6">
+    <div className="min-w-0 h-full flex flex-col justify-between rounded-2xl bg-pitch-800 border border-pitch-700 p-4 sm:p-6">
       <div>
         <div className="flex items-start justify-between gap-3">
           <div>
@@ -372,33 +381,34 @@ function ScoreHeatPanel() {
         </div>
 
         {/* Touch-scroll container */}
-        <div className="mt-4 overflow-x-auto no-scrollbar">
+        <div className="mt-4 overflow-x-auto no-scrollbar -mx-1 px-1">
           <table className="w-full border-collapse font-mono text-[10px] min-w-[260px]">
             <thead>
               <tr>
-                <th className="p-1 text-slate-500 text-left">H \ A</th>
-                {[0, 1, 2, 3, 4, 5].map((a) => (
-                  <th key={a} className="p-1 text-center text-slate-400">
-                    {a}
+                <th className="p-1 text-slate-500 text-left font-bold">A \ H</th>
+                {[0, 1, 2, 3, 4, 5].map((h) => (
+                  <th key={h} className="p-1 text-center text-slate-400">
+                    {h}
                   </th>
                 ))}
               </tr>
             </thead>
             <tbody>
-              {demo.matrix.map((row, h) => (
-                <tr key={h}>
-                  <th className="p-1 text-slate-400 text-left">{h}</th>
-                  {row.map((cell, a) => {
-                    const isProbable = h === demo.mostProbable.home && a === demo.mostProbable.away
-                    const isHovered = hoverCell && hoverCell.home === h && hoverCell.away === a
-                    const opacity = Math.min(1, Math.max(0.08, cell * 7))
+              {demo.matrix.map((row, a) => (
+                <tr key={a}>
+                  <th className="p-1 text-slate-400 text-left font-bold">{a}</th>
+                  {row.map((cell, h) => {
+                    const isProbable = cell.home === demo.mostProbable.home && cell.away === demo.mostProbable.away
+                    const isHovered = hoverCell && hoverCell.home === cell.home && hoverCell.away === cell.away
+                    const cellProb = Number(cell?.prob || 0)
+                    const opacity = Math.min(1, Math.max(0.08, (cellProb / 100) * 7))
 
                     return (
                       <td
-                        key={a}
-                        onMouseEnter={() => setHoverCell({ home: h, away: a, p: cell })}
+                        key={h}
+                        onMouseEnter={() => setHoverCell({ home: cell.home, away: cell.away, prob: cellProb })}
                         onMouseLeave={() => setHoverCell(null)}
-                        className={`p-1 text-center cursor-pointer transition-colors ${
+                        className={`p-1.5 text-center cursor-pointer transition-colors ${
                           isProbable
                             ? 'bg-amber-500/20 text-amber-300 font-bold border border-amber-500/50'
                             : isHovered
@@ -407,7 +417,7 @@ function ScoreHeatPanel() {
                         }`}
                         style={!isProbable ? { backgroundColor: `rgba(30, 41, 59, ${opacity})` } : undefined}
                       >
-                        {(cell * 100).toFixed(1)}%
+                        {cellProb.toFixed(1)}%
                       </td>
                     )
                   })}
@@ -422,7 +432,7 @@ function ScoreHeatPanel() {
         <span className="text-slate-400">
           Selected: <strong className="text-slate-200">{shown.home}-{shown.away}</strong> ({outcomeOf(shown.home, shown.away)})
         </span>
-        <span className="text-amber-400 font-bold">{(shown.p * 100).toFixed(1)}% prob</span>
+        <span className="text-amber-400 font-bold">{Number(shown?.prob || 0).toFixed(1)}% prob</span>
       </div>
     </div>
   )
@@ -634,8 +644,8 @@ function EquitySpark({ equity }) {
   const min = Math.min(...equity)
   const max = Math.max(...equity)
   const range = max - min || 1
-  const width = 120
-  const height = 32
+  const width = 100
+  const height = 28
 
   const points = equity
     .map((val, idx) => {
@@ -646,13 +656,14 @@ function EquitySpark({ equity }) {
     .join(' ')
 
   return (
-    <svg width={width} height={height} className="overflow-visible" aria-hidden="true">
+    <svg viewBox="0 0 100 28" className="w-full h-7 max-w-[90px] overflow-visible" preserveAspectRatio="none" aria-hidden="true">
       <polyline
         fill="none"
         stroke="#10b981"
-        strokeWidth="2"
+        strokeWidth="2.5"
         strokeLinecap="round"
         strokeLinejoin="round"
+        vectorEffect="non-scaling-stroke"
         points={points}
       />
     </svg>
@@ -713,11 +724,13 @@ function TrackRecordPanel({ settledFixtures, onOpenBacktest }) {
           <p className="text-[10px] font-mono uppercase text-slate-500">Brier Calibration Score</p>
           <p className="mt-1 text-2xl font-mono font-bold text-amber-400 tabular-nums">0.188</p>
         </div>
-        <div className="p-4 rounded-xl bg-pitch-900 border border-pitch-700 flex flex-col justify-between">
-          <p className="text-[10px] font-mono uppercase text-slate-500">Equity Curve Simulation</p>
-          <div className="mt-2 flex items-center justify-between">
-            <span className="text-xs font-mono text-emerald-400 font-bold">+18.4%</span>
-            <EquitySpark equity={simulatedEquity} />
+        <div className="p-3 sm:p-4 rounded-xl bg-pitch-900 border border-pitch-700 flex flex-col justify-between min-w-0">
+          <p className="text-[10px] font-mono uppercase text-slate-500 truncate">Equity Curve Simulation</p>
+          <div className="mt-2 flex items-center justify-between gap-1.5 min-w-0">
+            <span className="text-xs sm:text-sm font-mono text-emerald-400 font-bold shrink-0">+18.4%</span>
+            <div className="w-16 sm:w-20 h-7 shrink-0 flex items-center justify-end">
+              <EquitySpark equity={simulatedEquity} />
+            </div>
           </div>
         </div>
       </div>
@@ -766,25 +779,25 @@ export default function LandingPage({
     {
       index: '01',
       title: 'De-Vigged Consensus Pricing',
-      formula: 'Sum(1/o_i) > 1 &middot; vig = Sum(1/o_i) - 1',
+      formula: 'Sum(1/o_i) > 1 · vig = Sum(1/o_i) - 1',
       body: 'Bookmaker prices carry an overround built in. Matchlytics strips it proportionally across all three outcomes, recovering the fair market distribution to compare against model output.',
     },
     {
       index: '02',
       title: 'Bivariate Poisson & Bayesian Estimation',
-      formula: 'P(h,a) = P(lambda_h, h) * P(lambda_a, a) &middot; lambda in [0.6, 3.2]',
+      formula: 'P(h,a) = P(lambda_h, h) * P(lambda_a, a) · lambda in [0.6, 3.2]',
       body: 'Simultaneous attack and defense rate evaluation, shrunk toward league baselines with a dynamic home-advantage model. Outlier variance is eliminated by Bayesian regression, so early-season samples cannot distort a lambda.',
     },
     {
       index: '03',
       title: 'Automated +EV Scanner, Six Leagues',
-      formula: 'EV = p * o - 1 &middot; flag when MOS >= 4 pts',
+      formula: 'EV = p * o - 1 · flag when MOS >= 4 pts',
       body: 'Every odds cycle across Premier League, La Liga, Serie A, Bundesliga, Ligue 1 and the Champions League runs through the guardrails. Only picks with a real margin of safety reach the feed.',
     },
     {
       index: '04',
       title: 'Quarter-Kelly Risk Allocation',
-      formula: 'f* = 0.25 * (b * p - q) / b &middot; cap 2.5%',
+      formula: 'f* = 0.25 * (b * p - q) / b · cap 2.5%',
       body: 'Full Kelly assumes perfect calibration, which no model has. Matchlytics stakes a quarter of the theoretical maximum and hard-caps it, keeping the bankroll curve forgiving on variance.',
     },
   ]
