@@ -198,20 +198,42 @@ export default function ParlaySlipDrawer({
             type="button"
             onClick={() => {
               if (legs.length === 0) return
-              const stakeAmount = Math.max(10000, Math.round(((aggregates.recommendedStakePct || 1.0) / 100) * userBankroll))
-              onLogPosition({
-                fixtureId: `parlay_${Date.now()}`,
-                fixtureMatch: legs.map(l => `${l.homeTeam} vs ${l.awayTeam}`).join(' | '),
+              const combinedOdds = Number(aggregates.totalOdds || 1.0)
+              const kellyStakeCap = aggregates.recommendedStakePct || 1.0
+              const bankroll = Number(userBankroll || 1000000)
+              const calculatedStake = Math.max(
+                10000,
+                Math.round(bankroll * (Math.min(2.5, Math.max(0, kellyStakeCap)) / 100))
+              )
+              const fixtureText = `${legs.length}-Leg Parlay (${legs.map(l => l.matchName || `${l.homeTeam} vs ${l.awayTeam}`).join(' | ')})`
+              const selectionText = legs.map(l => `${l.target || l.selection || l.pickLabel || l.pick} @${Number(l.odds).toFixed(2)}`).join(' + ')
+
+              const parlayPosition = {
+                id: `parlay-${Date.now()}`,
+                date: new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
+                loggedAt: new Date().toISOString(),
+                fixture: fixtureText,
+                fixtureName: fixtureText,
+                fixtureMatch: fixtureText,
+                leagueName: `${legs.length} Markets Acca`,
+                selection: selectionText,
+                selectionLabel: selectionText,
+                selectionName: selectionText,
                 pick: `${legs.length}-Leg Parlay`,
-                selectionName: legs.map(l => `${l.pickLabel} (${l.odds})`).join(' + '),
-                marketOdds: aggregates.totalOdds,
-                modelProb: aggregates.jointProb,
-                evPercent: aggregates.combinedEv,
-                kellySuggested: aggregates.recommendedStakePct,
-                stake: stakeAmount,
+                odds: Number(combinedOdds.toFixed(2)),
+                marketOdds: Number(combinedOdds.toFixed(2)),
+                stake: calculatedStake,
+                stakeAmount: calculatedStake,
+                status: 'PENDING',
+                legs: legs,
+                ev: aggregates.combinedEv || 0,
+                evPercent: aggregates.combinedEv || 0,
+                pnl: 0,
                 bookmaker: 'Consensus Sharp Feed',
                 notes: `${legs.length} accumulator legs generated in Parlay Builder`
-              })
+              }
+
+              onLogPosition(parlayPosition)
               setLogged(true)
               setTimeout(() => setLogged(false), 2400)
             }}

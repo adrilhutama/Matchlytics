@@ -8,12 +8,18 @@ import { useState, useMemo } from 'react'
 export default function PortfolioTracker({
   positions = [],
   onUpdatePositionStatus,
+  onUpdateStatus,
   onDeletePosition,
   onAddManualPosition,
+  onAddPosition,
   bankrollAmount = 10000000,
+  bankroll = 10000000,
   onUpdateBankroll,
   currencyCode = 'IDR',
 }) {
+  const effectiveBankroll = bankroll || bankrollAmount || 10000000
+  const handleUpdate = onUpdatePositionStatus || onUpdateStatus
+  const handleAdd = onAddManualPosition || onAddPosition
   const [filterStatus, setFilterStatus] = useState('ALL')
   const [showAddModal, setShowAddModal] = useState(false)
   const [newPos, setNewPos] = useState({
@@ -36,8 +42,8 @@ export default function PortfolioTracker({
     let pendingExposure = 0
 
     positions.forEach((pos) => {
-      const stake = Number(pos.stakeAmount) || 0
-      const odds = Number(pos.odds) || 1.0
+      const stake = Number(pos.stake ?? pos.stakeAmount) || 0
+      const odds = Number(pos.odds ?? pos.marketOdds) || 1.0
 
       if (pos.status === 'WON') {
         wins += 1
@@ -58,7 +64,7 @@ export default function PortfolioTracker({
 
     const settledCount = wins + losses
     const netPnl = totalReturned - totalInvested
-    const currentEquity = bankrollAmount + netPnl - pendingExposure
+    const currentEquity = effectiveBankroll + netPnl - pendingExposure
     const roiPct = totalInvested > 0 ? Number(((netPnl / totalInvested) * 100).toFixed(1)) : 0.0
     const winRate = settledCount > 0 ? Number(((wins / settledCount) * 100).toFixed(1)) : 0.0
 
@@ -76,7 +82,7 @@ export default function PortfolioTracker({
       pendingExposure,
       totalPositions: positions.length,
     }
-  }, [positions, bankrollAmount])
+  }, [positions, effectiveBankroll])
 
   // Filtered positions
   const filteredPositions = useMemo(() => {
@@ -87,7 +93,7 @@ export default function PortfolioTracker({
   const handleManualSubmit = (e) => {
     e.preventDefault()
     if (!newPos.fixtureName) return
-    onAddManualPosition({
+    (handleAdd || onAddManualPosition)({
       id: `manual_${Date.now()}`,
       fixtureName: newPos.fixtureName,
       leagueName: newPos.leagueName,
@@ -249,8 +255,12 @@ export default function PortfolioTracker({
               </thead>
               <tbody className="divide-y divide-pitch-800/60">
                 {filteredPositions.map((pos) => {
-                  const stake = Number(pos.stakeAmount) || 0
-                  const odds = Number(pos.odds) || 1.0
+                  const stake = Number(pos.stake ?? pos.stakeAmount) || 0
+                  const odds = Number(pos.odds ?? pos.marketOdds) || 1.0
+                  const fixtureTitle = pos.fixture || pos.fixtureName || pos.fixtureMatch || (pos.legs ? `${pos.legs.length}-Leg Parlay` : 'Unknown Fixture')
+                  const selectionText = pos.selection || pos.selectionLabel || pos.selectionName || pos.pick || 'Custom Selection'
+                  const dateStr = pos.date || (pos.loggedAt ? new Date(pos.loggedAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : 'Today')
+
                   let pnlStr = '-'
                   let pnlColor = 'text-slate-500'
 
@@ -269,16 +279,22 @@ export default function PortfolioTracker({
                   return (
                     <tr key={pos.id} className="hover:bg-pitch-800/40 transition-colors">
                       <td className="py-3 px-3 text-slate-400 text-[11px] whitespace-nowrap">
-                        {pos.loggedAt ? new Date(pos.loggedAt).toLocaleDateString(undefined, { month: 'short', day: 'numeric' }) : 'Today'}
+                        {dateStr}
                       </td>
                       <td className="py-3 px-3 font-semibold text-slate-200">
                         <div>
-                          <span className="block truncate max-w-[200px]">{pos.fixtureName}</span>
-                          <span className="text-[10px] text-slate-500">{pos.leagueName}</span>
+                          <span className="block truncate max-w-[240px] sm:max-w-[320px]" title={fixtureTitle}>
+                            {fixtureTitle}
+                          </span>
+                          <span className="text-[10px] text-slate-500 font-mono">
+                            {pos.leagueName || (pos.legs ? `${pos.legs.length}-Leg Acca` : 'Direct Pick')}
+                          </span>
                         </div>
                       </td>
-                      <td className="py-3 px-3 text-amber-300 font-semibold">
-                        {pos.selectionLabel}
+                      <td className="py-3 px-3 text-amber-300 font-semibold max-w-[220px]">
+                        <span className="block truncate" title={selectionText}>
+                          {selectionText}
+                        </span>
                       </td>
                       <td className="py-3 px-3 text-center text-slate-200 font-bold">
                         {odds.toFixed(2)}
@@ -308,7 +324,7 @@ export default function PortfolioTracker({
                             <>
                               <button
                                 type="button"
-                                onClick={() => onUpdatePositionStatus(pos.id, 'WON')}
+                                onClick={() => handleUpdate && handleUpdate(pos.id, 'WON')}
                                 className="px-2 py-0.5 rounded bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 text-[10px]"
                                 title="Mark position as won"
                               >
@@ -316,7 +332,7 @@ export default function PortfolioTracker({
                               </button>
                               <button
                                 type="button"
-                                onClick={() => onUpdatePositionStatus(pos.id, 'LOST')}
+                                onClick={() => handleUpdate && handleUpdate(pos.id, 'LOST')}
                                 className="px-2 py-0.5 rounded bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 border border-rose-500/30 text-[10px]"
                                 title="Mark position as lost"
                               >
@@ -324,7 +340,7 @@ export default function PortfolioTracker({
                               </button>
                               <button
                                 type="button"
-                                onClick={() => onUpdatePositionStatus(pos.id, 'VOID')}
+                                onClick={() => handleUpdate && handleUpdate(pos.id, 'VOID')}
                                 className="px-1.5 py-0.5 rounded bg-pitch-950 hover:bg-pitch-800 text-slate-400 border border-pitch-700 text-[10px]"
                                 title="Mark void"
                               >

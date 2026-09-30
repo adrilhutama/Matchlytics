@@ -3,26 +3,39 @@
 // - Interactive Bivariate Poisson 6x6 Scoreline Heatmap with dynamic lambda overrides
 // - 10,000-iteration client-side Monte Carlo variance distribution engine
 // - Reverse Odds & True Fair-Value simulator with Quarter-Kelly sizing
-// - One-click position logging into the Bankroll Portfolio Journal
+// - Local React Error Boundary and safe mathematical property guards
+// - Zero em dash characters (R-02 compliance)
 
-import { useState, useMemo, useEffect } from 'react'
+import React, { Component, useState, useMemo, useEffect } from 'react'
 import { computePoissonMatrix, calculateZeroVigOdds, calculateEdgeAndEV, getKellyFraction } from '../utils/analytics'
 import FormGuide from './FormGuide'
 
-// Fast client-side Poisson random number generator (Knuth algorithm)
+// Safe clamp for expected goals lambda parameter
+function safeClampLambda(val, fallback = 1.35) {
+  const num = Number(val)
+  if (!Number.isFinite(num) || num <= 0) return fallback
+  return Math.max(0.6, Math.min(3.2, Number(num.toFixed(2))))
+}
+
+// Fast client-side Poisson random number generator (Knuth algorithm with loop safeguard)
 function samplePoisson(lambda) {
-  const L = Math.exp(-lambda)
+  const safeLambda = Math.max(0.1, Math.min(6.0, Number(lambda) || 1.2))
+  const L = Math.exp(-safeLambda)
   let k = 0
   let p = 1.0
   do {
     k += 1
     p *= Math.random()
-  } while (p > L)
-  return k - 1
+  } while (p > L && k < 50)
+  return Math.max(0, k - 1)
 }
 
-// 10,000-iteration Monte Carlo simulation
+// 10,000-iteration Monte Carlo simulation with safe defaults
 function runMonteCarloSimulation(lambdaHome, lambdaAway, iterations = 10000) {
+  const safeH = safeClampLambda(lambdaHome, 1.35)
+  const safeA = safeClampLambda(lambdaAway, 1.10)
+  const safeIters = Math.min(10000, Math.max(1000, Number(iterations) || 10000))
+
   let homeCleanSheets = 0
   let awayCleanSheets = 0
   let bttsCount = 0
@@ -47,9 +60,9 @@ function runMonteCarloSimulation(lambdaHome, lambdaAway, iterations = 10000) {
   let homeWins = 0
   let awayWins = 0
 
-  for (let i = 0; i < iterations; i += 1) {
-    const h = samplePoisson(lambdaHome)
-    const a = samplePoisson(lambdaAway)
+  for (let i = 0; i < safeIters; i += 1) {
+    const h = samplePoisson(safeH)
+    const a = samplePoisson(safeA)
     const total = h + a
     const diff = h - a
 
@@ -83,10 +96,10 @@ function runMonteCarloSimulation(lambdaHome, lambdaAway, iterations = 10000) {
     }
   }
 
-  const toPct = (val) => Number(((val / iterations) * 100).toFixed(1))
+  const toPct = (val) => Number(((val / safeIters) * 100).toFixed(1))
 
   return {
-    iterations,
+    iterations: safeIters,
     homeCleanSheetPct: toPct(homeCleanSheets),
     awayCleanSheetPct: toPct(awayCleanSheets),
     bttsPct: toPct(bttsCount),
@@ -112,64 +125,105 @@ function runMonteCarloSimulation(lambdaHome, lambdaAway, iterations = 10000) {
   }
 }
 
-export default function QuantLab({
+// Local React Error Boundary for Quant Lab workspace
+class QuantLabErrorBoundary extends Component {
+  constructor(props) {
+    super(props)
+    this.state = { hasError: false, error: null }
+  }
+
+  static getDerivedStateFromError(error) {
+    return { hasError: true, error }
+  }
+
+  componentDidCatch(error, errorInfo) {
+    console.error('QuantLab Runtime Error caught by Boundary:', error, errorInfo)
+  }
+
+  handleReset = () => {
+    this.setState({ hasError: false, error: null })
+    if (this.props.onReset) {
+      this.props.onReset()
+    }
+  }
+
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div className="p-8 my-6 text-center rounded-2xl bg-pitch-950 border border-rose-500/30 shadow-2xl max-w-xl mx-auto space-y-4 animate-fade-in">
+          <div className="w-12 h-12 rounded-full bg-rose-500/10 text-rose-400 border border-rose-500/20 flex items-center justify-center mx-auto text-xl font-bold">
+            !
+          </div>
+          <div>
+            <h3 className="text-base font-bold text-slate-100">
+              Quantitative Calculation Interrupted
+            </h3>
+            <p className="text-xs text-slate-400 mt-1 font-mono">
+              An unexpected value occurred during the simulation.
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={this.handleReset}
+            className="px-5 py-2.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-pitch-950 font-bold text-xs transition-colors shadow focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white"
+          >
+            Reset Target
+          </button>
+        </div>
+      )
+    }
+
+    return this.props.children
+  }
+}
+
+// Inner workspace view guarded by non-null fixture
+function QuantLabWorkspace({
   fixture,
-  selectedFixture,
-  allFixtures = [],
-  fixtures = [],
+  matchPool = [],
   onSelectFixture,
   standingsMap = {},
   onLogPosition,
-  bankrollAmount = 1000000,
-  userBankroll = 1000000,
+  effectiveBankroll = 1000000,
   currencyCode = 'IDR',
 }) {
-  const effectiveBankroll = userBankroll || bankrollAmount || 1000000
-  const matchPool = useMemo(() => {
-    const list = (allFixtures && allFixtures.length > 0) ? allFixtures : fixtures
-    return list || []
-  }, [allFixtures, fixtures])
+  const initialH = safeClampLambda(
+    fixture.lambdaHome ?? fixture.homeLambda ?? fixture.xG_home ?? fixture.lambda_home,
+    1.35
+  )
+  const initialA = safeClampLambda(
+    fixture.lambdaAway ?? fixture.awayLambda ?? fixture.xG_away ?? fixture.lambda_away,
+    1.10
+  )
 
-  const initialTarget = selectedFixture || fixture
+  const [customLambdaH, setCustomLambdaH] = useState(initialH)
+  const [customLambdaA, setCustomLambdaA] = useState(initialA)
+  const [activeMarketOdds, setActiveMarketOdds] = useState({
+    home: fixture.odds_home ? String(fixture.odds_home) : '2.10',
+    draw: fixture.odds_draw ? String(fixture.odds_draw) : '3.40',
+    away: fixture.odds_away ? String(fixture.odds_away) : '3.50',
+  })
 
-  // Active fixture state (fallback to highest +EV match or first available)
-  const activeMatch = useMemo(() => {
-    if (initialTarget) return initialTarget
-    if (matchPool.length > 0) {
-      const sortedByValue = [...matchPool]
-        .filter((f) => Boolean(f.value_pick))
-        .sort((a, b) => (b.ev_percentage || 0) - (a.ev_percentage || 0))
-      return sortedByValue[0] || matchPool[0]
-    }
-    return null
-  }, [initialTarget, matchPool])
-
-  // Sync back to parent if target was auto-selected
+  // Synchronize when fixture changes
   useEffect(() => {
-    if (!initialTarget && activeMatch && onSelectFixture) {
-      onSelectFixture(activeMatch)
-    }
-  }, [initialTarget, activeMatch, onSelectFixture])
-
-  // Custom Lambda overrides
-  const [customLambdaH, setCustomLambdaH] = useState(1.45)
-  const [customLambdaA, setCustomLambdaA] = useState(1.15)
-  const [activeMarketOdds, setActiveMarketOdds] = useState({ home: '2.10', draw: '3.40', away: '3.50' })
-
-  // Synchronize when active match changes
-  useEffect(() => {
-    if (activeMatch) {
-      const hXg = activeMatch.lambda_home ? Number(activeMatch.lambda_home) : 1.45
-      const aXg = activeMatch.lambda_away ? Number(activeMatch.lambda_away) : 1.15
+    if (fixture) {
+      const hXg = safeClampLambda(
+        fixture.lambdaHome ?? fixture.homeLambda ?? fixture.xG_home ?? fixture.lambda_home,
+        1.35
+      )
+      const aXg = safeClampLambda(
+        fixture.lambdaAway ?? fixture.awayLambda ?? fixture.xG_away ?? fixture.lambda_away,
+        1.10
+      )
       setCustomLambdaH(hXg)
       setCustomLambdaA(aXg)
       setActiveMarketOdds({
-        home: activeMatch.odds_home ? String(activeMatch.odds_home) : '2.10',
-        draw: activeMatch.odds_draw ? String(activeMatch.odds_draw) : '3.40',
-        away: activeMatch.odds_away ? String(activeMatch.odds_away) : '3.50',
+        home: fixture.odds_home ? String(fixture.odds_home) : '2.10',
+        draw: fixture.odds_draw ? String(fixture.odds_draw) : '3.40',
+        away: fixture.odds_away ? String(fixture.odds_away) : '3.50',
       })
     }
-  }, [activeMatch])
+  }, [fixture])
 
   // Compute 6x6 Poisson joint matrix from current lambdas
   const matrixData = useMemo(() => {
@@ -190,13 +244,21 @@ export default function QuantLab({
     )
   }, [activeMarketOdds])
 
+  // Safe team names and crests
+  const homeName = fixture.home_team_name || fixture.homeTeam || 'Home Team'
+  const awayName = fixture.away_team_name || fixture.awayTeam || 'Away Team'
+  const homeLogo = fixture.home_team_logo || fixture.homeLogo
+  const awayLogo = fixture.away_team_logo || fixture.awayLogo
+  const leagueName = fixture.league_name || fixture.league || 'League'
+  const matchDate = fixture.match_date || fixture.date
+
   // Calculate Edge & Kelly for each 1X2 outcome
   const valueEvaluations = useMemo(() => {
     if (!matrixData) return []
     const outcomes = [
-      { key: 'HOME', label: `${activeMatch?.home_team_name || 'Home'} Win`, prob: matrixData.sumHomeWin, odds: parseFloat(activeMarketOdds.home) || 0 },
-      { key: 'DRAW', label: 'Draw (X)', prob: matrixData.sumDraw, odds: parseFloat(activeMarketOdds.draw) || 0 },
-      { key: 'AWAY', label: `${activeMatch?.away_team_name || 'Away'} Win`, prob: matrixData.sumAwayWin, odds: parseFloat(activeMarketOdds.away) || 0 },
+      { key: 'HOME', label: `${homeName} Win`, prob: matrixData.sumHomeWin || 0, odds: parseFloat(activeMarketOdds.home) || 0 },
+      { key: 'DRAW', label: 'Draw (X)', prob: matrixData.sumDraw || 0, odds: parseFloat(activeMarketOdds.draw) || 0 },
+      { key: 'AWAY', label: `${awayName} Win`, prob: matrixData.sumAwayWin || 0, odds: parseFloat(activeMarketOdds.away) || 0 },
     ]
 
     return outcomes.map((item) => {
@@ -215,31 +277,31 @@ export default function QuantLab({
         hasEdge: expectedValuePct >= 2.0 && expectedValuePct <= 35.0,
       }
     })
-  }, [matrixData, activeMarketOdds, effectiveBankroll, activeMatch])
+  }, [matrixData, activeMarketOdds, effectiveBankroll, homeName, awayName])
 
   // Standings metadata for active match
-  const homeStandings = activeMatch ? (standingsMap[activeMatch.home_team_id] || standingsMap[`${activeMatch.league_id}_${activeMatch.home_team_id}`] || null) : null
-  const awayStandings = activeMatch ? (standingsMap[activeMatch.away_team_id] || standingsMap[`${activeMatch.league_id}_${activeMatch.away_team_id}`] || null) : null
+  const homeStandings = fixture ? (standingsMap[fixture.home_team_id] || standingsMap[`${fixture.league_id}_${fixture.home_team_id}`] || null) : null
+  const awayStandings = fixture ? (standingsMap[fixture.away_team_id] || standingsMap[`${fixture.league_id}_${fixture.away_team_id}`] || null) : null
 
   // Reset to original model xG
   const handleResetModelXg = () => {
-    if (activeMatch) {
-      setCustomLambdaH(activeMatch.lambda_home ? Number(activeMatch.lambda_home) : 1.45)
-      setCustomLambdaA(activeMatch.lambda_away ? Number(activeMatch.lambda_away) : 1.15)
+    if (fixture) {
+      const hXg = safeClampLambda(
+        fixture.lambdaHome ?? fixture.homeLambda ?? fixture.xG_home ?? fixture.lambda_home,
+        1.35
+      )
+      const aXg = safeClampLambda(
+        fixture.lambdaAway ?? fixture.awayLambda ?? fixture.xG_away ?? fixture.lambda_away,
+        1.10
+      )
+      setCustomLambdaH(hXg)
+      setCustomLambdaA(aXg)
     }
-  }
-
-  if (!activeMatch) {
-    return (
-      <div className="py-16 text-center text-slate-400 font-mono text-sm">
-        No fixtures currently available for quantitative deep-dive.
-      </div>
-    )
   }
 
   return (
     <div className="space-y-6 animate-fade-in max-w-7xl mx-auto">
-      {/* ---- Top Match Selector & Identity Header ---- */}
+      {/* Top Match Selector & Identity Header */}
       <div className="p-4 sm:p-5 rounded-2xl bg-pitch-900 border border-pitch-700/80 shadow-xl flex flex-col lg:flex-row lg:items-center justify-between gap-4">
         <div className="flex flex-col sm:flex-row sm:items-center gap-3 min-w-0">
           <div className="flex items-center gap-2">
@@ -251,30 +313,30 @@ export default function QuantLab({
                 Quantitative Research Lab
               </span>
               <h2 className="text-base sm:text-lg font-bold text-slate-100 truncate">
-                {activeMatch.home_team_name} vs {activeMatch.away_team_name}
+                {homeName} vs {awayName}
               </h2>
             </div>
           </div>
 
           <div className="flex items-center gap-2 sm:ml-4 text-xs font-mono text-slate-400">
             <span className="px-2 py-0.5 rounded bg-pitch-950 border border-pitch-800 text-amber-300">
-              {activeMatch.league_name || 'League'}
+              {leagueName}
             </span>
             <span>
-              {activeMatch.match_date ? new Date(activeMatch.match_date).toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : 'TBD'}
+              {matchDate ? new Date(matchDate).toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : 'TBD'}
             </span>
           </div>
         </div>
 
-        {/* Match Picker Selector */}
+        {/* Target Match Selector */}
         {matchPool.length > 0 && (
           <div className="flex items-center gap-2 w-full lg:w-auto">
             <label htmlFor="quant-match-select" className="text-xs text-slate-400 font-mono whitespace-nowrap">
-              Switch Target:
+              Target Match:
             </label>
             <select
               id="quant-match-select"
-              value={activeMatch ? activeMatch.id : ''}
+              value={fixture ? fixture.id : ''}
               onChange={(e) => {
                 const targetId = e.target.value
                 const found = matchPool.find((f) => String(f.id) === String(targetId))
@@ -296,17 +358,17 @@ export default function QuantLab({
         )}
       </div>
 
-      {/* ---- Interactive Lambda Overrides & Sensitivity Strip ---- */}
+      {/* Interactive Lambda Overrides & Sensitivity Strip */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
         {/* Home Expected Goals (Lambda H) */}
         <div className="p-4 rounded-xl bg-pitch-900 border border-pitch-800/90 shadow-md flex flex-col justify-between space-y-3">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
-              {activeMatch.home_team_logo && (
-                <img src={activeMatch.home_team_logo} alt="" className="w-5 h-5 object-contain" />
+              {homeLogo && (
+                <img src={homeLogo} alt="" className="w-5 h-5 object-contain" />
               )}
               <span className="text-xs font-bold text-slate-200 truncate">
-                {activeMatch.home_team_name} xG (λH)
+                {homeName} xG (λH)
               </span>
             </div>
             <span className="text-base font-mono font-bold text-sky-400 tabular-nums">
@@ -316,8 +378,8 @@ export default function QuantLab({
 
           <input
             type="range"
-            min="0.4"
-            max="3.8"
+            min="0.6"
+            max="3.2"
             step="0.05"
             value={customLambdaH}
             onChange={(e) => setCustomLambdaH(parseFloat(e.target.value))}
@@ -325,7 +387,7 @@ export default function QuantLab({
           />
 
           <div className="flex items-center justify-between text-[11px] font-mono text-slate-400">
-            <span>Model xG: {activeMatch.lambda_home ?? '1.45'}</span>
+            <span>Model baseline: {fixture.lambda_home ?? '1.45'}</span>
             {homeStandings?.home_played > 0 && (
               <span>Record: {homeStandings.home_goals_for}:{homeStandings.home_goals_against} in {homeStandings.home_played}H</span>
             )}
@@ -336,11 +398,11 @@ export default function QuantLab({
         <div className="p-4 rounded-xl bg-pitch-900 border border-pitch-800/90 shadow-md flex flex-col justify-between space-y-3">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
-              {activeMatch.away_team_logo && (
-                <img src={activeMatch.away_team_logo} alt="" className="w-5 h-5 object-contain" />
+              {awayLogo && (
+                <img src={awayLogo} alt="" className="w-5 h-5 object-contain" />
               )}
               <span className="text-xs font-bold text-slate-200 truncate">
-                {activeMatch.away_team_name} xG (λA)
+                {awayName} xG (λA)
               </span>
             </div>
             <span className="text-base font-mono font-bold text-rose-400 tabular-nums">
@@ -350,8 +412,8 @@ export default function QuantLab({
 
           <input
             type="range"
-            min="0.4"
-            max="3.8"
+            min="0.6"
+            max="3.2"
             step="0.05"
             value={customLambdaA}
             onChange={(e) => setCustomLambdaA(parseFloat(e.target.value))}
@@ -359,255 +421,255 @@ export default function QuantLab({
           />
 
           <div className="flex items-center justify-between text-[11px] font-mono text-slate-400">
-            <span>Model xG: {activeMatch.lambda_away ?? '1.15'}</span>
+            <span>Model baseline: {fixture.lambda_away ?? '1.15'}</span>
             {awayStandings?.away_played > 0 && (
               <span>Record: {awayStandings.away_goals_for}:{awayStandings.away_goals_against} in {awayStandings.away_played}A</span>
             )}
           </div>
         </div>
 
-        {/* Quick Presets & Sensitivity Controls */}
-        <div className="p-4 rounded-xl bg-pitch-900 border border-pitch-800/90 shadow-md flex flex-col justify-between space-y-2">
-          <span className="text-xs font-bold text-slate-300">
-            Scenario Modeling Presets
-          </span>
-          <div className="grid grid-cols-2 gap-2 text-[11px] font-mono">
+        {/* Quick Sensitivity Reset & Consensus Total */}
+        <div className="p-4 rounded-xl bg-pitch-900 border border-pitch-800/90 shadow-md flex flex-col justify-between">
+          <div>
+            <span className="text-xs text-slate-400 uppercase font-mono tracking-wider block mb-1">
+              Joint Total Expected Goals
+            </span>
+            <div className="flex items-baseline gap-2">
+              <span className="text-2xl font-mono font-bold text-amber-300">
+                {(customLambdaH + customLambdaA).toFixed(2)}
+              </span>
+              <span className="text-xs text-slate-500 font-mono">
+                Goals Projected
+              </span>
+            </div>
+          </div>
+
+          <div className="flex items-center justify-between pt-3 border-t border-pitch-800/80 mt-2">
             <button
               type="button"
               onClick={handleResetModelXg}
-              className="px-2.5 py-1.5 rounded-lg bg-pitch-950 hover:bg-pitch-800 border border-pitch-700 text-amber-300 text-left truncate transition-colors"
+              className="px-3 py-1.5 rounded-lg bg-pitch-950 hover:bg-pitch-800 text-xs font-mono text-slate-300 border border-pitch-700 transition-colors"
             >
-              ↺ Reset to Model
+              Reset Baseline
             </button>
-            <button
-              type="button"
-              onClick={() => {
-                setCustomLambdaH(Number((customLambdaH * 1.25).toFixed(2)))
-                setCustomLambdaA(Number((customLambdaA * 0.85).toFixed(2)))
-              }}
-              className="px-2.5 py-1.5 rounded-lg bg-pitch-950 hover:bg-pitch-800 border border-pitch-700 text-slate-300 text-left truncate transition-colors"
-            >
-              ▲ High Home Bias
-            </button>
-            <button
-              type="button"
-              onClick={() => {
-                setCustomLambdaH(0.90)
-                setCustomLambdaA(0.85)
-              }}
-              className="px-2.5 py-1.5 rounded-lg bg-pitch-950 hover:bg-pitch-800 border border-pitch-700 text-slate-300 text-left truncate transition-colors"
-            >
-              ▼ Low-Scoring Grid
-            </button>
-            <button
-              type="button"
-              onClick={() => {
-                setCustomLambdaH(2.30)
-                setCustomLambdaA(1.80)
-              }}
-              className="px-2.5 py-1.5 rounded-lg bg-pitch-950 hover:bg-pitch-800 border border-pitch-700 text-slate-300 text-left truncate transition-colors"
-            >
-              ★ Open Goal Fest
-            </button>
+            <span className="text-[11px] text-slate-500 font-mono">
+              Bivariate Poisson Core
+            </span>
           </div>
         </div>
       </div>
 
-      {/* ---- Interactive 6x6 Bivariate Poisson Heatmap & Monte Carlo Columns ---- */}
+      {/* Grid: 6x6 Bivariate Heatmap + 10k Monte Carlo Variance Deck */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-        {/* Left: 6x6 Matrix (7 Cols) */}
+        {/* Left Column: 6x6 Bivariate Poisson Heatmap */}
         <div className="lg:col-span-7 p-4 sm:p-5 rounded-2xl bg-pitch-900 border border-pitch-700/80 shadow-xl space-y-4">
           <div className="flex items-center justify-between border-b border-pitch-800 pb-3">
             <div>
-              <h3 className="text-sm font-bold text-slate-100">
-                Bivariate Poisson Joint Probability Matrix
+              <h3 className="text-sm font-bold text-slate-100 flex items-center gap-2">
+                <span>Interactive 6x6 Poisson Score Matrix</span>
+                <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-pitch-950 text-slate-400 border border-pitch-800">
+                  λ: {customLambdaH.toFixed(2)} v {customLambdaA.toFixed(2)}
+                </span>
               </h3>
-              <p className="text-[11px] font-mono text-slate-400 mt-0.5">
-                Calculated from λH = {customLambdaH.toFixed(2)} and λA = {customLambdaA.toFixed(2)}
+              <p className="text-[11px] text-slate-400 mt-0.5">
+                Exact probability for each scoreline (0-5 goals).
               </p>
             </div>
-            <div className="text-right">
-              <span className="text-[11px] font-mono text-amber-400 bg-amber-500/10 px-2 py-0.5 rounded border border-amber-500/20">
-                Most Likely: {matrixData.mostProbable.home}-{matrixData.mostProbable.away} ({matrixData.maxProb.toFixed(1)}%)
-              </span>
-            </div>
-          </div>
-
-          {/* Matrix Grid */}
-          <div className="overflow-x-auto pb-1">
-            <div className="min-w-[340px]">
-              <div className="text-center text-xs font-semibold text-sky-400 mb-2">
-                Home Goals (0 to 5)
+            {matrixData?.mostProbable && (
+              <div className="text-right">
+                <span className="text-[10px] font-mono text-slate-500 uppercase block">Model Mode</span>
+                <span className="text-xs font-mono font-bold text-amber-400">
+                  {matrixData.mostProbable.home}-{matrixData.mostProbable.away} ({matrixData.mostProbable.prob.toFixed(1)}%)
+                </span>
               </div>
-              <table className="w-full text-center border-collapse">
-                <thead>
-                  <tr>
-                    <th className="text-[11px] font-medium text-slate-500 p-1 w-12 text-left">
-                      Away ↓
-                    </th>
-                    {[0, 1, 2, 3, 4, 5].map((h) => (
-                      <th key={h} className="text-xs font-bold text-slate-300 p-1.5 bg-pitch-950/60 rounded-t border-b border-pitch-800">
-                        {h}
-                      </th>
-                    ))}
-                  </tr>
-                </thead>
-                <tbody>
-                  {matrixData.matrix.map((row, awayGoals) => (
-                    <tr key={awayGoals}>
-                      <th className="text-xs font-bold text-rose-400 p-1.5 text-left bg-pitch-950/60 rounded-l border-r border-pitch-800">
-                        {awayGoals}
-                      </th>
-                      {row.map((cell) => {
-                        const isTop = cell.home === matrixData.mostProbable.home && cell.away === matrixData.mostProbable.away
-                        const ratio = matrixData.maxProb > 0 ? cell.prob / matrixData.maxProb : 0
-                        const bgAlpha = Math.max(0.06, ratio * 0.70)
-
-                        return (
-                          <td
-                            key={cell.home}
-                            className={`p-1 relative transition-all ${
-                              isTop ? 'ring-2 ring-amber-400 rounded z-10' : 'hover:ring-1 hover:ring-slate-400/40'
-                            }`}
-                            style={{
-                              backgroundColor: `rgba(245, 158, 11, ${bgAlpha.toFixed(3)})`,
-                            }}
-                          >
-                            <div className="flex flex-col items-center justify-center min-h-[34px]">
-                              <span className="text-xs font-mono font-bold text-slate-100">
-                                {cell.prob.toFixed(1)}%
-                              </span>
-                              <span className="text-[9px] font-mono text-slate-400">
-                                {cell.home}-{cell.away}
-                              </span>
-                            </div>
-                          </td>
-                        )
-                      })}
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+            )}
           </div>
 
-          {/* Quick Outcome Probs Bar */}
+          {/* Matrix Heatmap Grid */}
+          <div className="overflow-x-auto">
+            <table className="w-full text-center border-collapse text-xs font-mono select-none">
+              <thead>
+                <tr>
+                  <th className="p-1.5 text-slate-600 text-[10px]">H \ A</th>
+                  {[0, 1, 2, 3, 4, 5].map((g) => (
+                    <th key={g} className="p-1.5 font-bold text-rose-400 text-xs">
+                      {g}
+                    </th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {(matrixData?.matrix || []).map((row, homeGoals) => (
+                  <tr key={homeGoals}>
+                    <th className="p-1.5 font-bold text-sky-400 text-xs">
+                      {homeGoals}
+                    </th>
+                    {row.map((cell) => {
+                      const isMostProb = homeGoals === matrixData?.mostProbable?.home && cell.away === matrixData?.mostProbable?.away
+                      const alpha = Math.min(1, Math.max(0.08, (cell.prob / (matrixData?.maxProb || 1)) * 0.95))
+                      const isHomeFav = homeGoals > cell.away
+                      const isAwayFav = cell.away > homeGoals
+                      const isDraw = homeGoals === cell.away
+
+                      let bgStyle = `rgba(51, 65, 85, ${alpha})`
+                      if (isHomeFav) bgStyle = `rgba(14, 165, 233, ${alpha})`
+                      else if (isAwayFav) bgStyle = `rgba(244, 63, 94, ${alpha})`
+                      else if (isDraw) bgStyle = `rgba(245, 158, 11, ${alpha})`
+
+                      return (
+                        <td
+                          key={cell.away}
+                          className="p-1.5 transition-transform hover:scale-105"
+                          title={`${homeGoals}-${cell.away}: ${cell.prob.toFixed(2)}%`}
+                        >
+                          <div
+                            style={{ backgroundColor: bgStyle }}
+                            className={`py-2 px-1 rounded-lg flex flex-col items-center justify-center min-w-[38px] ${
+                              isMostProb ? 'ring-2 ring-amber-400 font-bold shadow-lg shadow-amber-500/20' : ''
+                            }`}
+                          >
+                            <span className="text-[11px] font-bold text-slate-100">
+                              {cell.prob.toFixed(1)}%
+                            </span>
+                            <span className="text-[9px] text-slate-400">
+                              {homeGoals}-{cell.away}
+                            </span>
+                          </div>
+                        </td>
+                      )
+                    })}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+
+          {/* Matrix Aggregates */}
           <div className="grid grid-cols-3 gap-2 pt-2 border-t border-pitch-800 text-center font-mono">
-            <div className="p-2 rounded-lg bg-sky-500/10 border border-sky-500/20">
-              <span className="text-[10px] text-slate-400 block uppercase">Home Win</span>
-              <span className="text-sm font-bold text-sky-400">{matrixData.sumHomeWin.toFixed(1)}%</span>
+            <div className="p-2 rounded-xl bg-pitch-950/70 border border-sky-500/20">
+              <span className="text-[10px] text-slate-400 block">{homeName} Win</span>
+              <span className="text-sm font-bold text-sky-400">{matrixData?.sumHomeWin.toFixed(1)}%</span>
             </div>
-            <div className="p-2 rounded-lg bg-amber-500/10 border border-amber-500/20">
-              <span className="text-[10px] text-slate-400 block uppercase">Draw (X)</span>
-              <span className="text-sm font-bold text-amber-400">{matrixData.sumDraw.toFixed(1)}%</span>
+            <div className="p-2 rounded-xl bg-pitch-950/70 border border-amber-500/20">
+              <span className="text-[10px] text-slate-400 block">Draw</span>
+              <span className="text-sm font-bold text-amber-400">{matrixData?.sumDraw.toFixed(1)}%</span>
             </div>
-            <div className="p-2 rounded-lg bg-rose-500/10 border border-rose-500/20">
-              <span className="text-[10px] text-slate-400 block uppercase">Away Win</span>
-              <span className="text-sm font-bold text-rose-400">{matrixData.sumAwayWin.toFixed(1)}%</span>
+            <div className="p-2 rounded-xl bg-pitch-950/70 border border-rose-500/20">
+              <span className="text-[10px] text-slate-400 block">{awayName} Win</span>
+              <span className="text-sm font-bold text-rose-400">{matrixData?.sumAwayWin.toFixed(1)}%</span>
             </div>
           </div>
         </div>
 
-        {/* Right: 10,000-Iteration Monte Carlo Variance (5 Cols) */}
-        <div className="lg:col-span-5 p-4 sm:p-5 rounded-2xl bg-pitch-900 border border-pitch-700/80 shadow-xl flex flex-col justify-between space-y-4">
-          <div className="border-b border-pitch-800 pb-3">
-            <div className="flex items-center justify-between">
-              <h3 className="text-sm font-bold text-slate-100">
-                10,000-Iteration Monte Carlo Engine
-              </h3>
-              <span className="text-[10px] font-mono text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded border border-emerald-500/20">
-                10,000 Trials
+        {/* Right Column: 10,000 Monte Carlo Simulation Deck */}
+        <div className="lg:col-span-5 p-4 sm:p-5 rounded-2xl bg-pitch-900 border border-pitch-700/80 shadow-xl space-y-4 flex flex-col justify-between">
+          <div>
+            <div className="flex items-center justify-between border-b border-pitch-800 pb-3">
+              <div>
+                <h3 className="text-sm font-bold text-slate-100 flex items-center gap-2">
+                  <span>10,000 Monte Carlo Variance</span>
+                  <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-emerald-500/10 text-emerald-400 border border-emerald-500/30">
+                    Live Engine
+                  </span>
+                </h3>
+                <p className="text-[11px] text-slate-400 mt-0.5">
+                  10k simulated matches under current xG lambdas.
+                </p>
+              </div>
+            </div>
+
+            {/* Clean Sheets & BTTS */}
+            <div className="mt-4 space-y-3">
+              <span className="text-[11px] uppercase font-mono tracking-wider text-slate-400 block">
+                Defensive & Goal Market Tendencies
               </span>
+              <div className="grid grid-cols-3 gap-2 text-center font-mono">
+                <div className="p-2.5 rounded-xl bg-pitch-950 border border-pitch-800">
+                  <span className="text-[10px] text-slate-500 block truncate">{homeName} CS</span>
+                  <span className="text-base font-bold text-sky-400">{simResults?.homeCleanSheetPct ?? 0}%</span>
+                </div>
+                <div className="p-2.5 rounded-xl bg-pitch-950 border border-pitch-800">
+                  <span className="text-[10px] text-slate-500 block truncate">BTTS Yes</span>
+                  <span className="text-base font-bold text-emerald-400">{simResults?.bttsPct ?? 0}%</span>
+                </div>
+                <div className="p-2.5 rounded-xl bg-pitch-950 border border-pitch-800">
+                  <span className="text-[10px] text-slate-500 block truncate">{awayName} CS</span>
+                  <span className="text-base font-bold text-rose-400">{simResults?.awayCleanSheetPct ?? 0}%</span>
+                </div>
+              </div>
             </div>
-            <p className="text-[11px] font-mono text-slate-400 mt-0.5">
-              Empirical variance and clean sheet distributions
-            </p>
+
+            {/* Total Goals Bracket Distribution */}
+            <div className="mt-4 space-y-2">
+              <span className="text-[11px] uppercase font-mono tracking-wider text-slate-400 block">
+                Total Goal Brackets
+              </span>
+              <div className="space-y-1.5 font-mono text-xs">
+                {[
+                  { label: '0 to 1 Goals', pct: simResults?.brackets?.bracket01Pct ?? 0, color: 'bg-slate-500' },
+                  { label: '2 to 3 Goals', pct: simResults?.brackets?.bracket23Pct ?? 0, color: 'bg-emerald-500' },
+                  { label: '4 to 5 Goals', pct: simResults?.brackets?.bracket45Pct ?? 0, color: 'bg-amber-500' },
+                  { label: '6+ Goals', pct: simResults?.brackets?.bracket6PlusPct ?? 0, color: 'bg-rose-500' },
+                ].map((b) => (
+                  <div key={b.label} className="flex items-center justify-between gap-3 p-1.5 rounded-lg bg-pitch-950/60">
+                    <span className="text-slate-300 w-24 flex-shrink-0">{b.label}</span>
+                    <div className="flex-1 bg-pitch-900 rounded-full h-2 overflow-hidden">
+                      <div className={`h-full ${b.color} rounded-full`} style={{ width: `${b.pct}%` }} />
+                    </div>
+                    <span className="w-12 text-right text-slate-200 font-bold">{b.pct}%</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* Margin of Victory Distribution */}
+            <div className="mt-4 space-y-2">
+              <span className="text-[11px] uppercase font-mono tracking-wider text-slate-400 block">
+                Victory Margins
+              </span>
+              <div className="grid grid-cols-5 gap-1.5 text-center font-mono text-xs">
+                <div className="p-2 rounded-lg bg-pitch-950 border border-sky-500/20">
+                  <span className="text-[9px] text-slate-400 block truncate">H By 2+</span>
+                  <span className="font-bold text-sky-400">{simResults?.margins?.homeBy2PlusPct ?? 0}%</span>
+                </div>
+                <div className="p-2 rounded-lg bg-pitch-950 border border-sky-500/10">
+                  <span className="text-[9px] text-slate-400 block truncate">H By 1</span>
+                  <span className="font-bold text-sky-300">{simResults?.margins?.homeBy1Pct ?? 0}%</span>
+                </div>
+                <div className="p-2 rounded-lg bg-pitch-950 border border-amber-500/20">
+                  <span className="text-[9px] text-slate-400 block truncate">Draw</span>
+                  <span className="font-bold text-amber-400">{simResults?.margins?.drawsPct ?? 0}%</span>
+                </div>
+                <div className="p-2 rounded-lg bg-pitch-950 border border-rose-500/10">
+                  <span className="text-[9px] text-slate-400 block truncate">A By 1</span>
+                  <span className="font-bold text-rose-300">{simResults?.margins?.awayBy1Pct ?? 0}%</span>
+                </div>
+                <div className="p-2 rounded-lg bg-pitch-950 border border-rose-500/20">
+                  <span className="text-[9px] text-slate-400 block truncate">A By 2+</span>
+                  <span className="font-bold text-rose-400">{simResults?.margins?.awayBy2PlusPct ?? 0}%</span>
+                </div>
+              </div>
+            </div>
           </div>
 
-          {/* Clean Sheets & BTTS */}
-          <div className="grid grid-cols-3 gap-2 text-center font-mono">
-            <div className="p-2.5 rounded-xl bg-pitch-950 border border-pitch-800">
-              <span className="text-[10px] text-slate-400 block truncate">Home Clean Sheet</span>
-              <span className="text-sm font-bold text-slate-200">{simResults.homeCleanSheetPct}%</span>
-            </div>
-            <div className="p-2.5 rounded-xl bg-pitch-950 border border-pitch-800">
-              <span className="text-[10px] text-slate-400 block truncate">Away Clean Sheet</span>
-              <span className="text-sm font-bold text-slate-200">{simResults.awayCleanSheetPct}%</span>
-            </div>
-            <div className="p-2.5 rounded-xl bg-pitch-950 border border-pitch-800">
-              <span className="text-[10px] text-slate-400 block truncate">BTTS Yes</span>
-              <span className="text-sm font-bold text-amber-300">{simResults.bttsPct}%</span>
-            </div>
-          </div>
-
-          {/* Goal Brackets */}
-          <div className="space-y-1.5 font-mono text-xs">
-            <span className="text-[11px] uppercase tracking-wider text-slate-400 font-bold block">
-              Total Goals Brackets
-            </span>
-            <div className="grid grid-cols-2 gap-2">
-              <div className="flex items-center justify-between p-2 rounded-lg bg-pitch-950 border border-pitch-800">
-                <span className="text-slate-400">0 to 1 Goals</span>
-                <span className="font-bold text-slate-200">{simResults.brackets.bracket01Pct}%</span>
-              </div>
-              <div className="flex items-center justify-between p-2 rounded-lg bg-pitch-950 border border-pitch-800">
-                <span className="text-slate-400">2 to 3 Goals</span>
-                <span className="font-bold text-amber-300">{simResults.brackets.bracket23Pct}%</span>
-              </div>
-              <div className="flex items-center justify-between p-2 rounded-lg bg-pitch-950 border border-pitch-800">
-                <span className="text-slate-400">4 to 5 Goals</span>
-                <span className="font-bold text-slate-200">{simResults.brackets.bracket45Pct}%</span>
-              </div>
-              <div className="flex items-center justify-between p-2 rounded-lg bg-pitch-950 border border-pitch-800">
-                <span className="text-slate-400">6+ Goals</span>
-                <span className="font-bold text-rose-400">{simResults.brackets.bracket6PlusPct}%</span>
-              </div>
-            </div>
-          </div>
-
-          {/* Win-By Margins */}
-          <div className="space-y-1.5 font-mono text-xs">
-            <span className="text-[11px] uppercase tracking-wider text-slate-400 font-bold block">
-              Margin of Victory Distribution
-            </span>
-            <div className="grid grid-cols-5 gap-1.5 text-center text-[10px]">
-              <div className="p-1.5 rounded-lg bg-pitch-950 border border-pitch-800">
-                <span className="text-slate-500 block">H 2+</span>
-                <span className="font-bold text-sky-400 text-xs">{simResults.margins.homeBy2PlusPct}%</span>
-              </div>
-              <div className="p-1.5 rounded-lg bg-pitch-950 border border-pitch-800">
-                <span className="text-slate-500 block">H by 1</span>
-                <span className="font-bold text-sky-300 text-xs">{simResults.margins.homeBy1Pct}%</span>
-              </div>
-              <div className="p-1.5 rounded-lg bg-pitch-950 border border-pitch-800">
-                <span className="text-slate-500 block">Draw</span>
-                <span className="font-bold text-amber-400 text-xs">{simResults.margins.drawsPct}%</span>
-              </div>
-              <div className="p-1.5 rounded-lg bg-pitch-950 border border-pitch-800">
-                <span className="text-slate-500 block">A by 1</span>
-                <span className="font-bold text-rose-300 text-xs">{simResults.margins.awayBy1Pct}%</span>
-              </div>
-              <div className="p-1.5 rounded-lg bg-pitch-950 border border-pitch-800">
-                <span className="text-slate-500 block">A 2+</span>
-                <span className="font-bold text-rose-400 text-xs">{simResults.margins.awayBy2PlusPct}%</span>
-              </div>
-            </div>
+          <div className="pt-3 border-t border-pitch-800 text-[10px] text-slate-500 font-mono text-right">
+            Monte Carlo pseudorandom Knuth transform. 10,000 runs.
           </div>
         </div>
       </div>
 
-      {/* ---- Reverse Odds Fair-Value Simulator & One-Click Portfolio Logging ---- */}
+      {/* Reverse Odds Fair-Value Simulator & One-Click Portfolio Logging */}
       <div className="p-4 sm:p-5 rounded-2xl bg-pitch-900 border border-pitch-700/80 shadow-xl space-y-4">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-pitch-800 pb-3">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-pitch-800 pb-3">
           <div>
             <h3 className="text-sm font-bold text-slate-100 flex items-center gap-2">
-              <span>Reverse Odds Fair-Value Simulator</span>
-              <span className="text-[10px] font-mono text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded border border-emerald-500/20">
-                Zero-Vig Calibration
+              <span>Reverse Odds Fair-Value Simulator & Kelly Allocation</span>
+              <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-amber-500/10 text-amber-300 border border-amber-500/30">
+                Quarter-Kelly 2.5% Cap
               </span>
             </h3>
-            <p className="text-[11px] font-mono text-slate-400 mt-0.5">
-              Enter consensus market price to evaluate edge, expected value, and Quarter-Kelly stake
+            <p className="text-[11px] text-slate-400 mt-0.5">
+              Enter custom bookmaker decimal odds to calculate true fair odds, net EV, and safe position sizing.
             </p>
           </div>
           <div className="text-xs font-mono text-slate-400">
@@ -615,104 +677,168 @@ export default function QuantLab({
           </div>
         </div>
 
-        {/* 1X2 Comparison Table */}
-        <div className="overflow-x-auto">
-          <table className="w-full text-left border-collapse text-xs font-mono">
-            <thead>
-              <tr className="border-b border-pitch-800 text-[11px] uppercase tracking-wider text-slate-400">
-                <th className="py-2.5 px-3">Outcome</th>
-                <th className="py-2.5 px-3 text-center">Model Fair Odds</th>
-                <th className="py-2.5 px-3 text-center">Market Price</th>
-                <th className="py-2.5 px-3 text-center">Zero-Vig Sharp</th>
-                <th className="py-2.5 px-3 text-center">Net Edge</th>
-                <th className="py-2.5 px-3 text-center">Quarter-Kelly</th>
-                <th className="py-2.5 px-3 text-center">Recommended Stake</th>
-                <th className="py-2.5 px-3 text-right">Action</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-pitch-800/60">
-              {valueEvaluations.map((evalItem) => {
-                const fairOdds = evalItem.prob > 0 ? (100.0 / evalItem.prob).toFixed(2) : '-'
-                const vigFair = evalItem.key === 'HOME' ? zeroVig.fairHome : evalItem.key === 'DRAW' ? zeroVig.fairDraw : zeroVig.fairAway
+        {/* 1X2 Reverse Odds Input Grid */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          {[
+            { key: 'home', label: `${homeName} (1)`, prob: matrixData?.sumHomeWin || 0, odds: activeMarketOdds.home },
+            { key: 'draw', label: 'Draw (X)', prob: matrixData?.sumDraw || 0, odds: activeMarketOdds.draw },
+            { key: 'away', label: `${awayName} (2)`, prob: matrixData?.sumAwayWin || 0, odds: activeMarketOdds.away },
+          ].map((item) => {
+            const evalItem = valueEvaluations.find((v) => v.key === item.key.toUpperCase()) || {}
+            const fairOdds = evalItem.prob > 0 ? (100 / evalItem.prob).toFixed(2) : '-'
 
-                return (
-                  <tr key={evalItem.key} className="hover:bg-pitch-800/40 transition-colors">
-                    <td className="py-3 px-3 font-semibold text-slate-200">
-                      <span className="flex items-center gap-2">
-                        <span className={`w-2 h-2 rounded-full ${evalItem.hasEdge ? 'bg-emerald-400 animate-ping' : 'bg-slate-600'}`} />
-                        {evalItem.label}
-                      </span>
-                    </td>
-                    <td className="py-3 px-3 text-center text-amber-300 font-bold">
+            return (
+              <div
+                key={item.key}
+                className={`p-4 rounded-xl bg-pitch-950 border transition-all ${
+                  evalItem.hasEdge
+                    ? 'border-emerald-500/40 shadow-lg shadow-emerald-500/5'
+                    : 'border-pitch-800'
+                }`}
+              >
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-xs font-bold text-slate-200 truncate">{item.label}</span>
+                  {evalItem.hasEdge && (
+                    <span className="px-1.5 py-0.5 rounded text-[10px] font-mono font-bold bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">
+                      +EV Edge
+                    </span>
+                  )}
+                </div>
+
+                <div className="flex items-center gap-3 mb-3">
+                  <div className="flex-1">
+                    <label className="text-[10px] text-slate-500 uppercase font-mono block mb-1">
+                      Market Odds
+                    </label>
+                    <input
+                      type="number"
+                      step="0.01"
+                      min="1.01"
+                      max="50.0"
+                      value={activeMarketOdds[item.key]}
+                      onChange={(e) => setActiveMarketOdds({ ...activeMarketOdds, [item.key]: e.target.value })}
+                      className="w-full bg-pitch-900 border border-pitch-700 rounded-lg px-2.5 py-1.5 text-sm font-mono font-bold text-slate-100 focus:outline-none focus:ring-1 focus:ring-amber-500"
+                    />
+                  </div>
+
+                  <div className="text-right">
+                    <span className="text-[10px] text-slate-500 uppercase font-mono block mb-1">
+                      True Fair Odds
+                    </span>
+                    <span className="text-sm font-mono font-bold text-amber-300">
                       {fairOdds}
-                    </td>
-                    <td className="py-3 px-3 text-center">
-                      <input
-                        type="number"
-                        step="0.05"
-                        min="1.01"
-                        value={evalItem.key === 'HOME' ? activeMarketOdds.home : evalItem.key === 'DRAW' ? activeMarketOdds.draw : activeMarketOdds.away}
-                        onChange={(e) => {
-                          const val = e.target.value
-                          setActiveMarketOdds((prev) => ({
-                            ...prev,
-                            [evalItem.key.toLowerCase()]: val,
-                          }))
-                        }}
-                        className="w-20 bg-pitch-950 border border-pitch-700 rounded px-2 py-1 text-center text-slate-100 focus:outline-none focus:ring-1 focus:ring-amber-500 font-mono text-xs"
-                      />
-                    </td>
-                    <td className="py-3 px-3 text-center text-slate-400">
-                      {vigFair ?? '-'}
-                    </td>
-                    <td className="py-3 px-3 text-center">
-                      <span className={`px-2 py-0.5 rounded text-[11px] font-bold ${
-                        evalItem.hasEdge
-                          ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'
-                          : 'bg-pitch-950 text-slate-500 border border-pitch-800'
-                      }`}>
-                        {evalItem.expectedValuePct > 0 ? `+${evalItem.expectedValuePct.toFixed(1)}%` : `${evalItem.expectedValuePct.toFixed(1)}%`}
-                      </span>
-                    </td>
-                    <td className="py-3 px-3 text-center text-slate-300">
-                      {evalItem.quarterKelly > 0 ? `${evalItem.quarterKelly}%` : '-'}
-                    </td>
-                    <td className="py-3 px-3 text-center font-bold text-slate-200">
-                      {evalItem.stakeRec > 0 ? `${currencyCode} ${Math.round(evalItem.stakeRec).toLocaleString()}` : '-'}
-                    </td>
-                    <td className="py-3 px-3 text-right">
-                      <button
-                        type="button"
-                        onClick={() => {
-                          if (onLogPosition) {
-                            onLogPosition({
-                              fixtureId: activeMatch.id,
-                              fixtureName: `${activeMatch.home_team_name} vs ${activeMatch.away_team_name}`,
-                              leagueName: activeMatch.league_name || 'League',
-                              matchDate: activeMatch.match_date,
-                              selection: evalItem.key,
-                              selectionLabel: evalItem.label,
-                              odds: evalItem.odds,
-                              stakePercent: evalItem.quarterKelly || 1.0,
-                              stake: evalItem.stakeRec > 0 ? Math.round(evalItem.stakeRec) : Math.round(effectiveBankroll * 0.01),
-                              stakeAmount: evalItem.stakeRec > 0 ? Math.round(evalItem.stakeRec) : Math.round(effectiveBankroll * 0.01),
-                              modelProb: evalItem.prob,
-                              evPercentage: evalItem.expectedValuePct,
-                            })
-                          }
-                        }}
-                        className="px-2.5 py-1 rounded-lg bg-amber-500/20 text-amber-300 hover:bg-amber-500/30 border border-amber-500/40 text-[11px] transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-amber-500 font-sans font-semibold"
-                      >
-                        + Log Position
-                      </button>
-                    </td>
-                  </tr>
-                )
-              })}
-            </tbody>
-          </table>
+                    </span>
+                  </div>
+                </div>
+
+                <div className="space-y-1.5 pt-2 border-t border-pitch-800/80 font-mono text-xs">
+                  <div className="flex justify-between text-slate-400">
+                    <span>Model Probability:</span>
+                    <span className="text-slate-200 font-bold">{evalItem.prob ? evalItem.prob.toFixed(1) : '-'}%</span>
+                  </div>
+                  <div className="flex justify-between text-slate-400">
+                    <span>Expected Value (EV):</span>
+                    <span className={`font-bold ${evalItem.expectedValuePct > 0 ? 'text-emerald-400' : 'text-slate-400'}`}>
+                      {evalItem.expectedValuePct > 0 ? `+${evalItem.expectedValuePct}%` : `${evalItem.expectedValuePct || 0}%`}
+                    </span>
+                  </div>
+                  <div className="flex justify-between text-slate-400">
+                    <span>Quarter-Kelly Stake:</span>
+                    <span className="text-amber-300 font-bold">
+                      {evalItem.quarterKelly || 0}% ({currencyCode} {Math.round(evalItem.stakeRec || 0).toLocaleString()})
+                    </span>
+                  </div>
+                </div>
+
+                {/* Log Position Action */}
+                <div className="pt-3 mt-3 border-t border-pitch-800">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (onLogPosition) {
+                        onLogPosition({
+                          id: `pos_${Date.now()}_${item.key}`,
+                          fixture: `${homeName} vs ${awayName}`,
+                          fixtureName: `${homeName} vs ${awayName}`,
+                          fixtureMatch: `${homeName} vs ${awayName}`,
+                          leagueName: leagueName,
+                          selection: evalItem.label,
+                          selectionLabel: evalItem.label,
+                          selectionName: evalItem.label,
+                          odds: evalItem.odds,
+                          stake: evalItem.stakeRec > 0 ? Math.round(evalItem.stakeRec) : Math.round(effectiveBankroll * 0.01),
+                          stakeAmount: evalItem.stakeRec > 0 ? Math.round(evalItem.stakeRec) : Math.round(effectiveBankroll * 0.01),
+                          modelProb: evalItem.prob,
+                          ev: evalItem.expectedValuePct,
+                          evPercent: evalItem.expectedValuePct,
+                          status: 'PENDING',
+                          loggedAt: new Date().toISOString(),
+                          notes: `Logged from Quant Lab (xG: ${customLambdaH.toFixed(2)} v ${customLambdaA.toFixed(2)})`
+                        })
+                      }
+                    }}
+                    className={`w-full py-1.5 px-3 rounded-lg text-xs font-semibold transition-all flex items-center justify-center gap-1.5 ${
+                      evalItem.hasEdge
+                        ? 'bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-300 border border-emerald-500/40'
+                        : 'bg-pitch-900 hover:bg-pitch-800 text-slate-400 border border-pitch-800'
+                    }`}
+                  >
+                    <span>⊞ Log to Portfolio</span>
+                  </button>
+                </div>
+              </div>
+            )
+          })}
         </div>
       </div>
     </div>
+  )
+}
+
+// Main QuantLab export with null guard and error boundary
+export default function QuantLab({
+  fixture,
+  selectedFixture,
+  allFixtures = [],
+  fixtures = [],
+  onSelectFixture,
+  standingsMap = {},
+  onLogPosition,
+  bankrollAmount = 1000000,
+  userBankroll = 1000000,
+  currencyCode = 'IDR',
+}) {
+  const matchPool = (allFixtures && allFixtures.length > 0) ? allFixtures : (fixtures || [])
+  const targetFixture = fixture || selectedFixture || (matchPool.length > 0 ? (
+    [...matchPool].filter(f => Boolean(f.value_pick)).sort((a,b) => (b.ev_percentage || 0) - (a.ev_percentage || 0))[0] || matchPool[0]
+  ) : null)
+
+  // Safe Null Guard at top of QuantLab
+  if (!targetFixture) {
+    return (
+      <div className="p-8 text-center text-zinc-500 font-mono text-sm bg-pitch-950/40 rounded-2xl border border-pitch-800 max-w-xl mx-auto my-12">
+        No fixture selected for Quant Lab.
+      </div>
+    )
+  }
+
+  return (
+    <QuantLabErrorBoundary
+      onReset={() => {
+        if (matchPool.length > 0 && onSelectFixture) {
+          onSelectFixture(matchPool[0])
+        }
+      }}
+    >
+      <QuantLabWorkspace
+        fixture={targetFixture}
+        matchPool={matchPool}
+        onSelectFixture={onSelectFixture}
+        standingsMap={standingsMap}
+        onLogPosition={onLogPosition}
+        effectiveBankroll={userBankroll || bankrollAmount || 1000000}
+        currencyCode={currencyCode}
+      />
+    </QuantLabErrorBoundary>
   )
 }
