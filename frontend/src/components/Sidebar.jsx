@@ -35,6 +35,8 @@ export default function Sidebar({
     ? lastUpdated.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' })
     : null
 
+  const isTierLocked = !subscriptionTier || subscriptionTier === 'free' || subscriptionTier === 'inactive'
+
   const handleInstall = async () => {
     if (!deferredInstall) return
     deferredInstall.prompt()
@@ -101,9 +103,11 @@ export default function Sidebar({
                 <span className="text-sm font-mono text-indigo-400">⚅</span>
                 Quant Lab
               </span>
-              <span className="text-[9px] font-mono uppercase px-1.5 py-0.5 rounded bg-pitch-900 text-indigo-300 border border-indigo-500/20">
-                PRO
-              </span>
+              {isTierLocked && (
+                <span className="text-[9px] font-mono uppercase px-1.5 py-0.5 rounded bg-pitch-900 text-indigo-300 border border-indigo-500/20">
+                  PRO
+                </span>
+              )}
             </button>
           </li>
           <li>

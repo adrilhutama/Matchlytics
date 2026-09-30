@@ -113,19 +113,43 @@ function runMonteCarloSimulation(lambdaHome, lambdaAway, iterations = 10000) {
 }
 
 export default function QuantLab({
-  fixtures = [],
+  fixture,
   selectedFixture,
+  allFixtures = [],
+  fixtures = [],
   onSelectFixture,
   standingsMap = {},
   onLogPosition,
-  bankrollAmount = 10000000,
+  bankrollAmount = 1000000,
+  userBankroll = 1000000,
   currencyCode = 'IDR',
 }) {
-  // Active fixture state (fallback to first available or default)
+  const effectiveBankroll = userBankroll || bankrollAmount || 1000000
+  const matchPool = useMemo(() => {
+    const list = (allFixtures && allFixtures.length > 0) ? allFixtures : fixtures
+    return list || []
+  }, [allFixtures, fixtures])
+
+  const initialTarget = selectedFixture || fixture
+
+  // Active fixture state (fallback to highest +EV match or first available)
   const activeMatch = useMemo(() => {
-    if (selectedFixture) return selectedFixture
-    return fixtures[0] || null
-  }, [selectedFixture, fixtures])
+    if (initialTarget) return initialTarget
+    if (matchPool.length > 0) {
+      const sortedByValue = [...matchPool]
+        .filter((f) => Boolean(f.value_pick))
+        .sort((a, b) => (b.ev_percentage || 0) - (a.ev_percentage || 0))
+      return sortedByValue[0] || matchPool[0]
+    }
+    return null
+  }, [initialTarget, matchPool])
+
+  // Sync back to parent if target was auto-selected
+  useEffect(() => {
+    if (!initialTarget && activeMatch && onSelectFixture) {
+      onSelectFixture(activeMatch)
+    }
+  }, [initialTarget, activeMatch, onSelectFixture])
 
   // Custom Lambda overrides
   const [customLambdaH, setCustomLambdaH] = useState(1.45)
@@ -180,7 +204,7 @@ export default function QuantLab({
       const rawKelly = getKellyFraction(item.odds, item.prob)
       // Quarter-Kelly with 2.5% safe cap
       const quarterKelly = Math.max(0, Math.min(2.5, Number((rawKelly * 0.25).toFixed(2))))
-      const stakeRec = (bankrollAmount * (quarterKelly / 100))
+      const stakeRec = (effectiveBankroll * (quarterKelly / 100))
 
       return {
         ...item,
@@ -191,7 +215,7 @@ export default function QuantLab({
         hasEdge: expectedValuePct >= 2.0 && expectedValuePct <= 35.0,
       }
     })
-  }, [matrixData, activeMarketOdds, bankrollAmount, activeMatch])
+  }, [matrixData, activeMarketOdds, effectiveBankroll, activeMatch])
 
   // Standings metadata for active match
   const homeStandings = activeMatch ? (standingsMap[activeMatch.home_team_id] || standingsMap[`${activeMatch.league_id}_${activeMatch.home_team_id}`] || null) : null
@@ -243,26 +267,33 @@ export default function QuantLab({
         </div>
 
         {/* Match Picker Selector */}
-        <div className="flex items-center gap-2">
-          <label htmlFor="quant-match-select" className="text-xs text-slate-400 font-mono whitespace-nowrap">
-            Switch Target:
-          </label>
-          <select
-            id="quant-match-select"
-            value={activeMatch.id}
-            onChange={(e) => {
-              const found = fixtures.find((f) => String(f.id) === e.target.value)
-              if (found) onSelectFixture(found)
-            }}
-            className="bg-pitch-950 border border-pitch-700 rounded-xl px-3 py-1.5 text-xs text-slate-200 focus:outline-none focus:ring-1 focus:ring-amber-500 font-sans max-w-[240px] truncate"
-          >
-            {fixtures.map((f) => (
-              <option key={f.id} value={f.id}>
-                {f.home_team_name} vs {f.away_team_name} ({f.league_name || 'League'})
-              </option>
-            ))}
-          </select>
-        </div>
+        {matchPool.length > 0 && (
+          <div className="flex items-center gap-2 w-full lg:w-auto">
+            <label htmlFor="quant-match-select" className="text-xs text-slate-400 font-mono whitespace-nowrap">
+              Switch Target:
+            </label>
+            <select
+              id="quant-match-select"
+              value={activeMatch ? activeMatch.id : ''}
+              onChange={(e) => {
+                const targetId = e.target.value
+                const found = matchPool.find((f) => String(f.id) === String(targetId))
+                if (found && onSelectFixture) onSelectFixture(found)
+              }}
+              className="bg-pitch-950 border border-pitch-700 hover:border-amber-500/50 rounded-xl px-3 py-1.5 text-xs text-slate-200 focus:outline-none focus:ring-1 focus:ring-amber-500 font-sans max-w-[280px] sm:max-w-[340px] truncate cursor-pointer transition-colors"
+            >
+              {matchPool.map((f) => {
+                const isVal = Boolean(f.value_pick)
+                const evTag = isVal ? ` ★ [+EV ${(f.ev_percentage || 0).toFixed(1)}%]` : ''
+                return (
+                  <option key={f.id} value={f.id}>
+                    {f.home_team_name} vs {f.away_team_name}{evTag} ({f.league_name || 'League'})
+                  </option>
+                )
+              })}
+            </select>
+          </div>
+        )}
       </div>
 
       {/* ---- Interactive Lambda Overrides & Sensitivity Strip ---- */}
@@ -580,7 +611,7 @@ export default function QuantLab({
             </p>
           </div>
           <div className="text-xs font-mono text-slate-400">
-            Active Bankroll: <strong className="text-amber-400">{currencyCode} {bankrollAmount.toLocaleString()}</strong>
+            Active Bankroll: <strong className="text-amber-400">{currencyCode} {effectiveBankroll.toLocaleString()}</strong>
           </div>
         </div>
 
@@ -663,7 +694,8 @@ export default function QuantLab({
                               selectionLabel: evalItem.label,
                               odds: evalItem.odds,
                               stakePercent: evalItem.quarterKelly || 1.0,
-                              stakeAmount: evalItem.stakeRec > 0 ? Math.round(evalItem.stakeRec) : Math.round(bankrollAmount * 0.01),
+                              stake: evalItem.stakeRec > 0 ? Math.round(evalItem.stakeRec) : Math.round(effectiveBankroll * 0.01),
+                              stakeAmount: evalItem.stakeRec > 0 ? Math.round(evalItem.stakeRec) : Math.round(effectiveBankroll * 0.01),
                               modelProb: evalItem.prob,
                               evPercentage: evalItem.expectedValuePct,
                             })

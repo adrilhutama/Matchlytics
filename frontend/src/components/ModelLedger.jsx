@@ -183,7 +183,7 @@ export default function ModelLedger({ settledFixtures = [] }) {
         <div className="p-4 rounded-2xl bg-pitch-900 border border-pitch-700/80 shadow-lg">
           <span className="text-[11px] text-slate-400 block mb-1">Win Rate (+EV Edges)</span>
           <p className="text-lg sm:text-xl font-bold text-amber-300 tabular-nums">
-            {activeStats ? `${activeStats.winRate}%` : '-'}
+            {activeStats && activeStats.winRate != null ? `${activeStats.winRate}%` : '0.0%'}
           </p>
           <span className="text-[10px] text-slate-500 mt-1 block">
             Theoretical baseline ~45-50%
@@ -195,12 +195,16 @@ export default function ModelLedger({ settledFixtures = [] }) {
           <p className={`text-lg sm:text-xl font-bold tabular-nums ${
             (activeStats?.flatPnl ?? 0) >= 0 ? 'text-emerald-400' : 'text-rose-400'
           }`}>
-            {(activeStats?.flatPnl ?? 0) >= 0 ? `+${activeStats?.flatPnl}u` : `${activeStats?.flatPnl}u`}
+            {activeStats && activeStats.flatPnl != null
+              ? (activeStats.flatPnl >= 0 ? `+${activeStats.flatPnl.toFixed(2)}u` : `${activeStats.flatPnl.toFixed(2)}u`)
+              : '+0.00u'}
           </p>
           <span className={`text-[10px] font-bold mt-1 inline-block ${
             (activeStats?.flatRoi ?? 0) >= 0 ? 'text-emerald-400' : 'text-rose-400'
           }`}>
-            {(activeStats?.flatRoi ?? 0) >= 0 ? `+${activeStats?.flatRoi}% Yield` : `${activeStats?.flatRoi}% Yield`}
+            {activeStats && activeStats.flatRoi != null
+              ? (activeStats.flatRoi >= 0 ? `+${activeStats.flatRoi.toFixed(1)}% Yield` : `${activeStats.flatRoi.toFixed(1)}% Yield`)
+              : '0.0% Yield'}
           </span>
         </div>
 

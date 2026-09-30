@@ -217,11 +217,13 @@ function AppInner() {
     setVisibleCount(24)
   }, [activeLeague, dateRange, searchQuery, valueOnly, showWatchlistOnly])
 
-  // Auto-select initial fixture for Quant Lab when fixtures load
+  // Auto-select initial fixture for Quant Lab prioritizing highest +EV match
   useEffect(() => {
     if (!selectedLabFixture && fixtures.length > 0) {
-      const valFix = fixtures.find((f) => Boolean(f.value_pick))
-      setSelectedLabFixture(valFix || fixtures[0])
+      const sortedByValue = [...fixtures]
+        .filter((f) => Boolean(f.value_pick))
+        .sort((a, b) => (b.ev_percentage || 0) - (a.ev_percentage || 0))
+      setSelectedLabFixture(sortedByValue[0] || fixtures[0])
     }
   }, [fixtures, selectedLabFixture])
 
@@ -332,6 +334,22 @@ function AppInner() {
     setActiveWorkspace('quant_lab')
     window.scrollTo({ top: 0, behavior: 'smooth' })
   }, [canAccessQuantFeatures, openUpgradeFor])
+
+  // Centralized workspace switcher with auto-selection
+  const handleSelectWorkspace = useCallback((ws) => {
+    if ((ws === 'quant_lab' || ws === 'portfolio') && !canAccessQuantFeatures) {
+      openUpgradeFor(`${ws === 'quant_lab' ? 'Quant Lab' : 'Portfolio Tracker'} requires a Pro pass`)
+      return
+    }
+    if (ws === 'quant_lab' && !selectedLabFixture && fixtures.length > 0) {
+      const sortedByValue = [...fixtures]
+        .filter((f) => Boolean(f.value_pick))
+        .sort((a, b) => (b.ev_percentage || 0) - (a.ev_percentage || 0))
+      setSelectedLabFixture(sortedByValue[0] || fixtures[0])
+    }
+    setActiveWorkspace(ws)
+    window.scrollTo({ top: 0, behavior: 'smooth' })
+  }, [canAccessQuantFeatures, selectedLabFixture, fixtures, openUpgradeFor])
 
   // Data fetching: Standings
   const fetchStandings = useCallback(async () => {
@@ -579,13 +597,7 @@ function AppInner() {
         onSelectFixture={(f) => {
           handleSelectForLab(f)
         }}
-        onSelectWorkspace={(ws) => {
-          if ((ws === 'quant_lab' || ws === 'portfolio') && !canAccessQuantFeatures) {
-            openUpgradeFor(`${ws === 'quant_lab' ? 'Quant Lab' : 'Portfolio Tracker'} requires a Pro pass`)
-            return
-          }
-          setActiveWorkspace(ws)
-        }}
+        onSelectWorkspace={handleSelectWorkspace}
         onFilterLeague={(leagueId) => {
           setActiveLeague(leagueId)
           setShowWatchlistOnly(false)
@@ -662,14 +674,7 @@ function AppInner() {
         subscriptionTier={profile?.subscription_tier}
         onSignOut={signOut}
         activeWorkspace={activeWorkspace}
-        onSelectWorkspace={(ws) => {
-          if ((ws === 'quant_lab' || ws === 'portfolio') && !canAccessQuantFeatures) {
-            openUpgradeFor(`${ws === 'quant_lab' ? 'Quant Lab' : 'Portfolio Tracker'} requires a Pro pass`)
-            return
-          }
-          setActiveWorkspace(ws)
-          window.scrollTo({ top: 0, behavior: 'smooth' })
-        }}
+        onSelectWorkspace={handleSelectWorkspace}
       />
 
       {/* Main Content Area */}
@@ -728,17 +733,13 @@ function AppInner() {
         {/* Multi-Workspace Top Sub-Nav Switcher */}
         <WorkspaceNav
           activeWorkspace={activeWorkspace}
-          onWorkspaceChange={(ws) => {
-            if ((ws === 'quant_lab' || ws === 'portfolio') && !canAccessQuantFeatures) {
-              openUpgradeFor(`${ws === 'quant_lab' ? 'Quant Lab' : 'Portfolio Tracker'} requires a Pro pass`)
-              return
-            }
-            setActiveWorkspace(ws)
-            window.scrollTo({ top: 0, behavior: 'smooth' })
-          }}
+          onWorkspaceChange={handleSelectWorkspace}
+          onSelectWorkspace={handleSelectWorkspace}
           activeFixtureCount={displayedFixtures.length}
           valueCount={valueCount}
+          valueBetCount={valueCount}
           portfolioCount={portfolioPositions.length}
+          selectedLabFixture={selectedLabFixture}
           onOpenCommandPalette={() => setIsCommandPaletteOpen(true)}
           tier={tier}
         />
@@ -922,12 +923,15 @@ function AppInner() {
           {/* Workspace 2: Quant Lab (Single Match Deep-Dive) */}
           {activeWorkspace === 'quant_lab' && (
             <QuantLab
-              fixture={selectedLabFixture || displayedFixtures[0]}
+              fixture={selectedLabFixture}
+              selectedFixture={selectedLabFixture}
               allFixtures={fixtures}
+              fixtures={fixtures}
               onSelectFixture={setSelectedLabFixture}
               standingsMap={standingsMap}
               onLogPosition={handleLogPosition}
               userBankroll={bankrollAmount}
+              bankrollAmount={bankrollAmount}
             />
           )}
 

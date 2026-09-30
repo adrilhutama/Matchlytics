@@ -1,16 +1,24 @@
 // ---- WorkspaceNav.jsx ----
 // Multi-Tab Workspace Navigation Bar
 // Top sub-nav switching between Terminal Scanner, Quant Lab, Portfolio Tracker, and Model Ledger.
+// Zero em dash characters (R-02 compliance)
 
 export default function WorkspaceNav({
-  activeWorkspace,
+  activeWorkspace = 'terminal',
+  onWorkspaceChange,
   onSelectWorkspace,
   onOpenCommandPalette,
   activeFixtureCount = 0,
   valueBetCount = 0,
+  valueCount = 0,
   portfolioCount = 0,
   selectedLabFixture = null,
+  tier = 'free',
 }) {
+  const handleSwitch = onWorkspaceChange || onSelectWorkspace
+  const effectiveValueCount = valueBetCount || valueCount || 0
+  const isTierLocked = !tier || tier === 'free' || tier === 'inactive'
+
   const workspaces = [
     {
       id: 'terminal',
@@ -18,14 +26,19 @@ export default function WorkspaceNav({
       icon: '◈',
       badge: `${activeFixtureCount} Matches`,
       badgeColor: 'text-slate-400 bg-pitch-900 border-pitch-700',
-      highlightBadge: valueBetCount > 0 ? `${valueBetCount} +EV` : null,
+      highlightBadge: effectiveValueCount > 0 ? `${effectiveValueCount} +EV` : null,
     },
     {
       id: 'quant_lab',
       label: 'Quant Lab',
       icon: '⚅',
-      badge: selectedLabFixture ? `${selectedLabFixture.home_team_name.split(' ')[0]} v ${selectedLabFixture.away_team_name.split(' ')[0]}` : 'Single-Match Lab',
-      badgeColor: selectedLabFixture ? 'text-amber-300 bg-amber-500/10 border-amber-500/30' : 'text-slate-500 bg-pitch-900 border-pitch-800',
+      badge: selectedLabFixture
+        ? `${(selectedLabFixture.home_team_name || 'Home').split(' ')[0]} v ${(selectedLabFixture.away_team_name || 'Away').split(' ')[0]}`
+        : 'Single-Match Lab',
+      badgeColor: selectedLabFixture
+        ? 'text-indigo-300 bg-indigo-500/10 border-indigo-500/30'
+        : 'text-slate-500 bg-pitch-900 border-pitch-800',
+      showLockBadge: isTierLocked,
     },
     {
       id: 'portfolio',
@@ -54,7 +67,7 @@ export default function WorkspaceNav({
               <button
                 key={ws.id}
                 type="button"
-                onClick={() => onSelectWorkspace(ws.id)}
+                onClick={() => handleSwitch && handleSwitch(ws.id)}
                 className={`min-h-[40px] px-3 sm:px-3.5 py-1.5 rounded-xl text-xs font-semibold transition-all flex items-center gap-2 border flex-shrink-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500 ${
                   isActive
                     ? 'bg-pitch-800/90 text-amber-300 border-amber-500/40 shadow-sm shadow-amber-500/5'
@@ -63,11 +76,22 @@ export default function WorkspaceNav({
               >
                 <span className="text-sm">{ws.icon}</span>
                 <span>{ws.label}</span>
-                {ws.badge && (
+
+                {/* Show PRO Lock badge ONLY when tier is free or inactive */}
+                {ws.id === 'quant_lab' && ws.showLockBadge && (
+                  <span className="px-1.5 py-0.5 rounded text-[9px] font-mono font-bold uppercase bg-pitch-900 text-indigo-300 border border-indigo-500/30">
+                    🔒 PRO
+                  </span>
+                )}
+
+                {/* Show fixture / status badge when not locked */}
+                {(!ws.showLockBadge && ws.badge) && (
                   <span className={`hidden md:inline-block px-1.5 py-0.5 rounded text-[10px] font-mono border ${ws.badgeColor}`}>
                     {ws.badge}
                   </span>
                 )}
+
+                {/* Highlight +EV opportunities */}
                 {ws.highlightBadge && (
                   <span className="px-1.5 py-0.5 rounded text-[10px] font-mono font-bold bg-amber-500/20 text-amber-300 border border-amber-500/30">
                     {ws.highlightBadge}
