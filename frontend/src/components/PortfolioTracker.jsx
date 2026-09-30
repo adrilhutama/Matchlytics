@@ -261,6 +261,29 @@ export default function PortfolioTracker({
                   const selectionText = pos.selection || pos.selectionLabel || pos.selectionName || pos.pick || 'Custom Selection'
                   const dateStr = pos.date || (pos.loggedAt ? new Date(pos.loggedAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : 'Today')
 
+                  // Multi-leg parlay legs breakdown
+                  const hasLegsArray = Array.isArray(pos.legs) && pos.legs.length > 0
+                  const hasPlusDelimiter = typeof selectionText === 'string' && selectionText.includes(' + ')
+                  const isMultiLeg = hasLegsArray || hasPlusDelimiter
+
+                  const parsedLegs = hasLegsArray
+                    ? pos.legs.map((l) => ({
+                        fixture: l.matchName || (l.homeTeam ? `${l.homeTeam} vs ${l.awayTeam}` : ''),
+                        pick: l.target || l.selection || l.pickLabel || l.pick || 'Pick',
+                        odds: l.odds ? Number(l.odds).toFixed(2) : '',
+                      }))
+                    : hasPlusDelimiter
+                    ? selectionText.split(' + ').map((s) => {
+                        const trimmed = s.trim()
+                        const parts = trimmed.split(' @')
+                        return {
+                          fixture: '',
+                          pick: parts[0] || trimmed,
+                          odds: parts[1] || '',
+                        }
+                      })
+                    : []
+
                   let pnlStr = '-'
                   let pnlColor = 'text-slate-500'
 
@@ -291,15 +314,36 @@ export default function PortfolioTracker({
                           </span>
                         </div>
                       </td>
-                      <td className="py-3 px-3 text-amber-300 font-semibold max-w-[220px]">
-                        <span className="block truncate" title={selectionText}>
-                          {selectionText}
-                        </span>
+                      <td className="py-3 px-3">
+                        {isMultiLeg && parsedLegs.length > 0 ? (
+                          <div className="flex flex-col gap-1.5 py-0.5">
+                            <div className="flex flex-wrap gap-1 max-w-[340px]">
+                              {parsedLegs.map((leg, lIdx) => (
+                                <span
+                                  key={lIdx}
+                                  className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-mono bg-pitch-950 text-slate-200 border border-pitch-700/80 shadow-sm"
+                                >
+                                  <span className="text-amber-300 font-semibold">{leg.pick}</span>
+                                  {leg.odds && <span className="text-slate-400">@{leg.odds}</span>}
+                                  {leg.fixture && (
+                                    <span className="text-slate-500 text-[9px] truncate max-w-[120px]">
+                                      ({leg.fixture})
+                                    </span>
+                                  )}
+                                </span>
+                              ))}
+                            </div>
+                          </div>
+                        ) : (
+                          <span className="text-amber-300 font-semibold block truncate max-w-[220px]" title={selectionText}>
+                            {selectionText}
+                          </span>
+                        )}
                       </td>
-                      <td className="py-3 px-3 text-center text-slate-200 font-bold">
+                      <td className="py-3 px-3 text-center text-slate-200 font-bold font-mono">
                         {odds.toFixed(2)}
                       </td>
-                      <td className="py-3 px-3 text-center text-slate-300 whitespace-nowrap">
+                      <td className="py-3 px-3 text-center text-slate-300 whitespace-nowrap font-mono">
                         {currencyCode} {Math.round(stake).toLocaleString()}
                       </td>
                       <td className="py-3 px-3 text-center">
@@ -315,46 +359,55 @@ export default function PortfolioTracker({
                           {pos.status}
                         </span>
                       </td>
-                      <td className={`py-3 px-3 text-center whitespace-nowrap ${pnlColor}`}>
+                      <td className={`py-3 px-3 text-center whitespace-nowrap font-mono ${pnlColor}`}>
                         {pnlStr}
                       </td>
-                      <td className="py-3 px-3 text-right">
+                      <td className="py-3 px-3 text-right whitespace-nowrap">
                         <div className="flex items-center justify-end gap-1.5">
-                          {pos.status === 'PENDING' && (
-                            <>
+                          {pos.status === 'PENDING' ? (
+                            <div className="inline-flex items-center gap-1 bg-pitch-950/80 p-1 rounded-xl border border-pitch-800">
                               <button
                                 type="button"
                                 onClick={() => handleUpdate && handleUpdate(pos.id, 'WON')}
-                                className="px-2 py-0.5 rounded bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 text-[10px]"
-                                title="Mark position as won"
+                                className="px-2.5 py-1 rounded-lg bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-300 border border-emerald-500/40 text-[11px] font-bold transition-all shadow-sm active:scale-95 flex items-center gap-1"
+                                title="Mark position as won (realize profit)"
                               >
-                                Win
+                                <span>✓</span>
+                                <span>Won</span>
                               </button>
                               <button
                                 type="button"
                                 onClick={() => handleUpdate && handleUpdate(pos.id, 'LOST')}
-                                className="px-2 py-0.5 rounded bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 border border-rose-500/30 text-[10px]"
+                                className="px-2.5 py-1 rounded-lg bg-rose-500/20 hover:bg-rose-500/30 text-rose-300 border border-rose-500/40 text-[11px] font-bold transition-all shadow-sm active:scale-95 flex items-center gap-1"
                                 title="Mark position as lost"
                               >
-                                Loss
+                                <span>✗</span>
+                                <span>Lost</span>
                               </button>
                               <button
                                 type="button"
                                 onClick={() => handleUpdate && handleUpdate(pos.id, 'VOID')}
-                                className="px-1.5 py-0.5 rounded bg-pitch-950 hover:bg-pitch-800 text-slate-400 border border-pitch-700 text-[10px]"
-                                title="Mark void"
+                                className="px-2 py-1 rounded-lg bg-pitch-900 hover:bg-pitch-800 text-slate-400 hover:text-slate-200 border border-pitch-700 text-[11px] font-semibold transition-all active:scale-95"
+                                title="Mark position as void (refund stake)"
                               >
-                                V
+                                Void
                               </button>
-                            </>
+                            </div>
+                          ) : (
+                            <span className="text-[10px] font-mono text-slate-500 uppercase px-2 py-1 rounded-lg bg-pitch-950 border border-pitch-800">
+                              Settled
+                            </span>
                           )}
                           <button
                             type="button"
-                            onClick={() => onDeletePosition(pos.id)}
-                            className="p-1 rounded text-slate-600 hover:text-rose-400 transition-colors"
+                            onClick={() => onDeletePosition && onDeletePosition(pos.id)}
+                            className="p-1.5 rounded-lg text-slate-500 hover:text-rose-400 hover:bg-pitch-900 transition-colors ml-1"
                             title="Delete entry"
                           >
-                            ×
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                              <line x1="18" y1="6" x2="6" y2="18" />
+                              <line x1="6" y1="6" x2="18" y2="18" />
+                            </svg>
                           </button>
                         </div>
                       </td>

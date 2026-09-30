@@ -10,6 +10,13 @@ import React, { Component, useState, useMemo, useEffect } from 'react'
 import { computePoissonMatrix, calculateZeroVigOdds, calculateEdgeAndEV, getKellyFraction } from '../utils/analytics'
 import FormGuide from './FormGuide'
 
+// Parse decimal odds supporting both dot and comma notation
+function parseOddsInput(val) {
+  if (val == null) return 0
+  const parsedOdd = parseFloat(String(val).replace(',', '.'))
+  return Number.isFinite(parsedOdd) && parsedOdd > 1 ? parsedOdd : 0
+}
+
 // Safe clamp for expected goals lambda parameter
 function safeClampLambda(val, fallback = 1.35) {
   const num = Number(val)
@@ -238,9 +245,9 @@ function QuantLabWorkspace({
   // Odds & Zero-Vig consensus calculations
   const zeroVig = useMemo(() => {
     return calculateZeroVigOdds(
-      parseFloat(activeMarketOdds.home) || 0,
-      parseFloat(activeMarketOdds.draw) || 0,
-      parseFloat(activeMarketOdds.away) || 0
+      parseOddsInput(activeMarketOdds.home),
+      parseOddsInput(activeMarketOdds.draw),
+      parseOddsInput(activeMarketOdds.away)
     )
   }, [activeMarketOdds])
 
@@ -252,17 +259,21 @@ function QuantLabWorkspace({
   const leagueName = fixture.league_name || fixture.league || 'League'
   const matchDate = fixture.match_date || fixture.date
 
-  // Calculate Edge & Kelly for each 1X2 outcome
+  // Calculate Edge & Kelly for each 1X2 outcome (with comma decimal support)
   const valueEvaluations = useMemo(() => {
     if (!matrixData) return []
+    const parsedH = parseOddsInput(activeMarketOdds.home)
+    const parsedD = parseOddsInput(activeMarketOdds.draw)
+    const parsedA = parseOddsInput(activeMarketOdds.away)
+
     const outcomes = [
-      { key: 'HOME', label: `${homeName} Win`, prob: matrixData.sumHomeWin || 0, odds: parseFloat(activeMarketOdds.home) || 0 },
-      { key: 'DRAW', label: 'Draw (X)', prob: matrixData.sumDraw || 0, odds: parseFloat(activeMarketOdds.draw) || 0 },
-      { key: 'AWAY', label: `${awayName} Win`, prob: matrixData.sumAwayWin || 0, odds: parseFloat(activeMarketOdds.away) || 0 },
+      { key: 'HOME', label: `${homeName} Win`, prob: matrixData.sumHomeWin || 0, odds: parsedH, rawInput: activeMarketOdds.home },
+      { key: 'DRAW', label: 'Draw (X)', prob: matrixData.sumDraw || 0, odds: parsedD, rawInput: activeMarketOdds.draw },
+      { key: 'AWAY', label: `${awayName} Win`, prob: matrixData.sumAwayWin || 0, odds: parsedA, rawInput: activeMarketOdds.away },
     ]
 
     return outcomes.map((item) => {
-      const { netEdge, expectedValuePct } = calculateEdgeAndEV(item.odds, item.prob)
+      const { netEdge, evPercent } = calculateEdgeAndEV(item.odds, item.prob)
       const rawKelly = getKellyFraction(item.odds, item.prob)
       // Quarter-Kelly with 2.5% safe cap
       const quarterKelly = Math.max(0, Math.min(2.5, Number((rawKelly * 0.25).toFixed(2))))
@@ -271,10 +282,10 @@ function QuantLabWorkspace({
       return {
         ...item,
         netEdge,
-        expectedValuePct,
+        expectedValuePct: evPercent,
         quarterKelly,
         stakeRec,
-        hasEdge: expectedValuePct >= 2.0 && expectedValuePct <= 35.0,
+        hasEdge: evPercent >= 2.0,
       }
     })
   }, [matrixData, activeMarketOdds, effectiveBankroll, homeName, awayName])
@@ -490,26 +501,28 @@ function QuantLabWorkspace({
             <table className="w-full text-center border-collapse text-xs font-mono select-none">
               <thead>
                 <tr>
-                  <th className="p-1.5 text-slate-600 text-[10px]">H \ A</th>
-                  {[0, 1, 2, 3, 4, 5].map((g) => (
-                    <th key={g} className="p-1.5 font-bold text-rose-400 text-xs">
-                      {g}
+                  <th className="p-1.5 text-slate-500 text-[10px]" title="Away (row) \ Home (col)">A \ H</th>
+                  {[0, 1, 2, 3, 4, 5].map((h) => (
+                    <th key={h} className="p-1.5 font-bold text-sky-400 text-xs">
+                      {h}
                     </th>
                   ))}
                 </tr>
               </thead>
               <tbody>
-                {(matrixData?.matrix || []).map((row, homeGoals) => (
-                  <tr key={homeGoals}>
-                    <th className="p-1.5 font-bold text-sky-400 text-xs">
-                      {homeGoals}
+                {(matrixData?.matrix || []).map((row, awayGoals) => (
+                  <tr key={awayGoals}>
+                    <th className="p-1.5 font-bold text-rose-400 text-xs">
+                      {awayGoals}
                     </th>
                     {row.map((cell) => {
-                      const isMostProb = homeGoals === matrixData?.mostProbable?.home && cell.away === matrixData?.mostProbable?.away
+                      const h = cell.home
+                      const a = cell.away
+                      const isMostProb = h === matrixData?.mostProbable?.home && a === matrixData?.mostProbable?.away
                       const alpha = Math.min(1, Math.max(0.08, (cell.prob / (matrixData?.maxProb || 1)) * 0.95))
-                      const isHomeFav = homeGoals > cell.away
-                      const isAwayFav = cell.away > homeGoals
-                      const isDraw = homeGoals === cell.away
+                      const isHomeFav = h > a
+                      const isAwayFav = a > h
+                      const isDraw = h === a
 
                       let bgStyle = `rgba(51, 65, 85, ${alpha})`
                       if (isHomeFav) bgStyle = `rgba(14, 165, 233, ${alpha})`
@@ -518,9 +531,9 @@ function QuantLabWorkspace({
 
                       return (
                         <td
-                          key={cell.away}
+                          key={h}
                           className="p-1.5 transition-transform hover:scale-105"
-                          title={`${homeGoals}-${cell.away}: ${cell.prob.toFixed(2)}%`}
+                          title={`${h}-${a}: ${cell.prob.toFixed(2)}%`}
                         >
                           <div
                             style={{ backgroundColor: bgStyle }}
@@ -531,8 +544,8 @@ function QuantLabWorkspace({
                             <span className="text-[11px] font-bold text-slate-100">
                               {cell.prob.toFixed(1)}%
                             </span>
-                            <span className="text-[9px] text-slate-400">
-                              {homeGoals}-{cell.away}
+                            <span className="text-[9px] text-slate-400 font-semibold">
+                              {h}-{a}
                             </span>
                           </div>
                         </td>
@@ -711,12 +724,16 @@ function QuantLabWorkspace({
                       Market Odds
                     </label>
                     <input
-                      type="number"
-                      step="0.01"
-                      min="1.01"
-                      max="50.0"
+                      type="text"
+                      inputMode="decimal"
+                      placeholder="e.g. 2.10 or 15,5"
                       value={activeMarketOdds[item.key]}
-                      onChange={(e) => setActiveMarketOdds({ ...activeMarketOdds, [item.key]: e.target.value })}
+                      onChange={(e) => {
+                        const val = e.target.value
+                        if (/^[0-9.,]*$/.test(val)) {
+                          setActiveMarketOdds((prev) => ({ ...prev, [item.key]: val }))
+                        }
+                      }}
                       className="w-full bg-pitch-900 border border-pitch-700 rounded-lg px-2.5 py-1.5 text-sm font-mono font-bold text-slate-100 focus:outline-none focus:ring-1 focus:ring-amber-500"
                     />
                   </div>
@@ -739,7 +756,7 @@ function QuantLabWorkspace({
                   <div className="flex justify-between text-slate-400">
                     <span>Expected Value (EV):</span>
                     <span className={`font-bold ${evalItem.expectedValuePct > 0 ? 'text-emerald-400' : 'text-slate-400'}`}>
-                      {evalItem.expectedValuePct > 0 ? `+${evalItem.expectedValuePct}%` : `${evalItem.expectedValuePct || 0}%`}
+                      {evalItem.expectedValuePct > 0 ? `+${evalItem.expectedValuePct.toFixed(1)}%` : `${(evalItem.expectedValuePct || 0).toFixed(1)}%`}
                     </span>
                   </div>
                   <div className="flex justify-between text-slate-400">
