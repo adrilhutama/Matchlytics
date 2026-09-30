@@ -1,0 +1,470 @@
+// ---- PortfolioTracker.jsx ----
+// Bankroll & Bet Tracker (Portfolio Journal)
+// Tracks positions, bankroll equity progression, ROI, win rate, and Quarter-Kelly staking.
+// Backed by persistent localStorage.
+
+import { useState, useMemo } from 'react'
+
+export default function PortfolioTracker({
+  positions = [],
+  onUpdatePositionStatus,
+  onDeletePosition,
+  onAddManualPosition,
+  bankrollAmount = 10000000,
+  onUpdateBankroll,
+  currencyCode = 'IDR',
+}) {
+  const [filterStatus, setFilterStatus] = useState('ALL')
+  const [showAddModal, setShowAddModal] = useState(false)
+  const [newPos, setNewPos] = useState({
+    fixtureName: '',
+    leagueName: 'Premier League',
+    selectionLabel: 'Home Win',
+    odds: '2.10',
+    stakeAmount: '250000',
+    notes: '',
+  })
+
+  // Portfolio calculations
+  const stats = useMemo(() => {
+    let totalInvested = 0
+    let totalReturned = 0
+    let wins = 0
+    let losses = 0
+    let voids = 0
+    let pending = 0
+    let pendingExposure = 0
+
+    positions.forEach((pos) => {
+      const stake = Number(pos.stakeAmount) || 0
+      const odds = Number(pos.odds) || 1.0
+
+      if (pos.status === 'WON') {
+        wins += 1
+        totalInvested += stake
+        totalReturned += stake * odds
+      } else if (pos.status === 'LOST') {
+        losses += 1
+        totalInvested += stake
+      } else if (pos.status === 'VOID') {
+        voids += 1
+        totalInvested += stake
+        totalReturned += stake
+      } else {
+        pending += 1
+        pendingExposure += stake
+      }
+    })
+
+    const settledCount = wins + losses
+    const netPnl = totalReturned - totalInvested
+    const currentEquity = bankrollAmount + netPnl - pendingExposure
+    const roiPct = totalInvested > 0 ? Number(((netPnl / totalInvested) * 100).toFixed(1)) : 0.0
+    const winRate = settledCount > 0 ? Number(((wins / settledCount) * 100).toFixed(1)) : 0.0
+
+    return {
+      totalInvested,
+      totalReturned,
+      netPnl,
+      currentEquity,
+      roiPct,
+      winRate,
+      wins,
+      losses,
+      voids,
+      pending,
+      pendingExposure,
+      totalPositions: positions.length,
+    }
+  }, [positions, bankrollAmount])
+
+  // Filtered positions
+  const filteredPositions = useMemo(() => {
+    if (filterStatus === 'ALL') return positions
+    return positions.filter((p) => p.status === filterStatus)
+  }, [positions, filterStatus])
+
+  const handleManualSubmit = (e) => {
+    e.preventDefault()
+    if (!newPos.fixtureName) return
+    onAddManualPosition({
+      id: `manual_${Date.now()}`,
+      fixtureName: newPos.fixtureName,
+      leagueName: newPos.leagueName,
+      matchDate: new Date().toISOString(),
+      selectionLabel: newPos.selectionLabel,
+      odds: parseFloat(newPos.odds) || 2.0,
+      stakeAmount: parseFloat(newPos.stakeAmount) || 100000,
+      status: 'PENDING',
+      notes: newPos.notes,
+      loggedAt: new Date().toISOString(),
+    })
+    setNewPos({
+      fixtureName: '',
+      leagueName: 'Premier League',
+      selectionLabel: 'Home Win',
+      odds: '2.10',
+      stakeAmount: '250000',
+      notes: '',
+    })
+    setShowAddModal(false)
+  }
+
+  return (
+    <div className="space-y-6 animate-fade-in max-w-7xl mx-auto">
+      {/* ---- Top KPI Cards ---- */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4 font-mono">
+        {/* Current Bankroll / Equity */}
+        <div className="p-4 rounded-2xl bg-pitch-900 border border-pitch-700/80 shadow-lg">
+          <div className="flex items-center justify-between text-[11px] text-slate-400 mb-1">
+            <span>Portfolio Equity</span>
+            <button
+              type="button"
+              onClick={() => {
+                const val = prompt('Set Initial Bankroll Amount:', String(bankrollAmount))
+                if (val && !isNaN(val)) onUpdateBankroll(Number(val))
+              }}
+              className="text-[10px] text-amber-400 hover:underline"
+            >
+              Edit Base
+            </button>
+          </div>
+          <p className="text-lg sm:text-xl font-bold text-slate-100 tabular-nums">
+            {currencyCode} {Math.round(stats.currentEquity).toLocaleString()}
+          </p>
+          <span className="text-[10px] text-slate-500 mt-1 block">
+            Base: {currencyCode} {bankrollAmount.toLocaleString()}
+          </span>
+        </div>
+
+        {/* Net Profit & Loss */}
+        <div className="p-4 rounded-2xl bg-pitch-900 border border-pitch-700/80 shadow-lg">
+          <span className="text-[11px] text-slate-400 block mb-1">
+            Net Realized P&L
+          </span>
+          <p className={`text-lg sm:text-xl font-bold tabular-nums ${
+            stats.netPnl >= 0 ? 'text-emerald-400' : 'text-rose-400'
+          }`}>
+            {stats.netPnl >= 0 ? `+${currencyCode} ` : `-${currencyCode} `}
+            {Math.abs(Math.round(stats.netPnl)).toLocaleString()}
+          </p>
+          <span className={`text-[10px] font-bold mt-1 inline-block ${stats.roiPct >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
+            {stats.roiPct >= 0 ? `+${stats.roiPct}% ROI` : `${stats.roiPct}% ROI`}
+          </span>
+        </div>
+
+        {/* Win Rate on Settled Picks */}
+        <div className="p-4 rounded-2xl bg-pitch-900 border border-pitch-700/80 shadow-lg">
+          <span className="text-[11px] text-slate-400 block mb-1">
+            Settled Win Rate
+          </span>
+          <p className="text-lg sm:text-xl font-bold text-slate-100 tabular-nums">
+            {stats.winRate}%
+          </p>
+          <span className="text-[10px] text-slate-400 mt-1 block">
+            {stats.wins}W / {stats.losses}L {stats.voids > 0 ? `(${stats.voids}V)` : ''}
+          </span>
+        </div>
+
+        {/* Active Market Exposure */}
+        <div className="p-4 rounded-2xl bg-pitch-900 border border-pitch-700/80 shadow-lg">
+          <span className="text-[11px] text-slate-400 block mb-1">
+            Active Exposure
+          </span>
+          <p className="text-lg sm:text-xl font-bold text-amber-400 tabular-nums">
+            {currencyCode} {Math.round(stats.pendingExposure).toLocaleString()}
+          </p>
+          <span className="text-[10px] text-slate-400 mt-1 block">
+            {stats.pending} Pending Position(s)
+          </span>
+        </div>
+      </div>
+
+      {/* ---- Actions & Filter Bar ---- */}
+      <div className="p-4 rounded-2xl bg-pitch-900 border border-pitch-700/80 shadow-lg flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+        <div className="flex items-center gap-1.5 overflow-x-auto text-xs font-mono">
+          {['ALL', 'PENDING', 'WON', 'LOST', 'VOID'].map((st) => (
+            <button
+              key={st}
+              type="button"
+              onClick={() => setFilterStatus(st)}
+              className={`px-3 py-1.5 rounded-lg border transition-colors ${
+                filterStatus === st
+                  ? 'bg-amber-500/20 text-amber-300 border-amber-500/40 font-bold'
+                  : 'bg-pitch-950 text-slate-400 border-pitch-800 hover:text-slate-200'
+              }`}
+            >
+              {st}
+            </button>
+          ))}
+        </div>
+
+        <button
+          type="button"
+          onClick={() => setShowAddModal(true)}
+          className="min-h-[38px] px-3.5 py-1.5 rounded-xl bg-amber-500 text-pitch-950 font-bold text-xs hover:bg-amber-400 transition-colors flex items-center justify-center gap-1.5 shadow"
+        >
+          <span>+</span>
+          <span>Manual Entry</span>
+        </button>
+      </div>
+
+      {/* ---- Positions Ledger Table ---- */}
+      <div className="p-4 sm:p-5 rounded-2xl bg-pitch-900 border border-pitch-700/80 shadow-xl overflow-hidden">
+        <div className="flex items-center justify-between border-b border-pitch-800 pb-3 mb-3">
+          <div>
+            <h3 className="text-sm font-bold text-slate-100">
+              Logged Portfolio Positions
+            </h3>
+            <p className="text-[11px] font-mono text-slate-400">
+              Quarter-Kelly verified active and historical positions
+            </p>
+          </div>
+          <span className="text-xs font-mono text-slate-400">
+            {filteredPositions.length} item(s)
+          </span>
+        </div>
+
+        {filteredPositions.length === 0 ? (
+          <div className="py-16 text-center text-slate-500 text-xs font-mono space-y-2">
+            <p>No positions recorded under status "{filterStatus}".</p>
+            <p className="text-[11px] text-slate-600">
+              Log edges directly from the Terminal scanner or Quant Lab.
+            </p>
+          </div>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full text-left border-collapse text-xs font-mono">
+              <thead>
+                <tr className="border-b border-pitch-800 text-[11px] uppercase tracking-wider text-slate-400">
+                  <th className="py-2.5 px-3">Date</th>
+                  <th className="py-2.5 px-3">Fixture</th>
+                  <th className="py-2.5 px-3">Selection</th>
+                  <th className="py-2.5 px-3 text-center">Odds</th>
+                  <th className="py-2.5 px-3 text-center">Stake</th>
+                  <th className="py-2.5 px-3 text-center">Status</th>
+                  <th className="py-2.5 px-3 text-center">P&L</th>
+                  <th className="py-2.5 px-3 text-right">Quick Settle</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-pitch-800/60">
+                {filteredPositions.map((pos) => {
+                  const stake = Number(pos.stakeAmount) || 0
+                  const odds = Number(pos.odds) || 1.0
+                  let pnlStr = '-'
+                  let pnlColor = 'text-slate-500'
+
+                  if (pos.status === 'WON') {
+                    const profit = stake * (odds - 1)
+                    pnlStr = `+${currencyCode} ${Math.round(profit).toLocaleString()}`
+                    pnlColor = 'text-emerald-400 font-bold'
+                  } else if (pos.status === 'LOST') {
+                    pnlStr = `-${currencyCode} ${Math.round(stake).toLocaleString()}`
+                    pnlColor = 'text-rose-400 font-bold'
+                  } else if (pos.status === 'VOID') {
+                    pnlStr = '0 (Refund)'
+                    pnlColor = 'text-slate-400'
+                  }
+
+                  return (
+                    <tr key={pos.id} className="hover:bg-pitch-800/40 transition-colors">
+                      <td className="py-3 px-3 text-slate-400 text-[11px] whitespace-nowrap">
+                        {pos.loggedAt ? new Date(pos.loggedAt).toLocaleDateString(undefined, { month: 'short', day: 'numeric' }) : 'Today'}
+                      </td>
+                      <td className="py-3 px-3 font-semibold text-slate-200">
+                        <div>
+                          <span className="block truncate max-w-[200px]">{pos.fixtureName}</span>
+                          <span className="text-[10px] text-slate-500">{pos.leagueName}</span>
+                        </div>
+                      </td>
+                      <td className="py-3 px-3 text-amber-300 font-semibold">
+                        {pos.selectionLabel}
+                      </td>
+                      <td className="py-3 px-3 text-center text-slate-200 font-bold">
+                        {odds.toFixed(2)}
+                      </td>
+                      <td className="py-3 px-3 text-center text-slate-300 whitespace-nowrap">
+                        {currencyCode} {Math.round(stake).toLocaleString()}
+                      </td>
+                      <td className="py-3 px-3 text-center">
+                        <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${
+                          pos.status === 'WON'
+                            ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'
+                            : pos.status === 'LOST'
+                            ? 'bg-rose-500/20 text-rose-400 border border-rose-500/30'
+                            : pos.status === 'VOID'
+                            ? 'bg-slate-700 text-slate-300'
+                            : 'bg-amber-500/10 text-amber-300 border border-amber-500/20'
+                        }`}>
+                          {pos.status}
+                        </span>
+                      </td>
+                      <td className={`py-3 px-3 text-center whitespace-nowrap ${pnlColor}`}>
+                        {pnlStr}
+                      </td>
+                      <td className="py-3 px-3 text-right">
+                        <div className="flex items-center justify-end gap-1.5">
+                          {pos.status === 'PENDING' && (
+                            <>
+                              <button
+                                type="button"
+                                onClick={() => onUpdatePositionStatus(pos.id, 'WON')}
+                                className="px-2 py-0.5 rounded bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 text-[10px]"
+                                title="Mark position as won"
+                              >
+                                Win
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => onUpdatePositionStatus(pos.id, 'LOST')}
+                                className="px-2 py-0.5 rounded bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 border border-rose-500/30 text-[10px]"
+                                title="Mark position as lost"
+                              >
+                                Loss
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => onUpdatePositionStatus(pos.id, 'VOID')}
+                                className="px-1.5 py-0.5 rounded bg-pitch-950 hover:bg-pitch-800 text-slate-400 border border-pitch-700 text-[10px]"
+                                title="Mark void"
+                              >
+                                V
+                              </button>
+                            </>
+                          )}
+                          <button
+                            type="button"
+                            onClick={() => onDeletePosition(pos.id)}
+                            className="p-1 rounded text-slate-600 hover:text-rose-400 transition-colors"
+                            title="Delete entry"
+                          >
+                            ×
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  )
+                })}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
+
+      {/* Manual Entry Modal */}
+      {showAddModal && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center p-3 bg-pitch-950/80 backdrop-blur-sm"
+          role="dialog"
+          aria-modal="true"
+        >
+          <div className="w-full max-w-md bg-pitch-900 border border-pitch-700 rounded-2xl p-5 shadow-2xl space-y-4">
+            <div className="flex items-center justify-between border-b border-pitch-800 pb-2">
+              <h3 className="text-sm font-bold text-slate-100">
+                Log New Portfolio Position
+              </h3>
+              <button
+                type="button"
+                onClick={() => setShowAddModal(false)}
+                className="text-slate-500 hover:text-slate-300 text-lg"
+              >
+                ×
+              </button>
+            </div>
+
+            <form onSubmit={handleManualSubmit} className="space-y-3 text-xs font-mono">
+              <div>
+                <label className="text-slate-400 block mb-1">Fixture Name</label>
+                <input
+                  type="text"
+                  required
+                  placeholder="e.g. Arsenal vs Chelsea"
+                  value={newPos.fixtureName}
+                  onChange={(e) => setNewPos({ ...newPos, fixtureName: e.target.value })}
+                  className="w-full bg-pitch-950 border border-pitch-700 rounded-lg px-3 py-1.5 text-slate-100 focus:outline-none focus:ring-1 focus:ring-amber-500 font-sans"
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="text-slate-400 block mb-1">League</label>
+                  <input
+                    type="text"
+                    value={newPos.leagueName}
+                    onChange={(e) => setNewPos({ ...newPos, leagueName: e.target.value })}
+                    className="w-full bg-pitch-950 border border-pitch-700 rounded-lg px-3 py-1.5 text-slate-100 focus:outline-none focus:ring-1 focus:ring-amber-500 font-sans"
+                  />
+                </div>
+                <div>
+                  <label className="text-slate-400 block mb-1">Selection</label>
+                  <input
+                    type="text"
+                    required
+                    placeholder="e.g. Home Win"
+                    value={newPos.selectionLabel}
+                    onChange={(e) => setNewPos({ ...newPos, selectionLabel: e.target.value })}
+                    className="w-full bg-pitch-950 border border-pitch-700 rounded-lg px-3 py-1.5 text-slate-100 focus:outline-none focus:ring-1 focus:ring-amber-500 font-sans"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="text-slate-400 block mb-1">Decimal Odds</label>
+                  <input
+                    type="number"
+                    step="0.01"
+                    min="1.01"
+                    required
+                    value={newPos.odds}
+                    onChange={(e) => setNewPos({ ...newPos, odds: e.target.value })}
+                    className="w-full bg-pitch-950 border border-pitch-700 rounded-lg px-3 py-1.5 text-slate-100 focus:outline-none focus:ring-1 focus:ring-amber-500"
+                  />
+                </div>
+                <div>
+                  <label className="text-slate-400 block mb-1">Stake Amount ({currencyCode})</label>
+                  <input
+                    type="number"
+                    step="1000"
+                    min="1000"
+                    required
+                    value={newPos.stakeAmount}
+                    onChange={(e) => setNewPos({ ...newPos, stakeAmount: e.target.value })}
+                    className="w-full bg-pitch-950 border border-pitch-700 rounded-lg px-3 py-1.5 text-slate-100 focus:outline-none focus:ring-1 focus:ring-amber-500"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="text-slate-400 block mb-1">Notes / Rationale</label>
+                <input
+                  type="text"
+                  placeholder="Optional rationale..."
+                  value={newPos.notes}
+                  onChange={(e) => setNewPos({ ...newPos, notes: e.target.value })}
+                  className="w-full bg-pitch-950 border border-pitch-700 rounded-lg px-3 py-1.5 text-slate-100 focus:outline-none focus:ring-1 focus:ring-amber-500 font-sans"
+                />
+              </div>
+
+              <div className="flex items-center justify-end gap-2 pt-2 border-t border-pitch-800">
+                <button
+                  type="button"
+                  onClick={() => setShowAddModal(false)}
+                  className="px-3 py-1.5 rounded-lg bg-pitch-800 text-slate-400 hover:text-slate-200"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="px-4 py-1.5 rounded-lg bg-amber-500 text-pitch-950 font-bold hover:bg-amber-400"
+                >
+                  Save Entry
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}

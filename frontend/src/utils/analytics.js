@@ -217,6 +217,14 @@ export function calculateKelly(odds, modelProbPercent) {
 }
 
 /**
+ * Raw Kelly percentage helper (returns full Kelly % 0-100)
+ */
+export function getKellyFraction(odds, modelProbPercent) {
+  const res = calculateKelly(odds, modelProbPercent);
+  return res.fullKellyPct;
+}
+
+/**
  * Fast Poisson Pseudo-random generator (Knuth's method)
  */
 function samplePoisson(lambda) {

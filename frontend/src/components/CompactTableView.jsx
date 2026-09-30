@@ -21,6 +21,8 @@ export default function CompactTableView({
   onToggleWatchlist,
   onOpenMatrix,
   onOpenQuantModal,
+  onSelectForLab,
+  onLogPosition,
   slipLegs = [],
   onToggleSlip,
   standingsMap = {},
@@ -308,6 +310,22 @@ export default function CompactTableView({
                       >
                         {quantLocked ? '🔒 Quant · Pro' : 'Quant'}
                       </button>
+
+                      {onSelectForLab && (
+                        <button
+                          type="button"
+                          onClick={() => quantLocked ? lockedAction('Quant Lab requires a Pro pass') : onSelectForLab(fixture)}
+                          title={quantLocked ? 'Pro feature' : 'Deep dive in Quant Lab workspace'}
+                          aria-disabled={quantLocked || undefined}
+                          className={`px-2 py-1 min-h-[32px] text-[11px] font-semibold rounded-lg transition-colors ${
+                            quantLocked
+                              ? 'bg-pitch-900 text-slate-600 border border-pitch-800 hover:border-amber-500/30 cursor-pointer'
+                              : 'bg-indigo-500/20 hover:bg-indigo-500/30 text-indigo-300 border border-indigo-500/40'
+                          }`}
+                        >
+                          {quantLocked ? '🔒 Lab' : '⚅ Lab'}
+                        </button>
+                      )}
 
                       {!quantLocked && onToggleSlip && (valOdds || fixture.odds_home) && (
                         <button

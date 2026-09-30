@@ -20,7 +20,10 @@ export default function ParlaySlipDrawer({
   onToggleOpen,
   onRemoveLeg,
   onClearSlip,
+  onLogPosition,
+  userBankroll = 1000000,
 }) {
+  const [logged, setLogged] = useState(false)
   const [copied, setCopied] = useState(false)
 
   const aggregates = useMemo(() => {
@@ -188,14 +191,44 @@ export default function ParlaySlipDrawer({
         </p>
       )}
 
-      {/* Copy Slip Summary Button */}
-      <button
-        type="button"
-        onClick={handleCopySummary}
-        className="w-full py-2.5 px-4 min-h-[44px] rounded-xl bg-amber-500 hover:bg-amber-400 text-pitch-950 font-bold text-xs flex items-center justify-center gap-2 transition-all shadow focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white"
-      >
-        <span>{copied ? '✓ Copied to Clipboard!' : '📋 Copy Parlay Summary'}</span>
-      </button>
+      {/* Actions */}
+      <div className="flex flex-col gap-2 pt-1">
+        {onLogPosition && (
+          <button
+            type="button"
+            onClick={() => {
+              if (legs.length === 0) return
+              const stakeAmount = Math.max(10000, Math.round(((aggregates.recommendedStakePct || 1.0) / 100) * userBankroll))
+              onLogPosition({
+                fixtureId: `parlay_${Date.now()}`,
+                fixtureMatch: legs.map(l => `${l.homeTeam} vs ${l.awayTeam}`).join(' | '),
+                pick: `${legs.length}-Leg Parlay`,
+                selectionName: legs.map(l => `${l.pickLabel} (${l.odds})`).join(' + '),
+                marketOdds: aggregates.totalOdds,
+                modelProb: aggregates.jointProb,
+                evPercent: aggregates.combinedEv,
+                kellySuggested: aggregates.recommendedStakePct,
+                stake: stakeAmount,
+                bookmaker: 'Consensus Sharp Feed',
+                notes: `${legs.length} accumulator legs generated in Parlay Builder`
+              })
+              setLogged(true)
+              setTimeout(() => setLogged(false), 2400)
+            }}
+            className="w-full py-2.5 px-4 min-h-[44px] rounded-xl bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-300 border border-emerald-500/40 font-bold text-xs flex items-center justify-center gap-2 transition-all shadow focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-400"
+          >
+            <span>{logged ? '✓ Position Logged to Portfolio!' : '⊞ Log Parlay Position'}</span>
+          </button>
+        )}
+
+        <button
+          type="button"
+          onClick={handleCopySummary}
+          className="w-full py-2.5 px-4 min-h-[44px] rounded-xl bg-amber-500 hover:bg-amber-400 text-pitch-950 font-bold text-xs flex items-center justify-center gap-2 transition-all shadow focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white"
+        >
+          <span>{copied ? '✓ Copied to Clipboard!' : '📋 Copy Parlay Summary'}</span>
+        </button>
+      </div>
     </div>
   )
 

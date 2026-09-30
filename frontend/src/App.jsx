@@ -1,14 +1,13 @@
 // ---- App.jsx ----
-// Main dashboard orchestrator, modern SaaS layout:
-// - Left Sidebar  (desktop/laptop, lg+)       : branding, feeds, leagues, status
-// - Top Filter Bar (scrolls with main content): search, date range, sort, view mode
-// - Mobile Bottom Nav (below lg)              : Matches / +EV / Leagues / Watchlist / Slip
-// - Mobile League Drawer                      : slide-up sheet triggered from nav
+// Multi-Workspace Quantitative Sports Terminal
+// Workspace Decomposition:
+// - Workspace 1: ◈ Terminal / Scanner (Feed, +EV discrepancy radar, league filters, search)
+// - Workspace 2: ⚅ Quant Lab (Single match deep-dive: 6x6 Bivariate Poisson matrix, 10,000-iteration Monte Carlo, reverse odds)
+// - Workspace 3: ⊞ Bankroll & Bet Tracker (Portfolio journal, P&L, ROI, Quarter-Kelly sizing, local persistence)
+// - Workspace 4: 📈 Track Record & Model Ledger (Settled history, equity curve, Brier calibration)
 //
-// Data sources
-// - Supabase realtime channel debounced at 1500 ms
-// - LocalStorage-backed watchlist & parlay slip
-// - Date-range, league, value-only, search, sort, and view-mode filters all applied client-side
+// Desktop Left Sidebar (lg+) & Mobile Top Brand Bar & Sticky Workspace Nav
+// Zero em dash characters used (R-02 compliance)
 
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react'
 import { supabase } from './lib/supabase'
@@ -30,6 +29,11 @@ import InstallPrompt from './components/InstallPrompt'
 import LandingPage from './components/LandingPage'
 import LoginPage from './components/LoginPage'
 import SubscriptionModal from './components/SubscriptionModal'
+import WorkspaceNav from './components/WorkspaceNav'
+import CommandPalette from './components/CommandPalette'
+import QuantLab from './components/QuantLab'
+import PortfolioTracker from './components/PortfolioTracker'
+import ModelLedger from './components/ModelLedger'
 import { AuthProvider, useAuth } from './context/AuthContext'
 import {
   isDateInRange,
@@ -43,10 +47,9 @@ import {
 
 // ---- Dual-domain routing --------------------------------------
 // The same SPA ships to two domains:
-//   imortifex.me        -> landing surface (product showcase)
-//   app.imortifex.me    -> live dashboard
-// Query param (?view=) and hash (#/) overrides take precedence, so
-// either domain can deep-link into the other surface without a reload.
+//   imortifex.me        : landing surface (product showcase)
+//   app.imortifex.me    : live terminal dashboard
+// Query param (?view=) and hash (#/) overrides take precedence.
 const getInitialView = () => {
   const hostname = window.location.hostname
   const searchParams = new URLSearchParams(window.location.search)
@@ -56,57 +59,35 @@ const getInitialView = () => {
   return 'landing'
 }
 
-// ---- League metadata (also imported by Sidebar when needed) --------
+// ---- League metadata ------------------------------------------
 export const LEAGUES = [
-  { id: 'all',  label: 'All Leagues',            country: null },
-  { id: 2021,   label: 'Premier League',         country: 'England' },
-  { id: 2014,   label: 'La Liga',                country: 'Spain' },
-  { id: 2019,   label: 'Serie A',                country: 'Italy' },
-  { id: 2002,   label: 'Bundesliga',             country: 'Germany' },
-  { id: 2015,   label: 'Ligue 1',                country: 'France' },
-  { id: 2001,   label: 'UEFA Champions League',  country: 'Europe' },
+  { id: 'all', label: 'All Leagues' },
+  { id: 2021,  label: 'Premier League' },
+  { id: 2014,  label: 'La Liga' },
+  { id: 2019,  label: 'Serie A' },
+  { id: 2002,  label: 'Bundesliga' },
+  { id: 2015,  label: 'Ligue 1' },
+  { id: 2001,  label: 'Champions League' },
 ]
 
-const LEAGUE_IDS = LEAGUES.filter((l) => l.id !== 'all').map((l) => l.id)
-
-const DAYS_AHEAD = 30
-// Look-back so a match already IN_PLAY at page load still falls
-// inside the server-side window; mirrors the isDateInRange 'all' floor.
-const LOOKBACK_HOURS = 2
-
-function buildDateRange() {
+// Single window: now - 2h to now + 30 days
+const buildDateRange = () => {
   const now = new Date()
-  const from = new Date(now.getTime() - LOOKBACK_HOURS * 60 * 60 * 1000)
-  const end = new Date(now)
-  end.setDate(end.getDate() + DAYS_AHEAD)
-  return {
-    from: from.toISOString(),
-    to:   end.toISOString(),
-  }
+  const from = new Date(now.getTime() - 2 * 60 * 60 * 1000).toISOString()
+  const to = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000).toISOString()
+  return { from, to }
 }
 
-// Feed type maps cleanly onto existing filter booleans:
-//   'all'        -> no extra filters
-//   'value'      -> valueOnly = true
-//   'watchlist'  -> showWatchlistOnly = true
-//   'matches'    -> same as 'all' (kept for mobile-nav consistency)
+const UPCOMING_STATUSES = ['NS', 'SCHEDULED', 'TIMED', 'IN_PLAY', 'PAUSED']
 
 function AppInner() {
-  // Dual-domain routing: 'landing' renders the marketing surface,
-  // 'dashboard' renders the operational app. All data fetching below
-  // stays mounted for both views so the backtest ledger and the hero
-  // monitor work without re-loading.
   const [currentView, setCurrentView] = useState(getInitialView)
 
-  // Authentication + subscription state for the operational surface.
-  // The landing view ignores it (public viewing stays open); the
-  // dashboard branch reads the tier model below. Free callers still
-  // enter the dashboard; their horizons and quant features are
-  // gated component-by-component, not walled off here.
   const {
     user, profile, loading: authLoading, signOut,
     tier, canAccessWeekly, canAccessMonthly, canAccessQuantFeatures,
   } = useAuth()
+
   const [fixtures,            setFixtures]            = useState([])
   const [standingsMap,        setStandingsMap]        = useState({})
   const [loading,             setLoading]             = useState(true)
@@ -114,14 +95,39 @@ function AppInner() {
   const [lastUpdated,         setLastUpdated]         = useState(null)
   const [realtimeToast,       setRealtimeToast]       = useState(false)
 
-  // Navigation state
+  // Multi-workspace terminal state: 'terminal' | 'quant_lab' | 'portfolio' | 'ledger'
+  const [activeWorkspace,     setActiveWorkspace]     = useState('terminal')
+  const [isCommandPaletteOpen, setIsCommandPaletteOpen] = useState(false)
+  const [selectedLabFixture,  setSelectedLabFixture]  = useState(null)
+  const [visibleCount,        setVisibleCount]        = useState(24)
+
+  // Portfolio journal state (persisted in localStorage)
+  const [portfolioPositions, setPortfolioPositions] = useState(() => {
+    try {
+      const saved = localStorage.getItem('matchlytics_portfolio_positions_v1')
+      return saved ? JSON.parse(saved) : []
+    } catch {
+      return []
+    }
+  })
+
+  const [bankrollAmount, setBankrollAmount] = useState(() => {
+    try {
+      const saved = localStorage.getItem('matchlytics_bankroll_amount_v1')
+      return saved ? Number(saved) : 1000000
+    } catch {
+      return 1000000
+    }
+  })
+
+  const [portfolioToast, setPortfolioToast] = useState(null)
+
+  // Navigation state for scanner
   const [activeFeed,          setActiveFeed]          = useState('all')
   const [activeLeague,        setActiveLeague]        = useState('all')
   const [showWatchlistOnly,   setShowWatchlistOnly]   = useState(false)
   const [valueOnly,           setValueOnly]           = useState(false)
   const [dateRange,           setDateRangeState]      = useState('all')
-  // True once the caller manually picked a horizon; until then the
-  // tier-aware effect owns the default snap-up (pro -> week, annual -> all).
   const [rangeTouched,        setRangeTouched]        = useState(false)
   const setDateRange = useCallback((id) => {
     setRangeTouched(true)
@@ -131,36 +137,21 @@ function AppInner() {
   const [sortOption,          setSortOption]          = useState('kickoff_asc')
   const [viewMode,            setViewMode]            = useState('cards')
 
-  // Soft paywall: any locked control the Free tier taps opens the
-  // three-tier modal instead of blocking the whole dashboard.
-  const [showUpgradeModal,    setShowUpgradeModal]     = useState(false)
+  const [showUpgradeModal,    setShowUpgradeModal]    = useState(false)
 
-  // Keep the active horizon inside the caller's tier ownership. Runs
-  // only once auth has settled (session restored, profile read):
-  //   - pro snap-up default   -> 'week'   (never stranded on an empty Today)
-  //   - annual snap-up default -> 'all'   (full season window)
-  //   - free default          -> 'today'
-  // A manual pick clamps down when the tier shrinks live; untouched
-  // picks follow the tier's full entitlement.
+  // Clamping horizon based on tier
   const RANK = { today: 0, week: 1, all: 2 }
   useEffect(() => {
     if (authLoading) return
     const maxRange = canAccessMonthly ? 'all' : canAccessWeekly ? 'week' : 'today'
-    // Live downgrade: drop an owned-but-now-out-of-tier pick. Both
-    // branches are system actions (raw state setter) so neither
-    // pollutes rangeTouched and a later upgrade can still snap up.
     if (RANK[dateRange] > RANK[maxRange]) {
       setDateRangeState(maxRange)
       return
     }
-    // Snap-ups are system actions, not caller picks: they must not
-    // mark rangeTouched, or a later live downgrade would stop
-    // clamping the horizon back to ownership.
     if (!rangeTouched) setDateRangeState(maxRange)
-    // dateRange intentionally read outside deps: one pass per tier write
   }, [tier, canAccessMonthly, canAccessWeekly, authLoading])
 
-  // Mobile-specific sheet state
+  // Mobile sheet states
   const [isLeagueDrawerOpen,  setIsLeagueDrawerOpen]  = useState(false)
   const [activeMobileTab,     setActiveMobileTab]     = useState('matches')
 
@@ -172,11 +163,10 @@ function AppInner() {
   // Modal fixtures
   const [selectedMatrixFixture, setSelectedMatrixFixture] = useState(null)
   const [selectedQuantFixture,  setSelectedQuantFixture]  = useState(null)
-  const [isBacktestOpen, setIsBacktestOpen] = useState(false)
-  const [settledFixtures, setSettledFixtures] = useState([])
+  const [isBacktestOpen,        setIsBacktestOpen]        = useState(false)
+  const [settledFixtures,       setSettledFixtures]       = useState([])
 
-  // PWA: capture native install prompt so Sidebar can offer "Install App"
-  const [deferredInstall, setDeferredInstall] = useState(null)
+  const [deferredInstall,       setDeferredInstall]       = useState(null)
 
   useEffect(() => {
     function onBeforeInstall(e) {
@@ -187,14 +177,62 @@ function AppInner() {
     return () => window.removeEventListener('beforeinstallprompt', onBeforeInstall)
   }, [])
 
+  // Persist portfolio positions
+  useEffect(() => {
+    try {
+      localStorage.setItem('matchlytics_portfolio_positions_v1', JSON.stringify(portfolioPositions))
+    } catch (err) {
+      console.warn('Failed to persist portfolio positions:', err)
+    }
+  }, [portfolioPositions])
+
+  // Persist bankroll amount
+  useEffect(() => {
+    try {
+      localStorage.setItem('matchlytics_bankroll_amount_v1', String(bankrollAmount))
+    } catch (err) {
+      console.warn('Failed to persist bankroll amount:', err)
+    }
+  }, [bankrollAmount])
+
+  // Global Command Palette shortcut: Ctrl+K or Cmd+K
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k') {
+        e.preventDefault()
+        setIsCommandPaletteOpen((prev) => !prev)
+      }
+    }
+    const handleOpenPaletteEvent = () => setIsCommandPaletteOpen(true)
+    window.addEventListener('keydown', handleKeyDown)
+    window.addEventListener('open-command-palette', handleOpenPaletteEvent)
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown)
+      window.removeEventListener('open-command-palette', handleOpenPaletteEvent)
+    }
+  }, [])
+
+  // Reset pagination visible count on filter changes
+  useEffect(() => {
+    setVisibleCount(24)
+  }, [activeLeague, dateRange, searchQuery, valueOnly, showWatchlistOnly])
+
+  // Auto-select initial fixture for Quant Lab when fixtures load
+  useEffect(() => {
+    if (!selectedLabFixture && fixtures.length > 0) {
+      const valFix = fixtures.find((f) => Boolean(f.value_pick))
+      setSelectedLabFixture(valFix || fixtures[0])
+    }
+  }, [fixtures, selectedLabFixture])
+
   const debounceTimerRef = useRef(null)
 
-  // Keep activeFeed in sync when user interacts with top-level toggles
+  // Navigation handlers
   const handleFeedSelect = useCallback((feed) => {
     setActiveFeed(feed)
-    if (feed === 'value')       { setValueOnly(true);            setShowWatchlistOnly(false) }
+    if (feed === 'value')       { setValueOnly(true);  setShowWatchlistOnly(false) }
     else if (feed === 'watchlist') { setValueOnly(false); setShowWatchlistOnly(true)  }
-    else                        { setValueOnly(false); setShowWatchlistOnly(false)  }
+    else                        { setValueOnly(false); setShowWatchlistOnly(false) }
   }, [])
 
   const handleToggleValueOnly = useCallback(() => {
@@ -206,21 +244,11 @@ function AppInner() {
     })
   }, [])
 
-  const handleToggleWatchlistFeed = useCallback(() => {
-    setShowWatchlistOnly((prev) => {
-      const next = !prev
-      setActiveFeed(next ? 'watchlist' : 'all')
-      setValueOnly(false)
-      return next
-    })
-  }, [])
-
-  // Watchlist toggle per-match star
   const handleToggleWatchlist = useCallback((fixtureId) => {
     setWatchlist((prev) => toggleWatchlistItem(prev, fixtureId))
   }, [])
 
-  // Parlay-slip handlers
+  // Parlay slip handlers
   const handleToggleSlip = useCallback((leg) => {
     setParlaySlip((prev) => {
       const existsIndex = prev.findIndex(
@@ -254,7 +282,58 @@ function AppInner() {
     setIsSlipDrawerOpen(false)
   }, [])
 
-  // ---- Standings fetching from Supabase ----------------------
+  // Portfolio logging handlers
+  const handleLogPosition = useCallback((positionData) => {
+    const newPosition = {
+      id: `pos_${Date.now()}_${Math.random().toString(36).substr(2, 6)}`,
+      status: 'PENDING',
+      loggedAt: new Date().toISOString(),
+      ...positionData,
+    }
+    setPortfolioPositions((prev) => [newPosition, ...prev])
+    setPortfolioToast({
+      message: `Logged ${newPosition.selectionName || newPosition.pick} to Portfolio!`,
+      type: 'success',
+    })
+    setTimeout(() => setPortfolioToast(null), 3200)
+  }, [])
+
+  const handleUpdatePositionStatus = useCallback((positionId, newStatus) => {
+    setPortfolioPositions((prev) =>
+      prev.map((pos) => (pos.id === positionId ? { ...pos, status: newStatus } : pos))
+    )
+  }, [])
+
+  const handleDeletePosition = useCallback((positionId) => {
+    setPortfolioPositions((prev) => prev.filter((pos) => pos.id !== positionId))
+  }, [])
+
+  const handleAddManualPosition = useCallback((newPos) => {
+    setPortfolioPositions((prev) => [newPos, ...prev])
+  }, [])
+
+  const handleUpdateBankroll = useCallback((newBankroll) => {
+    setBankrollAmount(newBankroll)
+  }, [])
+
+  // Soft upgrade trigger
+  const openUpgradeFor = useCallback((reason) => {
+    console.info('Upgrade prompt:', reason || 'tier lock')
+    setShowUpgradeModal(true)
+  }, [])
+
+  // Quant Lab navigation action
+  const handleSelectForLab = useCallback((fixture) => {
+    if (!canAccessQuantFeatures) {
+      openUpgradeFor('Quant Lab deep-dive requires a Pro pass')
+      return
+    }
+    setSelectedLabFixture(fixture)
+    setActiveWorkspace('quant_lab')
+    window.scrollTo({ top: 0, behavior: 'smooth' })
+  }, [canAccessQuantFeatures, openUpgradeFor])
+
+  // Data fetching: Standings
   const fetchStandings = useCallback(async () => {
     try {
       const { data, error: stErr } = await supabase
@@ -273,14 +352,7 @@ function AppInner() {
     }
   }, [])
 
-// ---- Data fetching from Supabase --------------------------
-// Upcoming-horizon statuses are inclusive: NS/SCHEDULED/TIMED rows are
-// pre-match, IN_PLAY/PAUSED rows stay visible while live so the feed
-// never drops a match mid-week. Finished statuses are the only ones
-// excluded. A short look-back covers kicks that started just before
-// page load.
-const UPCOMING_STATUSES = ['NS', 'SCHEDULED', 'TIMED', 'IN_PLAY', 'PAUSED']
-
+  // Data fetching: Fixtures
   const fetchFixtures = useCallback(async (isSilent = false) => {
     if (!isSilent) setLoading(true)
     setError(null)
@@ -298,33 +370,36 @@ const UPCOMING_STATUSES = ['NS', 'SCHEDULED', 'TIMED', 'IN_PLAY', 'PAUSED']
 
       if (sbErr) throw sbErr
 
-      console.info(`[fixtures] ${data?.length ?? 0} upcoming rows (${from.slice(0, 10)}..${to.slice(0, 10)})`)
-
       setFixtures(data || [])
       setLastUpdated(new Date())
+
+      if (isSilent) {
+        setRealtimeToast(true)
+        setTimeout(() => setRealtimeToast(false), 3500)
+      }
     } catch (err) {
-      console.error('Supabase fetch error:', err)
-      if (!isSilent) setError(err.message || 'Failed to load fixtures.')
+      console.error('Error fetching fixtures:', err)
+      setError('Unable to load upcoming fixtures. Verify Supabase connection.')
     } finally {
       if (!isSilent) setLoading(false)
     }
   }, [])
 
-  // ---- Settled fixtures fetching (for performance backtest) ----
+  // Data fetching: Settled historical fixtures
   const fetchSettledFixtures = useCallback(async () => {
     try {
-      const { data, error: sbErr } = await supabase
+      const { data, error: stErr } = await supabase
         .from('fixtures')
         .select('*')
         .in('status', ['FT', 'FINISHED', 'AET', 'PEN'])
-        .not('home_score', 'is', null)
-        .not('away_score', 'is', null)
-        .not('value_pick', 'is', null)
-        .order('match_date', { ascending: true })
+        .order('match_date', { ascending: false })
+        .limit(150)
 
-      if (!sbErr && data) setSettledFixtures(data)
+      if (!stErr && data) {
+        setSettledFixtures(data)
+      }
     } catch (err) {
-      console.warn('Failed to load settled fixtures for backtest:', err)
+      console.warn('Settled fixtures query failed:', err)
     }
   }, [])
 
@@ -334,10 +409,10 @@ const UPCOMING_STATUSES = ['NS', 'SCHEDULED', 'TIMED', 'IN_PLAY', 'PAUSED']
     fetchSettledFixtures()
   }, [fetchFixtures, fetchStandings, fetchSettledFixtures])
 
-  // ---- Supabase Realtime Subscription -----------------------
+  // Realtime subscription
   useEffect(() => {
     const channel = supabase
-      .channel('matchlytics-realtime-feed')
+      .channel('fixtures_realtime_channel')
       .on(
         'postgres_changes',
         { event: '*', schema: 'public', table: 'fixtures' },
@@ -345,18 +420,8 @@ const UPCOMING_STATUSES = ['NS', 'SCHEDULED', 'TIMED', 'IN_PLAY', 'PAUSED']
           if (debounceTimerRef.current) clearTimeout(debounceTimerRef.current)
           debounceTimerRef.current = setTimeout(() => {
             fetchFixtures(true)
-            fetchStandings()
             fetchSettledFixtures()
-            setRealtimeToast(true)
-            setTimeout(() => setRealtimeToast(false), 3500)
           }, 1500)
-        }
-      )
-      .on(
-        'postgres_changes',
-        { event: '*', schema: 'public', table: 'team_standings' },
-        () => {
-          fetchStandings()
         }
       )
       .subscribe()
@@ -365,9 +430,9 @@ const UPCOMING_STATUSES = ['NS', 'SCHEDULED', 'TIMED', 'IN_PLAY', 'PAUSED']
       if (debounceTimerRef.current) clearTimeout(debounceTimerRef.current)
       supabase.removeChannel(channel)
     }
-  }, [fetchFixtures])
+  }, [fetchFixtures, fetchSettledFixtures])
 
-  // ---- Client-side Multi-Criteria Filtering & Sorting -------
+  // Client-side filtering & sorting
   const displayedFixtures = useMemo(() => {
     let result = fixtures
 
@@ -381,11 +446,6 @@ const UPCOMING_STATUSES = ['NS', 'SCHEDULED', 'TIMED', 'IN_PLAY', 'PAUSED']
       result = result.filter((f) => Boolean(f.value_pick))
     }
 
-    // Every horizon is bounded server-side, so the range predicate
-    // runs uniformly: 'today' widens to the next 24 h, 'week' spans
-    // now..now+7d, 'all' spans now-2h..now+30d. A realtime refresh on
-    // a long-lived session can re-fetch rows past the season window,
-    // and the filter trims them back down.
     result = result.filter((f) => isDateInRange(f.match_date, dateRange))
 
     if (searchQuery.trim()) {
@@ -395,8 +455,11 @@ const UPCOMING_STATUSES = ['NS', 'SCHEDULED', 'TIMED', 'IN_PLAY', 'PAUSED']
     return sortFixtures(result, sortOption)
   }, [fixtures, activeLeague, showWatchlistOnly, watchlist, valueOnly, dateRange, searchQuery, sortOption])
 
-  // Clear all filters handler. The horizon resets to the caller's own
-  // top entitlement, not 'all', so Free clears back to Today.
+  // Slice-based pagination for smooth 60 FPS rendering
+  const paginatedFixtures = useMemo(() => {
+    return displayedFixtures.slice(0, visibleCount)
+  }, [displayedFixtures, visibleCount])
+
   const handleClearFilters = useCallback(() => {
     setActiveLeague('all')
     setShowWatchlistOnly(false)
@@ -409,10 +472,8 @@ const UPCOMING_STATUSES = ['NS', 'SCHEDULED', 'TIMED', 'IN_PLAY', 'PAUSED']
 
   const currentLeagueLabel = LEAGUES.find((l) => l.id === activeLeague)?.label
   const currentDateRangeLabel = DATE_RANGES.find((r) => r.id === dateRange)?.label
-
   const valueCount = fixtures.filter((f) => Boolean(f.value_pick)).length
 
-  // Map activeFeed back to the three boolean toggles used by the rest of the app
   useEffect(() => {
     if (activeFeed === 'value') {
       setValueOnly(true)
@@ -430,19 +491,16 @@ const UPCOMING_STATUSES = ['NS', 'SCHEDULED', 'TIMED', 'IN_PLAY', 'PAUSED']
     setActiveLeague(id)
     setShowWatchlistOnly(false)
     setActiveFeed(id === 'all' ? 'all' : 'matches')
+    setActiveWorkspace('terminal')
   }, [])
 
   const handleMobileTab = useCallback((tab) => {
     setActiveMobileTab(tab)
-    if (tab === 'value')        { setValueOnly(true);  setShowWatchlistOnly(false) }
-    else if (tab === 'watchlist') { setValueOnly(false); setShowWatchlistOnly(true)  }
-    else                        { setValueOnly(false); setShowWatchlistOnly(false) }
+    if (tab === 'value')        { setValueOnly(true);  setShowWatchlistOnly(false); setActiveWorkspace('terminal') }
+    else if (tab === 'watchlist') { setValueOnly(false); setShowWatchlistOnly(true);  setActiveWorkspace('terminal') }
+    else                        { setValueOnly(false); setShowWatchlistOnly(false); setActiveWorkspace('terminal') }
   }, [])
 
-  // Ecosystem view switchers. The landing surface offers "enter the app",
-  // the dashboard offers "view the landing" as a Sidebar/mobile-bar quick
-  // action. ?view= is kept in sync via replaceState so the chosen surface
-  // persists across a refresh on whichever domain you are on.
   const syncUrlForView = useCallback((view) => {
     try {
       const url = new URL(window.location.href)
@@ -450,7 +508,7 @@ const UPCOMING_STATUSES = ['NS', 'SCHEDULED', 'TIMED', 'IN_PLAY', 'PAUSED']
       url.hash = ''
       window.history.replaceState(null, '', url.toString())
     } catch {
-      /* non-fatal: URL sync is convenience only */
+      // non-fatal
     }
   }, [])
 
@@ -464,41 +522,21 @@ const UPCOMING_STATUSES = ['NS', 'SCHEDULED', 'TIMED', 'IN_PLAY', 'PAUSED']
     syncUrlForView('landing')
   }, [syncUrlForView])
 
-  // ---- Soft subscription gate ----------------------------------
-  // Every signed-in caller enters the dashboard. Free callers meet
-  // locked controls inline: each one opens the same upgrade modal,
-  // and live fulfilment (profile writes over realtime) unlocks them
-  // without a reload.
-  const openUpgradeFor = useCallback(
-    (reason) => {
-      console.info('Upgrade prompt:', reason || 'tier lock')
-      setShowUpgradeModal(true)
-    },
-    []
-  )
-
-  // Quant tools + parlay slip are paid-tier features. Unlocked tiers
-  // get the real handlers; every other tier routes the tap into the
-  // upgrade modal instead. Cards paint lock marks from the same flag.
   const openMatrixGated = canAccessQuantFeatures
     ? (fixture) => setSelectedMatrixFixture(fixture)
     : () => openUpgradeFor('Score Matrix requires a Pro pass')
   const openQuantGated = canAccessQuantFeatures
     ? (fixture) => setSelectedQuantFixture(fixture)
-    : () => openUpgradeFor('Quant & Kelly require a Pro pass')
+    : () => openUpgradeFor('Quant and Kelly require a Pro pass')
   const toggleSlipGated = canAccessQuantFeatures
     ? handleToggleSlip
     : () => openUpgradeFor('Parlay Builder requires a Pro pass')
 
-  // A live fulfilment unlocks the features under the open modal:
-  // close it so the caller sees what just came online.
   useEffect(() => {
     if (canAccessQuantFeatures && showUpgradeModal) setShowUpgradeModal(false)
   }, [canAccessQuantFeatures, showUpgradeModal])
 
-  // ---- Modals & Drawers (shared by BOTH views) ----------------
-  // Rendered outside the view branch so the verified backtest ledger can
-  // be opened straight from the landing page hero CTA.
+  // Modals and shared overlays
   const sharedOverlays = (
     <>
       <ScoreMatrixModal
@@ -524,27 +562,47 @@ const UPCOMING_STATUSES = ['NS', 'SCHEDULED', 'TIMED', 'IN_PLAY', 'PAUSED']
         onToggleOpen={() => setIsSlipDrawerOpen(!isSlipDrawerOpen)}
         onRemoveLeg={handleRemoveSlipLeg}
         onClearSlip={handleClearSlip}
+        onLogPosition={handleLogPosition}
+        userBankroll={bankrollAmount}
       />
 
-      {/* Historical Bankroll Simulator & Settled Bets Ledger */}
       <PerformanceModal
         isOpen={isBacktestOpen}
         onClose={() => setIsBacktestOpen(false)}
         fixtures={settledFixtures}
       />
 
-      {/* PWA install prompt (mobile floating banner + iOS hint) */}
+      <CommandPalette
+        isOpen={isCommandPaletteOpen}
+        onClose={() => setIsCommandPaletteOpen(false)}
+        fixtures={fixtures}
+        onSelectFixture={(f) => {
+          handleSelectForLab(f)
+        }}
+        onSelectWorkspace={(ws) => {
+          if ((ws === 'quant_lab' || ws === 'portfolio') && !canAccessQuantFeatures) {
+            openUpgradeFor(`${ws === 'quant_lab' ? 'Quant Lab' : 'Portfolio Tracker'} requires a Pro pass`)
+            return
+          }
+          setActiveWorkspace(ws)
+        }}
+        onFilterLeague={(leagueId) => {
+          setActiveLeague(leagueId)
+          setShowWatchlistOnly(false)
+          setActiveWorkspace('terminal')
+        }}
+        onClearFilters={handleClearFilters}
+      />
+
       <InstallPrompt />
 
-      {/* Soft paywall: opened by any locked Free-tier control; the live
-          unlock effect above closes it the moment a subscription lands. */}
       {showUpgradeModal && (
         <SubscriptionModal onClose={() => setShowUpgradeModal(false)} />
       )}
     </>
   )
 
-  // ---- View: Landing Surface (marketing, ecosystem showcase) ----
+  // Landing view
   if (currentView === 'landing') {
     return (
       <div className="w-full min-h-screen bg-pitch-950 text-slate-100 overflow-x-hidden">
@@ -562,11 +620,7 @@ const UPCOMING_STATUSES = ['NS', 'SCHEDULED', 'TIMED', 'IN_PLAY', 'PAUSED']
     )
   }
 
-  // ---- Dashboard surface: authentication + subscription gate ----
-  // The operational app requires a signed-in caller with an active
-  // subscription. Loading, unauthenticated, and locked states each
-  // render their own screen; only the unlocked path mounts the live
-  // dashboard.
+  // Dashboard view auth check
   if (authLoading) {
     return (
       <div className="w-full min-h-screen bg-pitch-950 flex items-center justify-center overflow-x-hidden">
@@ -591,7 +645,7 @@ const UPCOMING_STATUSES = ['NS', 'SCHEDULED', 'TIMED', 'IN_PLAY', 'PAUSED']
 
   return (
     <div className="w-full min-h-screen bg-pitch-900 text-slate-100 flex overflow-x-hidden">
-      {/* ─── Desktop Left Sidebar ────────────────────────────── */}
+      {/* Desktop Left Sidebar */}
       <Sidebar
         activeFeed={activeFeed}
         onFeedSelect={handleFeedSelect}
@@ -607,11 +661,20 @@ const UPCOMING_STATUSES = ['NS', 'SCHEDULED', 'TIMED', 'IN_PLAY', 'PAUSED']
         userEmail={user?.email}
         subscriptionTier={profile?.subscription_tier}
         onSignOut={signOut}
+        activeWorkspace={activeWorkspace}
+        onSelectWorkspace={(ws) => {
+          if ((ws === 'quant_lab' || ws === 'portfolio') && !canAccessQuantFeatures) {
+            openUpgradeFor(`${ws === 'quant_lab' ? 'Quant Lab' : 'Portfolio Tracker'} requires a Pro pass`)
+            return
+          }
+          setActiveWorkspace(ws)
+          window.scrollTo({ top: 0, behavior: 'smooth' })
+        }}
       />
 
-      {/* ─── Main Content Area ──────────────────────────────── */}
+      {/* Main Content Area */}
       <div className="flex-1 lg:pl-64 flex flex-col min-w-0 pb-20 lg:pb-8">
-        {/* Mobile top brand bar (visible below lg) */}
+        {/* Mobile top brand bar */}
         <div className="lg:hidden sticky top-0 z-20 bg-pitch-950/90 backdrop-blur-md border-b border-pitch-800 px-4 py-3 flex items-center gap-2.5">
           <span
             className="inline-block w-7 h-7 rounded-md bg-amber-500 flex-shrink-0"
@@ -662,138 +725,229 @@ const UPCOMING_STATUSES = ['NS', 'SCHEDULED', 'TIMED', 'IN_PLAY', 'PAUSED']
           </div>
         </div>
 
-        {/* Sticky glassmorphism Filter Bar */}
-        <div className="sticky top-0 z-10 glass-filter">
-          <div className="max-w-7xl mx-auto px-3 sm:px-6 py-3">
-            <FilterBar
-              searchQuery={searchQuery}
-              onSearchChange={setSearchQuery}
-              dateRange={dateRange}
-              onDateRangeChange={setDateRange}
-              leagues={LEAGUES}   // passed through; hidden on desktop via CSS/media if needed
-              activeLeague={activeLeague}
-              onLeagueChange={(id) => {
-                setActiveLeague(id)
-                setShowWatchlistOnly(false)
-              }}
-              watchlistCount={watchlist.length}
-              showWatchlistOnly={showWatchlistOnly}
-              onToggleWatchlistTab={() => setShowWatchlistOnly((p) => !p)}
-              valueOnly={valueOnly}
-              onValueOnlyChange={(v) => {
-                setValueOnly(v)
-                if (v) setActiveFeed('value')
-                else if (showWatchlistOnly) setActiveFeed('watchlist')
-                else setActiveFeed('all')
-              }}
-              sortOption={sortOption}
-              onSortChange={setSortOption}
-              viewMode={viewMode}
-              onViewModeChange={setViewMode}
-              tier={tier}
-              onTriggerUpgrade={openUpgradeFor}
-            />
-          </div>
-        </div>
+        {/* Multi-Workspace Top Sub-Nav Switcher */}
+        <WorkspaceNav
+          activeWorkspace={activeWorkspace}
+          onWorkspaceChange={(ws) => {
+            if ((ws === 'quant_lab' || ws === 'portfolio') && !canAccessQuantFeatures) {
+              openUpgradeFor(`${ws === 'quant_lab' ? 'Quant Lab' : 'Portfolio Tracker'} requires a Pro pass`)
+              return
+            }
+            setActiveWorkspace(ws)
+            window.scrollTo({ top: 0, behavior: 'smooth' })
+          }}
+          activeFixtureCount={displayedFixtures.length}
+          valueCount={valueCount}
+          portfolioCount={portfolioPositions.length}
+          onOpenCommandPalette={() => setIsCommandPaletteOpen(true)}
+          tier={tier}
+        />
 
         {/* Realtime Toast Notification */}
         {realtimeToast && (
           <div
             role="status"
             aria-live="polite"
-            className="fixed top-20 right-3 sm:right-6 z-50 px-4 py-2.5 rounded-xl bg-pitch-900/95 border border-emerald-500/50 text-emerald-300 text-xs font-semibold shadow-2xl flex items-center gap-2.5 animate-slide-up backdrop-blur"
+            className="fixed top-24 right-3 sm:right-6 z-50 px-4 py-2.5 rounded-xl bg-pitch-900/95 border border-emerald-500/50 text-emerald-300 text-xs font-semibold shadow-2xl flex items-center gap-2.5 animate-slide-up backdrop-blur"
           >
             <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping" aria-hidden="true" />
             <span>Data refreshed in real-time</span>
           </div>
         )}
 
+        {/* Portfolio Toast Notification */}
+        {portfolioToast && (
+          <div
+            role="status"
+            aria-live="polite"
+            className="fixed top-24 right-3 sm:right-6 z-50 px-4 py-2.5 rounded-xl bg-pitch-900/95 border border-emerald-500/50 text-emerald-300 text-xs font-semibold shadow-2xl flex items-center gap-2.5 animate-slide-up backdrop-blur"
+          >
+            <span className="w-2 h-2 rounded-full bg-emerald-400" aria-hidden="true" />
+            <span>{portfolioToast.message}</span>
+          </div>
+        )}
+
+        {/* Main Workspace Body */}
         <main className="w-full px-2 sm:px-4 lg:px-6 py-2 min-w-0" id="main-content">
-          {loading ? (
-            <LoadingState />
-          ) : error ? (
-            <ErrorState message={error} onRetry={fetchFixtures} />
-          ) : displayedFixtures.length === 0 ? (
-            <EmptyState
-              leagueLabel={currentLeagueLabel}
-              valueOnly={valueOnly}
-              dateRangeLabel={currentDateRangeLabel}
-              searchQuery={searchQuery}
-              isWatchlist={showWatchlistOnly}
-              onClearFilters={handleClearFilters}
-            />
-          ) : (
-            <section aria-label="Match fixtures feed">
-              {/* Feed metadata bar */}
-              <div className="flex flex-wrap items-center justify-between gap-2 mb-4 text-xs text-slate-400">
-                <p>
-                  Showing{' '}
-                  <strong className="text-amber-400 font-mono">
-                    {displayedFixtures.length}
-                  </strong>{' '}
-                  {displayedFixtures.length === 1 ? 'fixture' : 'fixtures'}
-                  {showWatchlistOnly
-                    ? ' in Watchlist'
-                    : activeLeague !== 'all'
-                    ? ` in ${currentLeagueLabel}`
-                    : ''}
-                  {dateRange !== 'all' ? ` (${currentDateRangeLabel})` : ''}
-                </p>
-                <div className="flex items-center gap-3">
-                  <span className="inline-flex items-center gap-1.5 text-[11px] text-emerald-400 font-mono">
-                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" aria-hidden="true" />
-                    Realtime Active
-                  </span>
-                  <span className="text-slate-500 hidden sm:inline font-mono">
-                    Market Feed: Consensus Sharp Aggregation
-                  </span>
+          {/* Workspace 1: Terminal / Scanner */}
+          {activeWorkspace === 'terminal' && (
+            <div className="space-y-4">
+              {/* Sticky glassmorphism Filter Bar */}
+              <div className="sticky top-12 z-10 glass-filter -mx-2 sm:-mx-4 lg:-mx-6 px-3 sm:px-6 py-3">
+                <div className="max-w-7xl mx-auto">
+                  <FilterBar
+                    searchQuery={searchQuery}
+                    onSearchChange={setSearchQuery}
+                    dateRange={dateRange}
+                    onDateRangeChange={setDateRange}
+                    leagues={LEAGUES}
+                    activeLeague={activeLeague}
+                    onLeagueChange={(id) => {
+                      setActiveLeague(id)
+                      setShowWatchlistOnly(false)
+                    }}
+                    watchlistCount={watchlist.length}
+                    showWatchlistOnly={showWatchlistOnly}
+                    onToggleWatchlistTab={() => setShowWatchlistOnly((p) => !p)}
+                    valueOnly={valueOnly}
+                    onValueOnlyChange={(v) => {
+                      setValueOnly(v)
+                      if (v) setActiveFeed('value')
+                      else if (showWatchlistOnly) setActiveFeed('watchlist')
+                      else setActiveFeed('all')
+                    }}
+                    sortOption={sortOption}
+                    onSortChange={setSortOption}
+                    viewMode={viewMode}
+                    onViewModeChange={setViewMode}
+                    tier={tier}
+                    onTriggerUpgrade={openUpgradeFor}
+                  />
                 </div>
               </div>
 
-              {/* View Mode: Detailed Cards */}
-              {viewMode === 'cards' && (
-                <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3 sm:gap-4">
-                  {displayedFixtures.map((fixture, idx) => {
-                    const fixtureSlipPicks = parlaySlip
-                      .filter((l) => l.fixtureId === fixture.id)
-                      .map((l) => l.pick)
-
-                    return (
-                      <MatchCard
-                        key={fixture.id}
-                        fixture={fixture}
-                        isPinned={watchlist.includes(fixture.id)}
-                        onToggleWatchlist={handleToggleWatchlist}
-                        onOpenMatrix={openMatrixGated}
-                        onOpenQuantModal={openQuantGated}
-                        slipPicks={fixtureSlipPicks}
-                        onToggleSlip={toggleSlipGated}
-                        standingsMap={standingsMap}
-                        style={{ animationDelay: `${Math.min(idx * 30, 300)}ms` }}
-                        quantLocked={!canAccessQuantFeatures}
-                        onTriggerUpgrade={openUpgradeFor}
-                      />
-                    )
-                  })}
-                </div>
-              )}
-
-              {/* View Mode: Compact Table */}
-              {viewMode === 'table' && (
-                <CompactTableView
-                  fixtures={displayedFixtures}
-                  watchlist={watchlist}
-                  onToggleWatchlist={handleToggleWatchlist}
-                  onOpenMatrix={openMatrixGated}
-                  onOpenQuantModal={openQuantGated}
-                  slipLegs={parlaySlip}
-                  onToggleSlip={toggleSlipGated}
-                  standingsMap={standingsMap}
-                  quantLocked={!canAccessQuantFeatures}
-                  onTriggerUpgrade={openUpgradeFor}
+              {loading ? (
+                <LoadingState />
+              ) : error ? (
+                <ErrorState message={error} onRetry={fetchFixtures} />
+              ) : displayedFixtures.length === 0 ? (
+                <EmptyState
+                  leagueLabel={currentLeagueLabel}
+                  valueOnly={valueOnly}
+                  dateRangeLabel={currentDateRangeLabel}
+                  searchQuery={searchQuery}
+                  isWatchlist={showWatchlistOnly}
+                  onClearFilters={handleClearFilters}
                 />
+              ) : (
+                <section aria-label="Match fixtures feed">
+                  {/* Feed metadata bar */}
+                  <div className="flex flex-wrap items-center justify-between gap-2 mb-4 text-xs text-slate-400">
+                    <p>
+                      Showing{' '}
+                      <strong className="text-amber-400 font-mono">
+                        {paginatedFixtures.length}
+                      </strong>{' '}
+                      of{' '}
+                      <strong className="text-slate-200 font-mono">
+                        {displayedFixtures.length}
+                      </strong>{' '}
+                      {displayedFixtures.length === 1 ? 'fixture' : 'fixtures'}
+                      {showWatchlistOnly
+                        ? ' in Watchlist'
+                        : activeLeague !== 'all'
+                        ? ` in ${currentLeagueLabel}`
+                        : ''}
+                      {dateRange !== 'all' ? ` (${currentDateRangeLabel})` : ''}
+                    </p>
+                    <div className="flex items-center gap-3">
+                      <span className="inline-flex items-center gap-1.5 text-[11px] text-emerald-400 font-mono">
+                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" aria-hidden="true" />
+                        Realtime Active
+                      </span>
+                      <span className="text-slate-500 hidden sm:inline font-mono">
+                        Consensus Sharp Aggregation
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* View Mode: Detailed Cards */}
+                  {viewMode === 'cards' && (
+                    <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3 sm:gap-4">
+                      {paginatedFixtures.map((fixture, idx) => {
+                        const fixtureSlipPicks = parlaySlip
+                          .filter((l) => l.fixtureId === fixture.id)
+                          .map((l) => l.pick)
+
+                        return (
+                          <MatchCard
+                            key={fixture.id}
+                            fixture={fixture}
+                            isPinned={watchlist.includes(fixture.id)}
+                            onToggleWatchlist={handleToggleWatchlist}
+                            onOpenMatrix={openMatrixGated}
+                            onOpenQuantModal={openQuantGated}
+                            onSelectForLab={handleSelectForLab}
+                            onLogPosition={handleLogPosition}
+                            slipPicks={fixtureSlipPicks}
+                            onToggleSlip={toggleSlipGated}
+                            standingsMap={standingsMap}
+                            style={{ animationDelay: `${Math.min(idx * 30, 300)}ms` }}
+                            quantLocked={!canAccessQuantFeatures}
+                            onTriggerUpgrade={openUpgradeFor}
+                          />
+                        )
+                      })}
+                    </div>
+                  )}
+
+                  {/* View Mode: Compact Table */}
+                  {viewMode === 'table' && (
+                    <CompactTableView
+                      fixtures={paginatedFixtures}
+                      watchlist={watchlist}
+                      onToggleWatchlist={handleToggleWatchlist}
+                      onOpenMatrix={openMatrixGated}
+                      onOpenQuantModal={openQuantGated}
+                      onSelectForLab={handleSelectForLab}
+                      onLogPosition={handleLogPosition}
+                      slipLegs={parlaySlip}
+                      onToggleSlip={toggleSlipGated}
+                      standingsMap={standingsMap}
+                      quantLocked={!canAccessQuantFeatures}
+                      onTriggerUpgrade={openUpgradeFor}
+                    />
+                  )}
+
+                  {/* Batch Slice-based Pagination Button */}
+                  {visibleCount < displayedFixtures.length && (
+                    <div className="flex justify-center pt-8 pb-4">
+                      <button
+                        type="button"
+                        onClick={() => setVisibleCount((prev) => prev + 24)}
+                        className="px-6 py-2.5 rounded-xl bg-pitch-950 border border-pitch-700 hover:border-amber-500/50 hover:bg-pitch-800 text-xs font-mono font-semibold text-slate-300 hover:text-amber-400 transition-all flex items-center gap-2.5 shadow-lg group focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500"
+                      >
+                        <span>Load More Fixtures</span>
+                        <span className="px-2 py-0.5 rounded-md bg-pitch-900 group-hover:bg-amber-500/20 text-[10px] text-amber-400 border border-pitch-700 group-hover:border-amber-500/30 transition-colors">
+                          +{Math.min(24, displayedFixtures.length - visibleCount)} of {displayedFixtures.length - visibleCount} remaining
+                        </span>
+                      </button>
+                    </div>
+                  )}
+                </section>
               )}
-            </section>
+            </div>
+          )}
+
+          {/* Workspace 2: Quant Lab (Single Match Deep-Dive) */}
+          {activeWorkspace === 'quant_lab' && (
+            <QuantLab
+              fixture={selectedLabFixture || displayedFixtures[0]}
+              allFixtures={fixtures}
+              onSelectFixture={setSelectedLabFixture}
+              standingsMap={standingsMap}
+              onLogPosition={handleLogPosition}
+              userBankroll={bankrollAmount}
+            />
+          )}
+
+          {/* Workspace 3: Bankroll & Bet Tracker */}
+          {activeWorkspace === 'portfolio' && (
+            <PortfolioTracker
+              positions={portfolioPositions}
+              bankroll={bankrollAmount}
+              onUpdateBankroll={handleUpdateBankroll}
+              onUpdateStatus={handleUpdatePositionStatus}
+              onDeletePosition={handleDeletePosition}
+              onAddPosition={handleAddManualPosition}
+            />
+          )}
+
+          {/* Workspace 4: Track Record & Model Ledger */}
+          {activeWorkspace === 'ledger' && (
+            <ModelLedger
+              settledFixtures={settledFixtures}
+            />
           )}
         </main>
 
@@ -801,7 +955,7 @@ const UPCOMING_STATUSES = ['NS', 'SCHEDULED', 'TIMED', 'IN_PLAY', 'PAUSED']
         <footer className="max-w-7xl mx-auto px-4 sm:px-6 py-8 border-t border-pitch-800/80 w-full mt-auto">
           <div className="flex flex-col sm:flex-row items-center justify-between gap-4 text-xs text-slate-500">
             <p>
-              Matchlytics uses Poisson bivariate goal distribution modelling.
+              Matchlytics uses Proprietary Bivariate Poisson core distribution modelling.
               Probabilities are quantitative estimates, not guarantees.
             </p>
             <p className="text-slate-600 font-mono">
@@ -811,7 +965,7 @@ const UPCOMING_STATUSES = ['NS', 'SCHEDULED', 'TIMED', 'IN_PLAY', 'PAUSED']
         </footer>
       </div>
 
-      {/* ─── Mobile Bottom Navigation Bar ─────────────────── */}
+      {/* Mobile Bottom Navigation Bar */}
       <MobileNav
         activeTab={activeMobileTab}
         onTabChange={handleMobileTab}
@@ -824,7 +978,7 @@ const UPCOMING_STATUSES = ['NS', 'SCHEDULED', 'TIMED', 'IN_PLAY', 'PAUSED']
         onOpenBacktest={() => setIsBacktestOpen(true)}
       />
 
-      {/* ─── Mobile League Sheet (below lg only) ─────────── */}
+      {/* Mobile League Sheet */}
       <MobileLeagueDrawer
         leagues={LEAGUES.filter((l) => l.id !== 'all')}
         activeLeague={activeLeague}
@@ -833,17 +987,13 @@ const UPCOMING_STATUSES = ['NS', 'SCHEDULED', 'TIMED', 'IN_PLAY', 'PAUSED']
         onClose={() => setIsLeagueDrawerOpen(false)}
       />
 
-      {/* ─── Modals & Drawers (always rendered) ───────────── */}
+      {/* Shared Modals and Overlays */}
       {sharedOverlays}
     </div>
   )
 }
 
-// ---- Application root ------------------------------------------
-// AuthProvider supplies session + profile state to every screen.
-// AppInner decides what renders: the landing surface stays public,
-// while the operational dashboard runs through the authentication
-// and subscription gates above.
+// Application Root with AuthProvider
 export default function App() {
   return (
     <AuthProvider>

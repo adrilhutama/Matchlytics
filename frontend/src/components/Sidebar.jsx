@@ -28,6 +28,8 @@ export default function Sidebar({
   userEmail,             // signed-in account (app view only)
   subscriptionTier,     // 'free' | 'pro' | 'annual' | 'institutional'
   onSignOut,
+  activeWorkspace = 'terminal',
+  onSelectWorkspace,
 }) {
   const timeStr = lastUpdated
     ? lastUpdated.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' })
@@ -60,6 +62,86 @@ export default function Sidebar({
           <p className="text-[11px] text-slate-500 mt-1">Pre-Match Quant Analytics</p>
         </div>
       </div>
+
+      {/* ---- Workspaces Navigation ---- */}
+      <nav aria-label="Workspaces" className="mb-4">
+        <p className="text-[11px] uppercase tracking-wider text-slate-500 font-semibold px-2 mb-1.5">
+          Workspaces
+        </p>
+        <ul className="space-y-1">
+          <li>
+            <button
+              type="button"
+              onClick={() => onSelectWorkspace && onSelectWorkspace('terminal')}
+              aria-current={activeWorkspace === 'terminal' ? 'page' : undefined}
+              className={`w-full min-h-[38px] px-3 rounded-xl text-xs font-semibold transition-all flex items-center justify-between gap-2 ${
+                activeWorkspace === 'terminal'
+                  ? 'bg-amber-500/15 text-amber-400 border border-amber-500/30'
+                  : 'text-slate-300 hover:bg-pitch-900 hover:text-slate-100'
+              }`}
+            >
+              <span className="flex items-center gap-2">
+                <span className="text-sm font-mono text-amber-400">◈</span>
+                Terminal Scanner
+              </span>
+            </button>
+          </li>
+          <li>
+            <button
+              type="button"
+              onClick={() => onSelectWorkspace && onSelectWorkspace('quant_lab')}
+              aria-current={activeWorkspace === 'quant_lab' ? 'page' : undefined}
+              className={`w-full min-h-[38px] px-3 rounded-xl text-xs font-semibold transition-all flex items-center justify-between gap-2 ${
+                activeWorkspace === 'quant_lab'
+                  ? 'bg-indigo-500/15 text-indigo-400 border border-indigo-500/30'
+                  : 'text-slate-300 hover:bg-pitch-900 hover:text-slate-100'
+              }`}
+            >
+              <span className="flex items-center gap-2">
+                <span className="text-sm font-mono text-indigo-400">⚅</span>
+                Quant Lab
+              </span>
+              <span className="text-[9px] font-mono uppercase px-1.5 py-0.5 rounded bg-pitch-900 text-indigo-300 border border-indigo-500/20">
+                PRO
+              </span>
+            </button>
+          </li>
+          <li>
+            <button
+              type="button"
+              onClick={() => onSelectWorkspace && onSelectWorkspace('portfolio')}
+              aria-current={activeWorkspace === 'portfolio' ? 'page' : undefined}
+              className={`w-full min-h-[38px] px-3 rounded-xl text-xs font-semibold transition-all flex items-center justify-between gap-2 ${
+                activeWorkspace === 'portfolio'
+                  ? 'bg-emerald-500/15 text-emerald-400 border border-emerald-500/30'
+                  : 'text-slate-300 hover:bg-pitch-900 hover:text-slate-100'
+              }`}
+            >
+              <span className="flex items-center gap-2">
+                <span className="text-sm font-mono text-emerald-400">⊞</span>
+                Bankroll Tracker
+              </span>
+            </button>
+          </li>
+          <li>
+            <button
+              type="button"
+              onClick={() => onSelectWorkspace && onSelectWorkspace('ledger')}
+              aria-current={activeWorkspace === 'ledger' ? 'page' : undefined}
+              className={`w-full min-h-[38px] px-3 rounded-xl text-xs font-semibold transition-all flex items-center justify-between gap-2 ${
+                activeWorkspace === 'ledger'
+                  ? 'bg-sky-500/15 text-sky-400 border border-sky-500/30'
+                  : 'text-slate-300 hover:bg-pitch-900 hover:text-slate-100'
+              }`}
+            >
+              <span className="flex items-center gap-2">
+                <span className="text-sm font-mono text-sky-400">📈</span>
+                Model Ledger
+              </span>
+            </button>
+          </li>
+        </ul>
+      </nav>
 
       {/* ---- Feeds Section ---- */}
       <nav aria-label="Feeds">
