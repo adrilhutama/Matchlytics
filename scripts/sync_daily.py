@@ -21,28 +21,56 @@ from datetime import date, datetime, timedelta, timezone
 
 import requests
 
-from config import (
-    BASE_URL,
-    HEADERS,
-    ACTIVE_LEAGUES,
-    ODDS_API_KEY,
-    ODDS_API_BASE,
-    ODDS_SPORT_KEYS,
-    APP_BASE_URL,
-    supabase,
-    prune_stale_fixtures,
-)
-from engine import (
-    calc_probabilities,
-    calculate_lambdas,
-)
-from evaluator import (
-    fetch_and_settle_completed_matches,
-    evaluate_recent_settlement,
-)
-from telegram_notifier import (
-    send_daily_sitrep,
-)
+try:
+    from scripts.config import (
+        BASE_URL,
+        HEADERS,
+        ACTIVE_LEAGUES,
+        ODDS_API_KEY,
+        ODDS_API_KEYS,
+        ODDS_API_BASE,
+        ODDS_SPORT_KEYS,
+        APP_BASE_URL,
+        supabase,
+        prune_stale_fixtures,
+    )
+    from scripts.engine import (
+        calc_probabilities,
+        calculate_lambdas,
+    )
+    from scripts.evaluator import (
+        fetch_and_settle_completed_matches,
+        evaluate_recent_settlement,
+    )
+    from scripts.telegram_notifier import (
+        send_daily_sitrep,
+    )
+    from scripts.odds_client import odds_pool
+except ImportError:
+    from config import (
+        BASE_URL,
+        HEADERS,
+        ACTIVE_LEAGUES,
+        ODDS_API_KEY,
+        ODDS_API_KEYS,
+        ODDS_API_BASE,
+        ODDS_SPORT_KEYS,
+        APP_BASE_URL,
+        supabase,
+        prune_stale_fixtures,
+    )
+    from engine import (
+        calc_probabilities,
+        calculate_lambdas,
+    )
+    from evaluator import (
+        fetch_and_settle_completed_matches,
+        evaluate_recent_settlement,
+    )
+    from telegram_notifier import (
+        send_daily_sitrep,
+    )
+    from odds_client import odds_pool
 
 LAST_QUOTA_REMAINING: int | None = None
 

@@ -1,7 +1,7 @@
 # ============================================================
 # scripts/odds_client.py
 # Intelligent Odds API client with multi-account key pool rotation,
-# live quota tracking, and automatic failover.
+# live quota tracking, polite request pacing, and automatic failover.
 # Zero em dash characters used (R-02 compliance).
 # ============================================================
 
@@ -9,8 +9,9 @@ from __future__ import annotations
 
 import logging
 import os
-import requests
+import time
 from typing import Any, Callable
+import requests
 
 try:
     from config import ODDS_API_KEYS, ODDS_API_BASE, ODDS_SPORT_KEYS
@@ -24,6 +25,9 @@ if not logger.handlers:
     _handler.setFormatter(_formatter)
     logger.addHandler(_handler)
     logger.setLevel(logging.INFO)
+
+# Polite pacing delay between outgoing requests to avoid IP burst limits
+REQUEST_DELAY_SECONDS: float = 0.5
 
 
 def sanitize_key(key: str | None) -> str:
@@ -57,7 +61,6 @@ class OddsKeyInfo:
 
     def update_from_headers(self, headers: dict[str, Any]) -> None:
         """Parse The Odds API response headers for quota metadata."""
-        # Check standard and case-variant header keys
         rem = (
             headers.get("x-requests-remaining")
             or headers.get("X-Requests-Remaining")
@@ -99,8 +102,9 @@ class OddsKeyInfo:
 
 class OddsPoolManager:
     """
-    Manages a pool of The Odds API keys with round-robin rotation,
-    quota tracking, and automatic failover upon HTTP 429 or quota depletion.
+    Manages a pool of The Odds API keys with true per-request round-robin
+    rotation, polite request pacing, and automatic failover upon HTTP 429
+    or quota depletion.
     """
 
     def __init__(
@@ -109,6 +113,7 @@ class OddsPoolManager:
         base_url: str = ODDS_API_BASE,
         request_timeout: float = 15.0,
         quota_exhaustion_threshold: int = 2,
+        request_delay: float = REQUEST_DELAY_SECONDS,
     ):
         raw_keys = keys if keys is not None else ODDS_API_KEYS
         self.pool: list[OddsKeyInfo] = [OddsKeyInfo(k) for k in raw_keys if k and k.strip()]
@@ -116,6 +121,7 @@ class OddsPoolManager:
         self.base_url: str = base_url.rstrip("/")
         self.request_timeout: float = request_timeout
         self.quota_threshold: int = quota_exhaustion_threshold
+        self.request_delay: float = request_delay
 
     @property
     def key_count(self) -> int:
@@ -127,9 +133,11 @@ class OddsPoolManager:
         """List of keys that are not currently marked exhausted."""
         return [k for k in self.pool if not k.is_exhausted]
 
-    def get_current_key_info(self) -> OddsKeyInfo | None:
+    def get_next_active_key(self) -> OddsKeyInfo | None:
         """
-        Get the current active key info, advancing past any exhausted keys.
+        Retrieve the next available active key using round-robin rotation.
+        Advances current_index pointer immediately so every request alternates keys:
+        Request 1 -> Key A, Request 2 -> Key B, Request 3 -> Key C, Request 4 -> Key A.
         Returns None if all keys in the pool are exhausted.
         """
         if not self.pool:
@@ -137,8 +145,22 @@ class OddsPoolManager:
         n = len(self.pool)
         for offset in range(n):
             idx = (self.current_index + offset) % n
+            key_info = self.pool[idx]
+            if not key_info.is_exhausted:
+                self.current_index = (idx + 1) % n
+                return key_info
+        return None
+
+    def get_current_key_info(self) -> OddsKeyInfo | None:
+        """
+        Peek at the current key info without advancing pointer.
+        """
+        if not self.pool:
+            return None
+        n = len(self.pool)
+        for offset in range(n):
+            idx = (self.current_index + offset) % n
             if not self.pool[idx].is_exhausted:
-                self.current_index = idx
                 return self.pool[idx]
         return None
 
@@ -147,10 +169,10 @@ class OddsPoolManager:
         if not self.pool:
             return None
         n = len(self.pool)
-        for offset in range(1, n + 1):
+        for offset in range(n):
             idx = (self.current_index + offset) % n
             if not self.pool[idx].is_exhausted:
-                self.current_index = idx
+                self.current_index = (idx + 1) % n
                 logger.info(
                     f"[OddsPool] Rotated to key index {idx} ({self.pool[idx].sanitized}) due to: {reason}"
                 )
@@ -165,8 +187,8 @@ class OddsPoolManager:
         session_get: Callable[..., Any] | None = None,
     ) -> tuple[int, Any, dict[str, str]]:
         """
-        Execute an HTTP GET request with automatic key rotation and failover.
-        Retries with subsequent active keys if HTTP 429 or quota limit is reached.
+        Execute an HTTP GET request with true per-request round-robin rotation,
+        polite pacing delay, and automatic failover across the key pool.
         Returns: (status_code, response_data, headers_dict)
         """
         if not self.pool:
@@ -178,7 +200,7 @@ class OddsPoolManager:
         max_attempts = len(self.pool)
 
         while attempts < max_attempts:
-            key_info = self.get_current_key_info()
+            key_info = self.get_next_active_key()
             if not key_info:
                 logger.error("[OddsPool] No active keys available in pool.")
                 break
@@ -190,17 +212,23 @@ class OddsPoolManager:
             attempts += 1
             key_info.calls_made += 1
 
+            # Polite request pacing delay
+            if self.request_delay > 0:
+                time.sleep(self.request_delay)
+
             try:
                 resp = get_fn(url, params=current_params, timeout=self.request_timeout)
                 status = resp.status_code
                 headers = dict(resp.headers)
                 key_info.update_from_headers(headers)
 
-                # HTTP 429: Too Many Requests / Quota Exceeded
+                # HTTP 429: Too Many Requests / Monthly Quota Exceeded
                 if status == 429:
                     key_info.failed_calls += 1
                     key_info.mark_exhausted("HTTP 429 Rate Limit / Quota Exceeded")
-                    self.rotate_to_next_key("HTTP 429 failover")
+                    logger.warning(
+                        f"[OddsPool] Key {key_info.sanitized} failed with HTTP 429. Failing over to next key."
+                    )
                     continue
 
                 # Low Quota Detection: x-requests-remaining <= quota_threshold
@@ -216,20 +244,15 @@ class OddsPoolManager:
                     except Exception:
                         data = resp.text
 
-                    # Rotate to next key on round-robin when multiple active keys are available
-                    if len(self.active_keys) > 1:
-                        self.current_index = (self.current_index + 1) % len(self.pool)
-
                     return status, data, headers
 
                 # HTTP 401/403: Invalid Key or Unauthorized
                 if status in (401, 403):
                     key_info.failed_calls += 1
                     key_info.mark_exhausted(f"HTTP {status} Authentication failure")
-                    self.rotate_to_next_key(f"HTTP {status} failover")
                     continue
 
-                # Non-recoverable HTTP status (e.g., 404 Not Found, 422 Unprocessable)
+                # Other HTTP status (e.g. 404, 422, 500)
                 logger.warning(
                     f"[OddsPool] Key {key_info.sanitized} received HTTP {status} from {endpoint_path}: "
                     f"{getattr(resp, 'text', '')[:100]}"
@@ -241,7 +264,6 @@ class OddsPoolManager:
                 logger.warning(
                     f"[OddsPool] Network error on key {key_info.sanitized}: {exc}. Switching to next key."
                 )
-                self.rotate_to_next_key(f"Network error: {exc}")
 
         return 0, None, {}
 

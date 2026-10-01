@@ -63,9 +63,13 @@ class TestKeySanitization:
 class TestRoundRobinRotation:
     """Test round-robin switching across active keys in pool."""
 
+    def test_default_request_pacing(self):
+        manager = OddsPoolManager(keys=["key_alpha"])
+        assert manager.request_delay == 0.5
+
     def test_round_robin_sequence(self):
         keys = ["key_alpha_1111", "key_bravo_2222", "key_charlie_3333"]
-        manager = OddsPoolManager(keys=keys)
+        manager = OddsPoolManager(keys=keys, request_delay=0.0)
 
         def mock_get(url, params=None, timeout=15):
             resp = MagicMock()
@@ -100,7 +104,7 @@ class TestFailoverAndExhaustion:
 
     def test_failover_on_http_429(self):
         keys = ["primary_exhausted_key", "secondary_active_key"]
-        manager = OddsPoolManager(keys=keys)
+        manager = OddsPoolManager(keys=keys, request_delay=0.0)
 
         call_records = []
 
@@ -131,7 +135,7 @@ class TestFailoverAndExhaustion:
 
     def test_failover_on_low_quota_threshold(self):
         keys = ["near_empty_key", "healthy_backup_key"]
-        manager = OddsPoolManager(keys=keys, quota_exhaustion_threshold=2)
+        manager = OddsPoolManager(keys=keys, quota_exhaustion_threshold=2, request_delay=0.0)
 
         def mock_get(url, params=None, timeout=15):
             api_key = (params or {}).get("apiKey")
@@ -156,7 +160,7 @@ class TestFailoverAndExhaustion:
 
     def test_all_keys_exhausted_graceful_exit(self):
         keys = ["bad_key_1", "bad_key_2"]
-        manager = OddsPoolManager(keys=keys)
+        manager = OddsPoolManager(keys=keys, request_delay=0.0)
 
         def mock_get_429(url, params=None, timeout=15):
             resp = MagicMock()
@@ -175,7 +179,7 @@ class TestFailoverAndExhaustion:
 
     def test_fetch_odds_events_helper(self):
         keys = ["valid_key_123"]
-        manager = OddsPoolManager(keys=keys)
+        manager = OddsPoolManager(keys=keys, request_delay=0.0)
 
         def mock_get(url, params=None, timeout=15):
             resp = MagicMock()
@@ -190,7 +194,7 @@ class TestFailoverAndExhaustion:
 
     def test_quota_summary_structure(self):
         keys = ["key_11111111", "key_22222222"]
-        manager = OddsPoolManager(keys=keys)
+        manager = OddsPoolManager(keys=keys, request_delay=0.0)
         manager.pool[0].remaining_requests = 150
         manager.pool[0].used_requests = 350
         manager.pool[1].remaining_requests = 400

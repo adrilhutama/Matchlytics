@@ -19,12 +19,20 @@ from typing import Any
 
 import requests
 
-from config import (
-    TELEGRAM_BOT_TOKEN,
-    TELEGRAM_CHAT_ID,
-    APP_BASE_URL,
-    GITHUB_REPOSITORY,
-)
+try:
+    from scripts.config import (
+        TELEGRAM_BOT_TOKEN,
+        TELEGRAM_CHAT_ID,
+        APP_BASE_URL,
+        GITHUB_REPOSITORY,
+    )
+except ImportError:
+    from config import (
+        TELEGRAM_BOT_TOKEN,
+        TELEGRAM_CHAT_ID,
+        APP_BASE_URL,
+        GITHUB_REPOSITORY,
+    )
 
 
 def send_daily_sitrep(
