@@ -67,12 +67,22 @@ def fetch_and_settle_completed_matches(base_url: str, headers: dict, supabase: A
             if mid and h_score is not None and a_score is not None:
                 try:
                     # Update fixture record in Supabase
-                    supabase.table("fixtures").update({
+                    update_payload = {
                         "status": "FT",
-                        "home_score": int(h_score),
-                        "away_score": int(a_score),
+                        "actual_home_score": int(h_score),
+                        "actual_away_score": int(a_score),
                         "updated_at": datetime.now(timezone.utc).isoformat(),
-                    }).eq("id", mid).execute()
+                    }
+                    try:
+                        supabase.table("fixtures").update(update_payload).eq("id", mid).execute()
+                    except Exception:
+                        legacy_payload = {
+                            "status": "FT",
+                            "home_score": int(h_score),
+                            "away_score": int(a_score),
+                            "updated_at": datetime.now(timezone.utc).isoformat(),
+                        }
+                        supabase.table("fixtures").update(legacy_payload).eq("id", mid).execute()
                     settled_count += 1
                 except Exception as inner_err:
                     print(f"    [WARN] Failed to settle fixture {mid}: {inner_err}")
@@ -106,15 +116,26 @@ def evaluate_full_history(supabase: Any) -> dict:
     }
 
     try:
-        res = (
-            supabase.table("fixtures")
-            .select("*")
-            .in_("status", ["FT", "FINISHED", "AET", "PEN"])
-            .not_.is_("home_score", "null")
-            .not_.is_("away_score", "null")
-            .order("match_date", ascending=True)
-            .execute()
-        )
+        try:
+            res = (
+                supabase.table("fixtures")
+                .select("*")
+                .in_("status", ["FT", "FINISHED", "AET", "PEN"])
+                .not_.is_("actual_home_score", "null")
+                .not_.is_("actual_away_score", "null")
+                .order("kickoff_time", ascending=True)
+                .execute()
+            )
+        except Exception:
+            res = (
+                supabase.table("fixtures")
+                .select("*")
+                .in_("status", ["FT", "FINISHED", "AET", "PEN"])
+                .not_.is_("home_score", "null")
+                .not_.is_("away_score", "null")
+                .order("match_date", ascending=True)
+                .execute()
+            )
 
         rows = res.data or []
         if not rows:
@@ -136,8 +157,12 @@ def evaluate_full_history(supabase: Any) -> dict:
         equity_curve_k = []
 
         for r in rows:
-            h_score = int(r["home_score"])
-            a_score = int(r["away_score"])
+            h_val = r.get("actual_home_score") if r.get("actual_home_score") is not None else r.get("home_score")
+            a_val = r.get("actual_away_score") if r.get("actual_away_score") is not None else r.get("away_score")
+            if h_val is None or a_val is None:
+                continue
+            h_score = int(h_val)
+            a_score = int(a_val)
 
             if h_score > a_score:
                 actual_outcome = "HOME"
@@ -248,15 +273,26 @@ def evaluate_recent_settlement(supabase: Any) -> dict:
 
     try:
         two_days_ago = (datetime.now(timezone.utc) - timedelta(days=2)).isoformat()
-        res = (
-            supabase.table("fixtures")
-            .select("*")
-            .in_("status", ["FT", "FINISHED", "AET", "PEN"])
-            .not_.is_("home_score", "null")
-            .not_.is_("away_score", "null")
-            .gte("match_date", two_days_ago)
-            .execute()
-        )
+        try:
+            res = (
+                supabase.table("fixtures")
+                .select("*")
+                .in_("status", ["FT", "FINISHED", "AET", "PEN"])
+                .not_.is_("actual_home_score", "null")
+                .not_.is_("actual_away_score", "null")
+                .gte("kickoff_time", two_days_ago)
+                .execute()
+            )
+        except Exception:
+            res = (
+                supabase.table("fixtures")
+                .select("*")
+                .in_("status", ["FT", "FINISHED", "AET", "PEN"])
+                .not_.is_("home_score", "null")
+                .not_.is_("away_score", "null")
+                .gte("match_date", two_days_ago)
+                .execute()
+            )
 
         rows = res.data or []
         if not rows:
@@ -272,8 +308,12 @@ def evaluate_recent_settlement(supabase: Any) -> dict:
         net_units = 0.0
 
         for r in rows:
-            h_score = int(r["home_score"])
-            a_score = int(r["away_score"])
+            h_val = r.get("actual_home_score") if r.get("actual_home_score") is not None else r.get("home_score")
+            a_val = r.get("actual_away_score") if r.get("actual_away_score") is not None else r.get("away_score")
+            if h_val is None or a_val is None:
+                continue
+            h_score = int(h_val)
+            a_score = int(a_val)
 
             if h_score > a_score:
                 actual_outcome = "HOME"

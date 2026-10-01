@@ -198,14 +198,24 @@ def settle_portfolio_positions(supabase_client: Any, max_odds: float = 250.00) -
         if not pending:
             return 0
 
-        f_res = (
-            supabase_client.table("fixtures")
-            .select("id, status, home_score, away_score, match_date")
-            .in_("status", ["FT", "FINISHED", "AET", "PEN"])
-            .not_.is_("home_score", "null")
-            .not_.is_("away_score", "null")
-            .execute()
-        )
+        try:
+            f_res = (
+                supabase_client.table("fixtures")
+                .select("id, status, actual_home_score, actual_away_score, kickoff_time")
+                .in_("status", ["FT", "FINISHED", "AET", "PEN"])
+                .not_.is_("actual_home_score", "null")
+                .not_.is_("actual_away_score", "null")
+                .execute()
+            )
+        except Exception:
+            f_res = (
+                supabase_client.table("fixtures")
+                .select("id, status, home_score, away_score, match_date")
+                .in_("status", ["FT", "FINISHED", "AET", "PEN"])
+                .not_.is_("home_score", "null")
+                .not_.is_("away_score", "null")
+                .execute()
+            )
         finished_map = {f["id"]: f for f in (f_res.data or [])}
 
         settled_count = 0
@@ -218,8 +228,12 @@ def settle_portfolio_positions(supabase_client: Any, max_odds: float = 250.00) -
                 continue
 
             try:
-                h_score = int(f["home_score"])
-                a_score = int(f["away_score"])
+                h_raw = f.get("actual_home_score") if f.get("actual_home_score") is not None else f.get("home_score")
+                a_raw = f.get("actual_away_score") if f.get("actual_away_score") is not None else f.get("away_score")
+                if h_raw is None or a_raw is None:
+                    continue
+                h_score = int(h_raw)
+                a_score = int(a_raw)
             except (ValueError, TypeError):
                 continue
 
@@ -837,7 +851,6 @@ def sync_competition(
                 "odds_draw":           final_odds_draw,
                 "odds_away":           final_odds_away,
                 "value_pick":          final_value_pick,
-                "ev_percentage":       round(min(999.0, max(-100.0, final_ev_pct)), 2) if final_ev_pct is not None else None,
                 "market_odds":         market_odds,
                 "ev_opportunities":    ev_opps,
                 "best_ev_opportunity": best_ev,
@@ -849,10 +862,12 @@ def sync_competition(
             except Exception as upsert_err:
                 err_str = str(upsert_err)
                 base_keys = (
-                    "id", "home_team_id", "away_team_id", "lambda_home", "lambda_away",
+                    "id", "competition_code", "home_team_id", "away_team_id",
+                    "home_xg", "away_xg", "lambda_home", "lambda_away",
                     "prob_home", "prob_draw", "prob_away", "predicted_score",
-                    "prob_over_25", "prob_btts", "odds_home", "odds_draw", "odds_away",
-                    "value_pick", "ev_percentage", "market_odds", "ev_opportunities", "updated_at"
+                    "prob_over_25", "prob_under_25", "prob_btts_yes", "prob_btts",
+                    "odds_home", "odds_draw", "odds_away", "value_pick",
+                    "market_odds", "ev_opportunities", "best_ev_opportunity", "updated_at"
                 )
                 fallback_row = {k: v for k, v in update_row.items() if k in base_keys}
                 try:
@@ -995,6 +1010,29 @@ def write_github_step_summary(
         print(f"    [WARN] Failed to write GitHub step summary: {exc}")
 
 
+def clean_stale_fixtures(days_threshold: int = 45) -> int:
+    """
+    Housekeeping query to prune completed matches older than the threshold.
+    Deletes records where kickoff_time < cutoff_iso.
+    """
+    cutoff_iso = (datetime.now(timezone.utc) - timedelta(days=days_threshold)).isoformat()
+    try:
+        res = (
+            supabase.table("fixtures")
+            .delete()
+            .lt("kickoff_time", cutoff_iso)
+            .in_("status", ["FT", "FINISHED", "AET", "PEN"])
+            .execute()
+        )
+        return len(res.data) if res.data else 0
+    except Exception as exc:
+        print(f"    [WARN] Direct prune using kickoff_time encountered error: {exc}")
+        try:
+            return prune_stale_fixtures()
+        except Exception:
+            return 0
+
+
 # ---- Main Pipeline Orchestrator ------------------------------
 
 def main() -> None:
@@ -1065,7 +1103,7 @@ def main() -> None:
 
     # 5. Database housekeeping: prune matches finished > 45 days ago
     print("Running database housekeeping (clean_stale_fixtures)...")
-    pruned = prune_stale_fixtures()
+    pruned = clean_stale_fixtures(days_threshold=45)
     print(f"Stale fixtures pruned: {pruned}")
 
     # 6. Dispatch Telegram Daily SITREP

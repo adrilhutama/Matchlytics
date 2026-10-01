@@ -30,6 +30,8 @@ ALTER TABLE public.fixtures ADD COLUMN IF NOT EXISTS market_odds JSONB;
 ALTER TABLE public.fixtures ADD COLUMN IF NOT EXISTS best_ev_opportunity JSONB;
 ALTER TABLE public.fixtures ADD COLUMN IF NOT EXISTS competition_code TEXT;
 ALTER TABLE public.fixtures ADD COLUMN IF NOT EXISTS kickoff_time TIMESTAMPTZ;
+ALTER TABLE public.fixtures ADD COLUMN IF NOT EXISTS actual_home_score INT;
+ALTER TABLE public.fixtures ADD COLUMN IF NOT EXISTS actual_away_score INT;
 
 -- Add foreign key constraints safely
 DO $$

@@ -142,11 +142,22 @@ REQUEST_DELAY: float = 6.5
 def prune_stale_fixtures() -> int:
     """
     Execute stored database housekeeping function clean_stale_fixtures()
-    to prune completed matches older than 45 days.
+    or delete directly where kickoff_time < cutoff.
     """
+    cutoff_iso = (datetime.now(timezone.utc) - timedelta(days=45)).isoformat()
     try:
-        res = supabase.rpc("clean_stale_fixtures", {}).execute()
-        return res.data or 0
-    except Exception as exc:
-        print(f"Error executing clean_stale_fixtures: {exc}")
-        return 0
+        res = (
+            supabase.table("fixtures")
+            .delete()
+            .lt("kickoff_time", cutoff_iso)
+            .in_("status", ["FT", "FINISHED", "AET", "PEN"])
+            .execute()
+        )
+        return len(res.data) if res.data else 0
+    except Exception:
+        try:
+            res = supabase.rpc("clean_stale_fixtures", {}).execute()
+            return res.data or 0
+        except Exception as exc:
+            print(f"Error executing clean_stale_fixtures: {exc}")
+            return 0
