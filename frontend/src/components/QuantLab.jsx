@@ -253,10 +253,10 @@ function QuantLabWorkspace({
   }, [activeMarketOdds])
 
   // Safe team names and crests
-  const homeName = fixture.home_team_name || fixture.homeTeam || 'Home Team'
-  const awayName = fixture.away_team_name || fixture.awayTeam || 'Away Team'
-  const homeLogo = fixture.home_team_logo || fixture.homeLogo
-  const awayLogo = fixture.away_team_logo || fixture.awayLogo
+  const homeName = fixture.home_team?.name || fixture.home_team_name || fixture.homeTeam || 'Home Team'
+  const awayName = fixture.away_team?.name || fixture.away_team_name || fixture.awayTeam || 'Away Team'
+  const homeLogo = fixture.home_team?.crest_url || fixture.home_team_logo || fixture.homeLogo
+  const awayLogo = fixture.away_team?.crest_url || fixture.away_team_logo || fixture.awayLogo
   const leagueName = fixture.league_name || fixture.league || 'League'
   const matchDate = fixture.match_date || fixture.date
 

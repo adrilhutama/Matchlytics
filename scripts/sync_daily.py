@@ -76,6 +76,168 @@ except ImportError:
 
 LAST_QUOTA_REMAINING: int | None = None
 
+# ---- Normalized Schema & Team Metadata Caching --------------
+
+DEFAULT_LEAGUE_SHIELDS: dict[str, str] = {
+    "PL": "https://crests.football-data.org/PL.png",
+    "PD": "https://crests.football-data.org/PD.png",
+    "SA": "https://crests.football-data.org/SA.png",
+    "BL1": "https://crests.football-data.org/BL1.png",
+    "FL1": "https://crests.football-data.org/FL1.png",
+    "CL": "https://crests.football-data.org/CL.png",
+}
+
+CACHED_TEAM_IDS: set[int] = set()
+MAX_PARLAY_ODDS: float = 250.00
+
+
+def ensure_team_metadata(
+    team_id: int | None,
+    team_name: str | None,
+    crest_url: str | None,
+    competition_code: str,
+    supabase_client: Any,
+    tla: str | None = None,
+    short_name: str | None = None,
+) -> int | None:
+    """
+    Ensure team exists in public.teams table.
+    Upserts metadata: id, name, short_name, tla, crest_url, and competition_code.
+    Guardrail: If crest_url is missing, fallback to local league shield placeholder.
+    """
+    if not team_id or not team_name:
+        return team_id
+
+    if team_id in CACHED_TEAM_IDS:
+        return team_id
+
+    fallback_crest = DEFAULT_LEAGUE_SHIELDS.get(
+        competition_code, "https://crests.football-data.org/PL.png"
+    )
+    final_crest = (crest_url or "").strip() or fallback_crest
+    final_tla = tla or (team_name[:3].upper() if len(team_name) >= 3 else "TBD")
+    final_short = short_name or team_name
+
+    team_row = {
+        "id": team_id,
+        "name": team_name,
+        "short_name": final_short,
+        "tla": final_tla,
+        "crest_url": final_crest,
+        "competition_code": competition_code,
+        "updated_at": datetime.now(timezone.utc).isoformat(),
+    }
+
+    try:
+        if supabase_client:
+            supabase_client.table("teams").upsert(team_row, on_conflict="id").execute()
+            CACHED_TEAM_IDS.add(team_id)
+    except Exception as exc:
+        print(f"    [WARN] Failed to upsert team {team_id} ({team_name}): {exc}")
+
+    return team_id
+
+
+def settle_portfolio_positions(supabase_client: Any, max_odds: float = 250.00) -> int:
+    """
+    Settle pending user portfolio positions against completed fixtures.
+    Enforces a strict max parlay odds cap (max_odds = 250.00) to prevent
+    runaway ROI spikes from compounding invalid odds entries.
+    """
+    if not supabase_client:
+        return 0
+
+    try:
+        res = (
+            supabase_client.table("portfolio_positions")
+            .select("*")
+            .eq("status", "PENDING")
+            .execute()
+        )
+        pending = res.data or []
+        if not pending:
+            return 0
+
+        f_res = (
+            supabase_client.table("fixtures")
+            .select("id, status, home_score, away_score, match_date")
+            .in_("status", ["FT", "FINISHED", "AET", "PEN"])
+            .not_.is_("home_score", "null")
+            .not_.is_("away_score", "null")
+            .execute()
+        )
+        finished_map = {f["id"]: f for f in (f_res.data or [])}
+
+        settled_count = 0
+        now_iso = datetime.now(timezone.utc).isoformat()
+
+        for pos in pending:
+            fid = pos.get("fixture_id") or pos.get("fixtureId")
+            f = finished_map.get(fid)
+            if not f:
+                continue
+
+            try:
+                h_score = int(f["home_score"])
+                a_score = int(f["away_score"])
+            except (ValueError, TypeError):
+                continue
+
+            total_goals = h_score + a_score
+            sel = str(pos.get("selection") or pos.get("pick") or pos.get("selection_label") or "").upper()
+            status = "LOST"
+
+            if sel == "HOME" or (sel.startswith("HOME") and "AWAY" not in sel):
+                if h_score > a_score:
+                    status = "WON"
+            elif sel == "DRAW" or "DRAW" in sel or sel == "X":
+                if h_score == a_score:
+                    status = "WON"
+            elif sel == "AWAY" or (sel.startswith("AWAY") and "HOME" not in sel):
+                if a_score > h_score:
+                    status = "WON"
+            elif "OVER" in sel:
+                line = 1.5 if "1.5" in sel else 3.5 if "3.5" in sel else 2.5
+                if total_goals > line:
+                    status = "WON"
+            elif "UNDER" in sel:
+                line = 1.5 if "1.5" in sel else 3.5 if "3.5" in sel else 2.5
+                if total_goals < line:
+                    status = "WON"
+
+            try:
+                raw_odds = float(pos.get("odds", 1.0))
+            except (ValueError, TypeError):
+                raw_odds = 1.0
+
+            capped_odds = min(max_odds, max(1.0, raw_odds))
+
+            try:
+                stake = float(pos.get("stake_amount") or pos.get("stake") or 0.0)
+            except (ValueError, TypeError):
+                stake = 0.0
+
+            payout = round(stake * capped_odds, 2) if status == "WON" else 0.0
+
+            try:
+                supabase_client.table("portfolio_positions").update({
+                    "status": status,
+                    "payout": payout,
+                    "capped_odds": capped_odds,
+                    "settled_at": now_iso,
+                }).eq("id", pos["id"]).execute()
+                settled_count += 1
+            except Exception as upd_err:
+                print(f"    [WARN] Failed to settle portfolio position {pos.get('id')}: {upd_err}")
+
+        if settled_count > 0:
+            print(f"    Settled {settled_count} portfolio position(s) with max odds cap ({max_odds:.2f}).")
+        return settled_count
+
+    except Exception as exc:
+        print(f"    [WARN] Exception while settling portfolio positions: {exc}")
+        return 0
+
 
 # ---- Team name matching for The Odds API --------------------
 
@@ -489,6 +651,12 @@ def sync_competition(
         away_id   = fixture.get("away_team_id")
         home_name = fixture.get("home_team_name", "")
         away_name = fixture.get("away_team_name", "")
+        home_logo = fixture.get("home_team_logo") or fixture.get("home_crest")
+        away_logo = fixture.get("away_team_logo") or fixture.get("away_crest")
+
+        # Ingestion & Team Metadata Caching in public.teams
+        ensure_team_metadata(home_id, home_name, home_logo, code, supabase)
+        ensure_team_metadata(away_id, away_name, away_logo, code, supabase)
 
         try:
             home_stats = standings_map.get(f"{code}_{home_id}") or standings_map.get(home_id) or {}
@@ -530,39 +698,75 @@ def sync_competition(
 
             ev_opps = multi_analytics.get("ev_opportunities", [])
 
-            # Build update payload with multi-market odds and EV opportunities
+            # Build update payload with normalized schema columns & multi-market data
+            prob_o25 = round(min(100.0, max(0.0, multi_analytics["prob_over_25"])), 2)
+            prob_u25 = round(min(100.0, max(0.0, 100.0 - multi_analytics["prob_over_25"])), 2)
+            prob_btts_val = round(min(100.0, max(0.0, multi_analytics["prob_btts"])), 2)
+
+            best_ev = ev_opps[0] if ev_opps else (
+                {
+                    "market": "h2h",
+                    "selection": final_value_pick,
+                    "odds": (
+                        final_odds_home if final_value_pick == "HOME"
+                        else final_odds_draw if final_value_pick == "DRAW"
+                        else final_odds_away
+                    ),
+                    "ev_percentage": final_ev_pct,
+                    "model_prob": (
+                        multi_analytics["prob_home"] if final_value_pick == "HOME"
+                        else multi_analytics["prob_draw"] if final_value_pick == "DRAW"
+                        else multi_analytics["prob_away"]
+                    ),
+                } if final_value_pick and final_ev_pct else None
+            )
+
             update_row = {
-                "id":               fid,
-                "lambda_home":      lambda_home,
-                "lambda_away":      lambda_away,
-                "prob_home":        round(min(100.0, max(0.0, multi_analytics["prob_home"])), 2),
-                "prob_draw":        round(min(100.0, max(0.0, multi_analytics["prob_draw"])), 2),
-                "prob_away":        round(min(100.0, max(0.0, multi_analytics["prob_away"])), 2),
-                "predicted_score":  multi_analytics["predicted_score"],
-                "prob_over_25":     round(min(100.0, max(0.0, multi_analytics["prob_over_25"])), 2),
-                "prob_btts":        round(min(100.0, max(0.0, multi_analytics["prob_btts"])), 2),
-                "odds_home":        final_odds_home,
-                "odds_draw":        final_odds_draw,
-                "odds_away":        final_odds_away,
-                "value_pick":       final_value_pick,
-                "ev_percentage":    round(min(999.0, max(-100.0, final_ev_pct)), 2) if final_ev_pct is not None else None,
-                "market_odds":      market_odds,
-                "ev_opportunities": ev_opps,
-                "updated_at":       datetime.now(timezone.utc).isoformat(),
+                "id":                  fid,
+                "home_team_id":        home_id,
+                "away_team_id":        away_id,
+                "home_xg":             lambda_home,
+                "away_xg":             lambda_away,
+                "lambda_home":         lambda_home,
+                "lambda_away":         lambda_away,
+                "prob_home":           round(min(100.0, max(0.0, multi_analytics["prob_home"])), 2),
+                "prob_draw":           round(min(100.0, max(0.0, multi_analytics["prob_draw"])), 2),
+                "prob_away":           round(min(100.0, max(0.0, multi_analytics["prob_away"])), 2),
+                "predicted_score":     multi_analytics["predicted_score"],
+                "prob_over_25":        prob_o25,
+                "prob_under_25":       prob_u25,
+                "prob_btts_yes":       prob_btts_val,
+                "prob_btts":           prob_btts_val,
+                "odds_home":           final_odds_home,
+                "odds_draw":           final_odds_draw,
+                "odds_away":           final_odds_away,
+                "value_pick":          final_value_pick,
+                "ev_percentage":       round(min(999.0, max(-100.0, final_ev_pct)), 2) if final_ev_pct is not None else None,
+                "market_odds":         market_odds,
+                "ev_opportunities":    ev_opps,
+                "best_ev_opportunity": best_ev,
+                "updated_at":          datetime.now(timezone.utc).isoformat(),
             }
 
             try:
                 supabase.table("fixtures").upsert(update_row, on_conflict="id").execute()
             except Exception as upsert_err:
                 err_str = str(upsert_err)
-                if "market_odds" in err_str or "ev_opportunities" in err_str:
-                    fallback_row = {
-                        k: v for k, v in update_row.items()
+                base_keys = (
+                    "id", "home_team_id", "away_team_id", "lambda_home", "lambda_away",
+                    "prob_home", "prob_draw", "prob_away", "predicted_score",
+                    "prob_over_25", "prob_btts", "odds_home", "odds_draw", "odds_away",
+                    "value_pick", "ev_percentage", "market_odds", "ev_opportunities", "updated_at"
+                )
+                fallback_row = {k: v for k, v in update_row.items() if k in base_keys}
+                try:
+                    supabase.table("fixtures").upsert(fallback_row, on_conflict="id").execute()
+                except Exception:
+                    minimal_row = {
+                        k: v for k, v in fallback_row.items()
                         if k not in ("market_odds", "ev_opportunities")
                     }
-                    supabase.table("fixtures").upsert(fallback_row, on_conflict="id").execute()
-                else:
-                    raise upsert_err
+                    supabase.table("fixtures").upsert(minimal_row, on_conflict="id").execute()
 
             odds_source = " [REAL ODDS: MULTI-MARKET]" if has_real_odds else " [FAIR ODDS]"
             opp_count_str = f" | +EV opps: {len(ev_opps)}" if ev_opps else ""
@@ -705,6 +909,10 @@ def main() -> None:
     # 1. Settle recent completed matches and evaluate accuracy
     print("Settling recent completed matches from Football-Data.org...")
     fetch_and_settle_completed_matches(BASE_URL, HEADERS, supabase)
+
+    # 1b. Settle user portfolio positions with strict odds cap (250.00)
+    print("Settling user portfolio positions with max odds cap (250.00)...")
+    settle_portfolio_positions(supabase, max_odds=MAX_PARLAY_ODDS)
 
     print("Evaluating model accuracy & Brier calibration...")
     settlement_stats = evaluate_recent_settlement(supabase)

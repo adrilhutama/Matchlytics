@@ -445,15 +445,31 @@ function AppInner() {
     const { from, to } = buildDateRange()
 
     try {
-      const { data, error: sbErr } = await supabase
+      // Query fixtures with joined normalized team metadata
+      let { data, error: sbErr } = await supabase
         .from('fixtures')
-        .select('*')
+        .select(`
+          *,
+          home_team:teams!fixtures_home_team_id_fkey(id, name, short_name, crest_url),
+          away_team:teams!fixtures_away_team_id_fkey(id, name, short_name, crest_url)
+        `)
         .gte('match_date', from)
         .lte('match_date', to)
         .in('status', UPCOMING_STATUSES)
         .order('match_date', { ascending: true })
 
-      if (sbErr) throw sbErr
+      if (sbErr) {
+        // Fallback to flat select if foreign key constraint is not yet available
+        const fallbackRes = await supabase
+          .from('fixtures')
+          .select('*')
+          .gte('match_date', from)
+          .lte('match_date', to)
+          .in('status', UPCOMING_STATUSES)
+          .order('match_date', { ascending: true })
+        if (fallbackRes.error) throw sbErr
+        data = fallbackRes.data
+      }
 
       setFixtures(data || [])
       setLastUpdated(new Date())
@@ -470,17 +486,31 @@ function AppInner() {
     }
   }, [])
 
-  // Data fetching: Settled historical fixtures
+  // Data fetching: Settled historical fixtures with joined team metadata
   const fetchSettledFixtures = useCallback(async () => {
     try {
-      const { data, error: stErr } = await supabase
+      let { data, error: stErr } = await supabase
         .from('fixtures')
-        .select('*')
+        .select(`
+          *,
+          home_team:teams!fixtures_home_team_id_fkey(id, name, short_name, crest_url),
+          away_team:teams!fixtures_away_team_id_fkey(id, name, short_name, crest_url)
+        `)
         .in('status', ['FT', 'FINISHED', 'AET', 'PEN'])
         .order('match_date', { ascending: false })
         .limit(150)
 
-      if (!stErr && data) {
+      if (stErr) {
+        const fallbackRes = await supabase
+          .from('fixtures')
+          .select('*')
+          .in('status', ['FT', 'FINISHED', 'AET', 'PEN'])
+          .order('match_date', { ascending: false })
+          .limit(150)
+        data = fallbackRes.data
+      }
+
+      if (data) {
         setSettledFixtures(data)
       }
     } catch (err) {
@@ -493,6 +523,64 @@ function AppInner() {
     fetchStandings()
     fetchSettledFixtures()
   }, [fetchFixtures, fetchStandings, fetchSettledFixtures])
+
+  // Rational Portfolio Settlement: Auto-settle pending positions matching finished fixtures
+  useEffect(() => {
+    if (fixtures.length === 0 && settledFixtures.length === 0) return
+
+    setPortfolioPositions((prev) => {
+      if (!Array.isArray(prev) || prev.length === 0) return prev
+      const allMatches = [...fixtures, ...settledFixtures]
+      const matchMap = new Map()
+      allMatches.forEach((m) => {
+        if (m.id) matchMap.set(m.id, m)
+      })
+
+      let changed = false
+      const next = prev.map((pos) => {
+        if (pos.status !== 'PENDING') return pos
+        const m = matchMap.get(pos.fixture_id || pos.fixtureId)
+        if (!m || !['FT', 'FINISHED', 'AET', 'PEN'].includes(m.status)) return pos
+        if (m.home_score == null || m.away_score == null) return pos
+
+        const hScore = Number(m.home_score)
+        const aScore = Number(m.away_score)
+        const totalGoals = hScore + aScore
+        const sel = String(pos.selection || pos.pick || pos.selectionLabel || '').toUpperCase()
+
+        let status = 'LOST'
+        if (sel === 'HOME' || (sel.startsWith('HOME') && !sel.includes('AWAY'))) {
+          if (hScore > aScore) status = 'WON'
+        } else if (sel === 'DRAW' || sel.includes('DRAW') || sel === 'X') {
+          if (hScore === aScore) status = 'WON'
+        } else if (sel === 'AWAY' || (sel.startsWith('AWAY') && !sel.includes('HOME'))) {
+          if (aScore > hScore) status = 'WON'
+        } else if (sel.includes('OVER')) {
+          const line = sel.includes('1.5') ? 1.5 : sel.includes('3.5') ? 3.5 : 2.5
+          if (totalGoals > line) status = 'WON'
+        } else if (sel.includes('UNDER')) {
+          const line = sel.includes('1.5') ? 1.5 : sel.includes('3.5') ? 3.5 : 2.5
+          if (totalGoals < line) status = 'WON'
+        }
+
+        const rawOdds = Number(pos.odds ?? pos.marketOdds) || 1.0
+        const cappedOdds = Math.min(250.0, Math.max(1.0, rawOdds))
+        const stake = Number(pos.stake ?? pos.stakeAmount) || 0
+        const payout = status === 'WON' ? Math.round(stake * cappedOdds) : 0
+
+        changed = true
+        return {
+          ...pos,
+          status,
+          capped_odds: cappedOdds,
+          payout,
+          settledAt: new Date().toISOString(),
+        }
+      })
+
+      return changed ? next : prev
+    })
+  }, [fixtures, settledFixtures])
 
   // Realtime subscription
   useEffect(() => {

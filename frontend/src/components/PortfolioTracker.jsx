@@ -5,6 +5,8 @@
 
 import { useState, useMemo } from 'react'
 
+const MAX_PARLAY_ODDS = 250.00
+
 export default function PortfolioTracker({
   positions = [],
   onUpdatePositionStatus,
@@ -43,7 +45,9 @@ export default function PortfolioTracker({
 
     positions.forEach((pos) => {
       const stake = Number(pos.stake ?? pos.stakeAmount) || 0
-      const odds = Number(pos.odds ?? pos.marketOdds) || 1.0
+      const rawOdds = Number(pos.capped_odds ?? pos.odds ?? pos.marketOdds) || 1.0
+      // Enforce strict parlay odds cap (max 250.00) to eliminate runaway payouts and ROI spikes
+      const odds = Math.min(MAX_PARLAY_ODDS, Math.max(1.0, rawOdds))
 
       if (pos.status === 'WON') {
         wins += 1
@@ -99,7 +103,7 @@ export default function PortfolioTracker({
       leagueName: newPos.leagueName,
       matchDate: new Date().toISOString(),
       selectionLabel: newPos.selectionLabel,
-      odds: parseFloat(newPos.odds) || 2.0,
+      odds: Math.min(MAX_PARLAY_ODDS, Math.max(1.01, parseFloat(newPos.odds) || 2.0)),
       stakeAmount: parseFloat(newPos.stakeAmount) || 100000,
       status: 'PENDING',
       notes: newPos.notes,
@@ -256,7 +260,8 @@ export default function PortfolioTracker({
               <tbody className="divide-y divide-pitch-800/60">
                 {filteredPositions.map((pos) => {
                   const stake = Number(pos.stake ?? pos.stakeAmount) || 0
-                  const odds = Number(pos.odds ?? pos.marketOdds) || 1.0
+                  const rawOdds = Number(pos.capped_odds ?? pos.odds ?? pos.marketOdds) || 1.0
+                  const odds = Math.min(MAX_PARLAY_ODDS, Math.max(1.0, rawOdds))
                   const fixtureTitle = pos.fixture || pos.fixtureName || pos.fixtureMatch || (pos.legs ? `${pos.legs.length}-Leg Parlay` : 'Unknown Fixture')
                   const selectionText = pos.selection || pos.selectionLabel || pos.selectionName || pos.pick || 'Custom Selection'
                   const dateStr = pos.date || (pos.loggedAt ? new Date(pos.loggedAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : 'Today')

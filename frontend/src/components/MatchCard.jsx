@@ -89,6 +89,11 @@ export default function MatchCard({
     lambda_home, lambda_away,
   } = fixture
 
+  const homeLogo = fixture.home_team?.crest_url || home_team_logo
+  const awayLogo = fixture.away_team?.crest_url || away_team_logo
+  const homeName = fixture.home_team?.name || home_team_name
+  const awayName = fixture.away_team?.name || away_team_name
+
   const homeStandings = standingsMap[fixture.home_team_id] || standingsMap[`${fixture.league_id}_${fixture.home_team_id}`] || null
   const awayStandings = standingsMap[fixture.away_team_id] || standingsMap[`${fixture.league_id}_${fixture.away_team_id}`] || null
 
@@ -315,7 +320,7 @@ export default function MatchCard({
         <div className="flex items-center justify-between gap-2.5 mb-3">
           {/* Home */}
           <div className="flex flex-col items-center gap-1 flex-1 text-center min-w-0">
-            <TeamLogo src={home_team_logo} name={home_team_name} />
+            <TeamLogo src={homeLogo} name={homeName} />
             <span className="text-xs font-semibold text-slate-200 line-clamp-2 leading-tight min-h-[2.4em] flex items-center justify-center">
               {home_team_name}
             </span>
@@ -348,7 +353,7 @@ export default function MatchCard({
 
           {/* Away */}
           <div className="flex flex-col items-center gap-1 flex-1 text-center min-w-0">
-            <TeamLogo src={away_team_logo} name={away_team_name} />
+            <TeamLogo src={awayLogo} name={awayName} />
             <span className="text-xs font-semibold text-slate-200 line-clamp-2 leading-tight min-h-[2.4em] flex items-center justify-center">
               {away_team_name}
             </span>

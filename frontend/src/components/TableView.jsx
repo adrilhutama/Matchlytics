@@ -69,6 +69,11 @@ export function TableRow({
     ev_opportunities,
   } = fixture
 
+  const homeLogo = fixture.home_team?.crest_url || home_team_logo
+  const awayLogo = fixture.away_team?.crest_url || away_team_logo
+  const homeName = fixture.home_team?.name || home_team_name
+  const awayName = fixture.away_team?.name || away_team_name
+
   const hasRealOdds = isRealMarketOdds(fixture)
   const { relativeBadge, timeStr } = formatLocalizedMatchDate(match_date)
 
@@ -286,9 +291,9 @@ export function TableRow({
             <div className="flex flex-col gap-1 min-w-0">
               {/* Home */}
               <div className="flex items-center gap-2 min-w-0">
-                {home_team_logo && (
+                {homeLogo && (
                   <img
-                    src={home_team_logo}
+                    src={homeLogo}
                     alt=""
                     width={16}
                     height={16}
@@ -309,9 +314,9 @@ export function TableRow({
 
               {/* Away */}
               <div className="flex items-center gap-2 min-w-0">
-                {away_team_logo && (
+                {awayLogo && (
                   <img
-                    src={away_team_logo}
+                    src={awayLogo}
                     alt=""
                     width={16}
                     height={16}
