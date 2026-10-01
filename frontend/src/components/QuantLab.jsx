@@ -193,6 +193,7 @@ function QuantLabWorkspace({
   onLogPosition,
   effectiveBankroll = 1000000,
   currencyCode = 'IDR',
+  onBackToScanner,
 }) {
   const initialH = safeClampLambda(
     fixture.lambdaHome ?? fixture.homeLambda ?? fixture.xG_home ?? fixture.lambda_home,
@@ -315,6 +316,17 @@ function QuantLabWorkspace({
       {/* Top Match Selector & Identity Header */}
       <div className="p-4 sm:p-5 rounded-2xl bg-pitch-900 border border-pitch-700/80 shadow-xl flex flex-col lg:flex-row lg:items-center justify-between gap-4">
         <div className="flex flex-col sm:flex-row sm:items-center gap-3 min-w-0">
+          {onBackToScanner && (
+            <button
+              type="button"
+              onClick={onBackToScanner}
+              className="min-h-[40px] px-3 py-1.5 rounded-xl bg-pitch-950 hover:bg-pitch-800 text-slate-300 hover:text-amber-400 border border-pitch-700 text-xs font-mono font-semibold transition-all flex items-center gap-1.5 active:scale-95 touch-manipulation flex-shrink-0"
+              title="Return to Terminal Scanner Table"
+            >
+              <span>&larr;</span>
+              <span>Scanner</span>
+            </button>
+          )}
           <div className="flex items-center gap-2">
             <span className="w-8 h-8 rounded-lg bg-amber-500/10 text-amber-400 border border-amber-500/20 flex items-center justify-center font-mono font-bold text-sm">
               ⚅
@@ -877,6 +889,7 @@ export default function QuantLab({
   bankrollAmount = 1000000,
   userBankroll = 1000000,
   currencyCode = 'IDR',
+  onBackToScanner,
 }) {
   const matchPool = (allFixtures && allFixtures.length > 0) ? allFixtures : (fixtures || [])
   const targetFixture = fixture || selectedFixture || (matchPool.length > 0 ? (
@@ -908,6 +921,7 @@ export default function QuantLab({
         onLogPosition={onLogPosition}
         effectiveBankroll={userBankroll || bankrollAmount || 1000000}
         currencyCode={currencyCode}
+        onBackToScanner={onBackToScanner}
       />
     </QuantLabErrorBoundary>
   )

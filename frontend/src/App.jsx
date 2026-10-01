@@ -15,6 +15,8 @@ import Header from './components/Header'
 import FilterBar, { DATE_RANGES } from './components/FilterBar'
 import MatchCard from './components/MatchCard'
 import CompactTableView from './components/CompactTableView'
+import TableView from './components/TableView'
+import TerminalScanner from './components/TerminalScanner'
 import ScoreMatrixModal from './components/ScoreMatrixModal'
 import KellyCalculatorModal from './components/KellyCalculatorModal'
 import ParlaySlipDrawer from './components/ParlaySlipDrawer'
@@ -136,7 +138,7 @@ function AppInner() {
   }, [])
   const [searchQuery,         setSearchQuery]         = useState('')
   const [sortOption,          setSortOption]          = useState('kickoff_asc')
-  const [viewMode,            setViewMode]            = useState('cards')
+  const [viewMode,            setViewMode]            = useState('table')
 
   const [showUpgradeModal,    setShowUpgradeModal]    = useState(false)
 
@@ -168,6 +170,51 @@ function AppInner() {
   const [settledFixtures,       setSettledFixtures]       = useState([])
 
   const [deferredInstall,       setDeferredInstall]       = useState(null)
+
+  // Dedicated match deep route check: /match/:id or #/match/:id or ?match=:id
+  useEffect(() => {
+    if (typeof window === 'undefined' || fixtures.length === 0) return
+
+    const getTargetMatchId = () => {
+      const hash = window.location.hash
+      const hashMatch = hash.match(/#\/match\/([a-zA-Z0-9_-]+)/)
+      if (hashMatch) return hashMatch[1]
+
+      const pathname = window.location.pathname
+      const pathMatch = pathname.match(/\/match\/([a-zA-Z0-9_-]+)/)
+      if (pathMatch) return pathMatch[1]
+
+      const searchParams = new URLSearchParams(window.location.search)
+      return searchParams.get('match') || null
+    }
+
+    const matchId = getTargetMatchId()
+    if (matchId) {
+      const found = fixtures.find((f) => String(f.id) === String(matchId))
+      if (found) {
+        setSelectedLabFixture(found)
+        setActiveWorkspace('quant_lab')
+      }
+    }
+
+    const handleLocationChange = () => {
+      const updatedId = getTargetMatchId()
+      if (updatedId) {
+        const found = fixtures.find((f) => String(f.id) === String(updatedId))
+        if (found) {
+          setSelectedLabFixture(found)
+          setActiveWorkspace('quant_lab')
+        }
+      }
+    }
+
+    window.addEventListener('popstate', handleLocationChange)
+    window.addEventListener('hashchange', handleLocationChange)
+    return () => {
+      window.removeEventListener('popstate', handleLocationChange)
+      window.removeEventListener('hashchange', handleLocationChange)
+    }
+  }, [fixtures])
 
   useEffect(() => {
     function onBeforeInstall(e) {
@@ -333,8 +380,27 @@ function AppInner() {
     }
     setSelectedLabFixture(fixture)
     setActiveWorkspace('quant_lab')
+    if (typeof window !== 'undefined') {
+      try {
+        window.history.pushState(null, '', `#/match/${fixture.id}`)
+      } catch {
+        // fallback
+      }
+    }
     window.scrollTo({ top: 0, behavior: 'smooth' })
   }, [canAccessQuantFeatures, openUpgradeFor])
+
+  const handleBackToScanner = useCallback(() => {
+    setActiveWorkspace('terminal')
+    if (typeof window !== 'undefined') {
+      try {
+        window.history.pushState(null, '', `#/app`)
+      } catch {
+        // fallback
+      }
+    }
+    window.scrollTo({ top: 0, behavior: 'smooth' })
+  }, [])
 
   // Centralized workspace switcher with auto-selection
   const handleSelectWorkspace = useCallback((ws) => {
@@ -884,101 +950,31 @@ function AppInner() {
                   onClearFilters={handleClearFilters}
                 />
               ) : (
-                <section aria-label="Match fixtures feed">
-                  {/* Feed metadata bar */}
-                  <div className="flex flex-wrap items-center justify-between gap-2 mb-4 text-xs text-slate-400">
-                    <p>
-                      Showing{' '}
-                      <strong className="text-amber-400 font-mono">
-                        {paginatedFixtures.length}
-                      </strong>{' '}
-                      of{' '}
-                      <strong className="text-slate-200 font-mono">
-                        {displayedFixtures.length}
-                      </strong>{' '}
-                      {displayedFixtures.length === 1 ? 'fixture' : 'fixtures'}
-                      {showWatchlistOnly
-                        ? ' in Watchlist'
-                        : activeLeague !== 'all'
-                        ? ` in ${currentLeagueLabel}`
-                        : ''}
-                      {dateRange !== 'all' ? ` (${currentDateRangeLabel})` : ''}
-                    </p>
-                    <div className="flex items-center gap-3">
-                      <span className="inline-flex items-center gap-1.5 text-[11px] text-emerald-400 font-mono">
-                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" aria-hidden="true" />
-                        Realtime Active
-                      </span>
-                      <span className="text-slate-500 hidden sm:inline font-mono">
-                        Consensus Sharp Aggregation
-                      </span>
-                    </div>
-                  </div>
-
-                  {/* View Mode: Detailed Cards */}
-                  {viewMode === 'cards' && (
-                    <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3 sm:gap-4">
-                      {paginatedFixtures.map((fixture, idx) => {
-                        const fixtureSlipPicks = parlaySlip
-                          .filter((l) => l.fixtureId === fixture.id)
-                          .map((l) => l.pick)
-
-                        return (
-                          <MatchCard
-                            key={fixture.id}
-                            fixture={fixture}
-                            isPinned={watchlist.includes(fixture.id)}
-                            onToggleWatchlist={handleToggleWatchlist}
-                            onOpenMatrix={openMatrixGated}
-                            onOpenQuantModal={openQuantGated}
-                            onSelectForLab={handleSelectForLab}
-                            onLogPosition={handleLogPosition}
-                            slipPicks={fixtureSlipPicks}
-                            onToggleSlip={toggleSlipGated}
-                            standingsMap={standingsMap}
-                            style={{ animationDelay: `${Math.min(idx * 30, 300)}ms` }}
-                            quantLocked={!canAccessQuantFeatures}
-                            onTriggerUpgrade={openUpgradeFor}
-                          />
-                        )
-                      })}
-                    </div>
-                  )}
-
-                  {/* View Mode: Compact Table */}
-                  {viewMode === 'table' && (
-                    <CompactTableView
-                      fixtures={paginatedFixtures}
-                      watchlist={watchlist}
-                      onToggleWatchlist={handleToggleWatchlist}
-                      onOpenMatrix={openMatrixGated}
-                      onOpenQuantModal={openQuantGated}
-                      onSelectForLab={handleSelectForLab}
-                      onLogPosition={handleLogPosition}
-                      slipLegs={parlaySlip}
-                      onToggleSlip={toggleSlipGated}
-                      standingsMap={standingsMap}
-                      quantLocked={!canAccessQuantFeatures}
-                      onTriggerUpgrade={openUpgradeFor}
-                    />
-                  )}
-
-                  {/* Batch Slice-based Pagination Button */}
-                  {visibleCount < displayedFixtures.length && (
-                    <div className="flex justify-center pt-8 pb-4">
-                      <button
-                        type="button"
-                        onClick={() => setVisibleCount((prev) => prev + 24)}
-                        className="px-6 py-2.5 rounded-xl bg-pitch-950 border border-pitch-700 hover:border-amber-500/50 hover:bg-pitch-800 text-xs font-mono font-semibold text-slate-300 hover:text-amber-400 transition-all flex items-center gap-2.5 shadow-lg group focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500"
-                      >
-                        <span>Load More Fixtures</span>
-                        <span className="px-2 py-0.5 rounded-md bg-pitch-900 group-hover:bg-amber-500/20 text-[10px] text-amber-400 border border-pitch-700 group-hover:border-amber-500/30 transition-colors">
-                          +{Math.min(24, displayedFixtures.length - visibleCount)} of {displayedFixtures.length - visibleCount} remaining
-                        </span>
-                      </button>
-                    </div>
-                  )}
-                </section>
+                <TerminalScanner
+                  fixtures={paginatedFixtures}
+                  allFixturesCount={displayedFixtures.length}
+                  currentLeagueLabel={currentLeagueLabel}
+                  currentDateRangeLabel={currentDateRangeLabel}
+                  showWatchlistOnly={showWatchlistOnly}
+                  activeLeague={activeLeague}
+                  dateRange={dateRange}
+                  watchlist={watchlist}
+                  onToggleWatchlist={handleToggleWatchlist}
+                  onOpenMatrix={openMatrixGated}
+                  onOpenQuantModal={openQuantGated}
+                  onSelectForLab={handleSelectForLab}
+                  onLogPosition={handleLogPosition}
+                  slipLegs={parlaySlip}
+                  onToggleSlip={toggleSlipGated}
+                  standingsMap={standingsMap}
+                  quantLocked={!canAccessQuantFeatures}
+                  onTriggerUpgrade={openUpgradeFor}
+                  viewMode={viewMode}
+                  onViewModeChange={setViewMode}
+                  visibleCount={visibleCount}
+                  totalCount={displayedFixtures.length}
+                  onLoadMore={() => setVisibleCount((prev) => prev + 24)}
+                />
               )}
             </div>
           )}
@@ -995,6 +991,7 @@ function AppInner() {
               onLogPosition={handleLogPosition}
               userBankroll={bankrollAmount}
               bankrollAmount={bankrollAmount}
+              onBackToScanner={handleBackToScanner}
             />
           )}
 
