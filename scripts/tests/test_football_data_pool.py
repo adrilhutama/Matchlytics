@@ -15,8 +15,9 @@ from scripts.football_data_pool import (
     FootballTokenInfo,
     parse_football_data_tokens,
     sanitize_token,
+    fetch_fixture_h2h,
 )
-from scripts.sync_monthly_fixtures import fetch_cross_league_fixtures
+from scripts.sync_monthly_fixtures import fetch_cross_league_fixtures, extract_venue_and_referee
 from scripts.sync_daily import fetch_cross_league_matches
 
 
@@ -309,3 +310,66 @@ class TestMultiCompetitionOptimization:
         assert params.get("competitions") == "PL,PD,SA,BL1,FL1,CL"
         assert params.get("dateFrom") == "2026-10-02"
         assert params.get("dateTo") == "2026-10-09"
+
+
+class TestH2HAndMatchEnrichment:
+    """Test suite for H2H match history and match metadata extraction."""
+
+    def test_extract_venue_and_referee(self):
+        match_payload = {
+            "venue": "Anfield",
+            "referees": [
+                {"name": "Michael Oliver", "type": "REFEREE", "nationality": "England"},
+                {"name": "Stuart Burt", "type": "ASSISTANT_REFEREE", "nationality": "England"},
+            ],
+        }
+        venue, referee = extract_venue_and_referee(match_payload)
+        assert venue == "Anfield"
+        assert referee == {"name": "Michael Oliver", "nationality": "England"}
+
+    def test_extract_venue_and_referee_empty(self):
+        venue, referee = extract_venue_and_referee({})
+        assert venue is None
+        assert referee == {}
+
+    def test_fetch_fixture_h2h_compact_payload(self):
+        mock_pool = MagicMock()
+        mock_resp = MagicMock()
+        mock_resp.status_code = 200
+        mock_resp.json.return_value = {
+            "aggregates": {
+                "numberOfMatches": 5,
+                "totalGoals": 14,
+                "homeTeam": {"id": 64, "name": "Liverpool FC", "wins": 3, "draws": 1, "losses": 1},
+                "awayTeam": {"id": 65, "name": "Manchester City FC", "wins": 1, "draws": 1, "losses": 3},
+            },
+            "matches": [
+                {
+                    "id": 1001,
+                    "utcDate": "2026-03-10T16:30:00Z",
+                    "homeTeam": {"id": 64, "name": "Liverpool FC"},
+                    "awayTeam": {"id": 65, "name": "Manchester City FC"},
+                    "score": {
+                        "winner": "HOME_TEAM",
+                        "fullTime": {"home": 2, "away": 1},
+                    },
+                    "competition": {"code": "PL"},
+                }
+            ],
+        }
+        mock_pool.get.return_value = mock_resp
+
+        result = fetch_fixture_h2h(mock_pool, 501928)
+        assert result["numberOfMatches"] == 5
+        assert result["totalGoals"] == 14
+        assert result["homeWins"] == 3
+        assert result["draws"] == 1
+        assert result["awayWins"] == 1
+        assert len(result["recentMatches"]) == 1
+        first_m = result["recentMatches"][0]
+        assert first_m["id"] == 1001
+        assert first_m["date"] == "2026-03-10"
+        assert first_m["homeScore"] == 2
+        assert first_m["awayScore"] == 1
+        assert first_m["competition"] == "PL"
+

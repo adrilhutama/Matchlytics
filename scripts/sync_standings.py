@@ -145,6 +145,54 @@ def upsert_team_standings(records: list[dict]) -> int:
         return 0
 
 
+def update_team_strength_splits(records: list[dict]) -> int:
+    """Calculate relative home/away strength splits and update public.teams."""
+    if not records or not supabase:
+        return 0
+
+    total_h_gf = sum(r.get('home_goals_for', 0) for r in records)
+    total_h_pl = sum(r.get('home_played', 0) for r in records)
+    total_a_gf = sum(r.get('away_goals_for', 0) for r in records)
+    total_a_pl = sum(r.get('away_played', 0) for r in records)
+
+    league_avg_home = (total_h_gf / total_h_pl) if total_h_pl > 0 else 1.50
+    league_avg_away = (total_a_gf / total_a_pl) if total_a_pl > 0 else 1.20
+
+    updated = 0
+    now_iso = datetime.now(timezone.utc).isoformat()
+
+    for r in records:
+        tid = r.get('team_id')
+        if not tid:
+            continue
+
+        h_games = r.get('home_played', 0) or 0
+        a_games = r.get('away_played', 0) or 0
+        h_gf = r.get('home_goals_for', 0) or 0
+        h_ga = r.get('home_goals_against', 0) or 0
+        a_gf = r.get('away_goals_for', 0) or 0
+        a_ga = r.get('away_goals_against', 0) or 0
+
+        home_attack = round((h_gf / h_games) / league_avg_home, 4) if (h_games > 0 and league_avg_home > 0) else 1.0000
+        home_defense = round((h_ga / h_games) / league_avg_away, 4) if (h_games > 0 and league_avg_away > 0) else 1.0000
+        away_attack = round((a_gf / a_games) / league_avg_away, 4) if (a_games > 0 and league_avg_away > 0) else 1.0000
+        away_defense = round((a_ga / a_games) / league_avg_home, 4) if (a_games > 0 and league_avg_home > 0) else 1.0000
+
+        try:
+            supabase.table('teams').update({
+                'home_attack': home_attack,
+                'home_defense': home_defense,
+                'away_attack': away_attack,
+                'away_defense': away_defense,
+                'updated_at': now_iso,
+            }).eq('id', tid).execute()
+            updated += 1
+        except Exception:
+            pass
+
+    return updated
+
+
 def main() -> None:
     now_str = datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M UTC')
     print(f'Starting Standings & Form Sync: {now_str}')
@@ -160,7 +208,8 @@ def main() -> None:
         if standings_list:
             records = parse_standings_tables(code, standings_list)
             upserted = upsert_team_standings(records)
-            print(f'    Upserted {upserted} team standings records for {code}.')
+            strengths_updated = update_team_strength_splits(records)
+            print(f'    Upserted {upserted} team standings records and updated {strengths_updated} team strength splits for {code}.')
             total_teams_upserted += upserted
         else:
             print(f'    No standings returned for {code}.')

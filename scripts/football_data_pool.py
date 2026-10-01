@@ -388,3 +388,81 @@ class FootballDataPoolManager:
 
 # Default singleton instance for application pipeline
 football_pool = FootballDataPoolManager()
+
+
+def fetch_fixture_h2h(pool: Any, match_id: int | str) -> dict[str, Any]:
+    """
+    Fetch head-to-head match history for a fixture from Football-Data.org v4:
+    GET /v4/matches/{match_id}/head2head?limit=5
+    Returns compact summary:
+      {
+        "numberOfMatches": int,
+        "totalGoals": int,
+        "homeWins": int,
+        "draws": int,
+        "awayWins": int,
+        "recentMatches": list[dict]
+      }
+    """
+    if not match_id or not pool:
+        return {}
+
+    url = f"{DEFAULT_BASE_URL}/matches/{match_id}/head2head"
+    params = {"limit": 5}
+    try:
+        resp = pool.get(url, params=params, timeout=15)
+        if resp.status_code != 200:
+            return {}
+        data = resp.json()
+        matches = data.get("matches", []) or []
+        agg = data.get("aggregates", {}) or {}
+
+        home_agg = agg.get("homeTeam", {}) or {}
+        away_agg = agg.get("awayTeam", {}) or {}
+
+        recent_matches = []
+        for rm in matches[:5]:
+            ft_score = rm.get("score", {}).get("fullTime", {}) if isinstance(rm.get("score"), dict) else {}
+            recent_matches.append({
+                "id": rm.get("id"),
+                "date": (rm.get("utcDate") or "")[:10],
+                "utcDate": rm.get("utcDate"),
+                "homeTeam": rm.get("homeTeam", {}).get("name", "") if isinstance(rm.get("homeTeam"), dict) else "",
+                "awayTeam": rm.get("awayTeam", {}).get("name", "") if isinstance(rm.get("awayTeam"), dict) else "",
+                "homeScore": ft_score.get("home"),
+                "awayScore": ft_score.get("away"),
+                "winner": rm.get("score", {}).get("winner") if isinstance(rm.get("score"), dict) else None,
+                "competition": (
+                    rm.get("competition", {}).get("code") or rm.get("competition", {}).get("name")
+                    if isinstance(rm.get("competition"), dict) else ""
+                ),
+            })
+
+        home_wins = home_agg.get("wins") if home_agg.get("wins") is not None else sum(
+            1 for m in matches if isinstance(m.get("score"), dict) and m.get("score", {}).get("winner") == "HOME_TEAM"
+        )
+        away_wins = home_agg.get("losses") if home_agg.get("losses") is not None else (
+            away_agg.get("wins") if away_agg.get("wins") is not None else sum(
+                1 for m in matches if isinstance(m.get("score"), dict) and m.get("score", {}).get("winner") == "AWAY_TEAM"
+            )
+        )
+        draws = home_agg.get("draws") if home_agg.get("draws") is not None else sum(
+            1 for m in matches if isinstance(m.get("score"), dict) and m.get("score", {}).get("winner") == "DRAW"
+        )
+        total_goals = agg.get("totalGoals") if agg.get("totalGoals") is not None else sum(
+            ((m.get("score", {}).get("fullTime", {}).get("home") or 0) +
+             (m.get("score", {}).get("fullTime", {}).get("away") or 0))
+            for m in matches if isinstance(m.get("score"), dict) and isinstance(m.get("score", {}).get("fullTime"), dict)
+        )
+
+        return {
+            "numberOfMatches": agg.get("numberOfMatches", len(matches)),
+            "totalGoals": total_goals,
+            "homeWins": home_wins,
+            "draws": draws,
+            "awayWins": away_wins,
+            "recentMatches": recent_matches,
+        }
+    except Exception as exc:
+        logger.warning(f"[H2H Fetch Error] match {match_id}: {exc}")
+        return {}

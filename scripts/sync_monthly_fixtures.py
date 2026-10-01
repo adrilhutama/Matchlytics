@@ -95,11 +95,23 @@ def fetch_cross_league_fixtures(
     return data.get("matches", [])
 
 
+def extract_venue_and_referee(m: dict) -> tuple[str | None, dict]:
+    """Extract venue and primary referee metadata from Football-Data.org match payload."""
+    venue = m.get("venue")
+    refs = m.get("referees", []) or []
+    main_ref = next((r for r in refs if r.get("type") == "REFEREE"), refs[0] if refs else {})
+    referee_payload = {
+        "name": main_ref.get("name"),
+        "nationality": main_ref.get("nationality"),
+    } if main_ref and main_ref.get("name") else {}
+    return venue, referee_payload
+
+
 def parse_fixture_row(m: dict, league: dict | None = None, comp_code: str | None = None) -> dict:
     """
     Extract and map fields from a football-data.org match object to Supabase fixture row.
     Adheres strictly to the normalized schema with only essential relational columns:
-    id, competition_code, home_team_id, away_team_id, kickoff_time, status.
+    id, competition_code, home_team_id, away_team_id, kickoff_time, status, venue, referee.
     """
     comp = m.get("competition", {})
     home = m.get("homeTeam", {})
@@ -109,8 +121,9 @@ def parse_fixture_row(m: dict, league: dict | None = None, comp_code: str | None
     raw_status = m.get("status", "SCHEDULED")
     status = "NS" if raw_status in ("SCHEDULED", "TIMED") else raw_status
     utc_date = m.get("utcDate")
+    venue, referee_payload = extract_venue_and_referee(m)
 
-    # Strictly normalized payload matching new schema
+    # Strictly normalized payload matching new schema with venue and referee
     return {
         "id":               m["id"],
         "competition_code": code,
@@ -118,6 +131,8 @@ def parse_fixture_row(m: dict, league: dict | None = None, comp_code: str | None
         "away_team_id":     away.get("id"),
         "kickoff_time":     utc_date,
         "status":           status,
+        "venue":            venue,
+        "referee":          referee_payload,
     }
 
 

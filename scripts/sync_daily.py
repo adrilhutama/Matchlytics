@@ -48,7 +48,7 @@ try:
         send_daily_sitrep,
     )
     from scripts.odds_client import odds_pool
-    from scripts.football_data_pool import football_pool
+    from scripts.football_data_pool import football_pool, fetch_fixture_h2h
 except ImportError:
     from config import (
         BASE_URL,
@@ -76,11 +76,23 @@ except ImportError:
         send_daily_sitrep,
     )
     from odds_client import odds_pool
-    from football_data_pool import football_pool
+    from football_data_pool import football_pool, fetch_fixture_h2h
 
 LAST_QUOTA_REMAINING: int | None = None
 
 # ---- Football-Data.org Ingestion Helpers with Pool Rotation ---
+
+def extract_venue_and_referee(m: dict) -> tuple[str | None, dict]:
+    """Extract venue and primary referee metadata from Football-Data.org match payload."""
+    venue = m.get("venue")
+    refs = m.get("referees", []) or []
+    main_ref = next((r for r in refs if r.get("type") == "REFEREE"), refs[0] if refs else {})
+    referee_payload = {
+        "name": main_ref.get("name"),
+        "nationality": main_ref.get("nationality"),
+    } if main_ref and main_ref.get("name") else {}
+    return venue, referee_payload
+
 
 def fetch_league_standings(competition_code: str, pool: Any = None) -> list[dict]:
     """Fetch standings tables for a competition from Football-Data.org via token pool."""
@@ -685,16 +697,6 @@ def load_team_standings_and_averages() -> tuple[dict[Any, dict], dict[str, dict]
 
     for r in rows:
         code = r.get("league_code")
-        tid = r.get("team_id")
-        rec_id = r.get("id")
-
-        if rec_id:
-            standings_map[rec_id] = r
-        if tid:
-            standings_map[tid] = r
-            if code:
-                standings_map[f"{code}_{tid}"] = r
-
         if code:
             if code not in league_totals:
                 league_totals[code] = {
@@ -703,10 +705,10 @@ def load_team_standings_and_averages() -> tuple[dict[Any, dict], dict[str, dict]
                     "away_goals_for": 0,
                     "away_played": 0,
                 }
-            league_totals[code]["home_goals_for"] += r.get("home_goals_for", 0)
-            league_totals[code]["home_played"] += r.get("home_played", 0)
-            league_totals[code]["away_goals_for"] += r.get("away_goals_for", 0)
-            league_totals[code]["away_played"] += r.get("away_played", 0)
+            league_totals[code]["home_goals_for"] += r.get("home_goals_for", 0) or 0
+            league_totals[code]["home_played"] += r.get("home_played", 0) or 0
+            league_totals[code]["away_goals_for"] += r.get("away_goals_for", 0) or 0
+            league_totals[code]["away_played"] += r.get("away_played", 0) or 0
 
     league_averages: dict[str, dict] = {}
     for code, totals in league_totals.items():
@@ -718,6 +720,51 @@ def load_team_standings_and_averages() -> tuple[dict[Any, dict], dict[str, dict]
             "home_avg_goals_for": max(0.5, round(h_avg, 3)),
             "away_avg_goals_for": max(0.5, round(a_avg, 3)),
         }
+
+    for r in rows:
+        code = r.get("league_code")
+        tid = r.get("team_id")
+        rec_id = r.get("id")
+
+        avg = league_averages.get(code, {"home_avg_goals_for": 1.50, "away_avg_goals_for": 1.20})
+        lg_home_avg = avg.get("home_avg_goals_for") or 1.50
+        lg_away_avg = avg.get("away_avg_goals_for") or 1.20
+
+        h_games = r.get("home_played", 0) or 0
+        a_games = r.get("away_played", 0) or 0
+        h_gf = r.get("home_goals_for", 0) or 0
+        h_ga = r.get("home_goals_against", 0) or 0
+        a_gf = r.get("away_goals_for", 0) or 0
+        a_ga = r.get("away_goals_against", 0) or 0
+
+        # Relative attack and defense strength splits
+        home_attack = round((h_gf / h_games) / lg_home_avg, 4) if (h_games > 0 and lg_home_avg > 0) else 1.0000
+        home_defense = round((h_ga / h_games) / lg_away_avg, 4) if (h_games > 0 and lg_away_avg > 0) else 1.0000
+        away_attack = round((a_gf / a_games) / lg_away_avg, 4) if (a_games > 0 and lg_away_avg > 0) else 1.0000
+        away_defense = round((a_ga / a_games) / lg_home_avg, 4) if (a_games > 0 and lg_home_avg > 0) else 1.0000
+
+        r["home_attack"] = home_attack
+        r["home_defense"] = home_defense
+        r["away_attack"] = away_attack
+        r["away_defense"] = away_defense
+
+        if rec_id:
+            standings_map[rec_id] = r
+        if tid:
+            standings_map[tid] = r
+            if code:
+                standings_map[f"{code}_{tid}"] = r
+
+            if supabase:
+                try:
+                    supabase.table("teams").update({
+                        "home_attack": home_attack,
+                        "home_defense": home_defense,
+                        "away_attack": away_attack,
+                        "away_defense": away_defense,
+                    }).eq("id", tid).execute()
+                except Exception:
+                    pass
 
     return standings_map, league_averages
 
@@ -868,8 +915,34 @@ def sync_competition(
             home_stats = standings_map.get(f"{code}_{home_id}") or standings_map.get(home_id) or {}
             away_stats = standings_map.get(f"{code}_{away_id}") or standings_map.get(away_id) or {}
 
-            # Calculate Poisson lambdas with Home/Away split stats and Bayesian shrinkage
-            lambda_home, lambda_away = calculate_lambdas(home_stats, away_stats, averages)
+            # Dynamic Poisson lambda calibration using Home/Away strength split
+            h_att = home_stats.get("home_attack")
+            h_def = home_stats.get("home_defense")
+            a_att = away_stats.get("away_attack")
+            a_def = away_stats.get("away_defense")
+            league_avg_home = averages.get("home_avg_goals_for", 1.50)
+            league_avg_away = averages.get("away_avg_goals_for", 1.20)
+
+            if h_att is not None and a_def is not None and a_att is not None and h_def is not None:
+                lh = float(h_att) * float(a_def) * float(league_avg_home)
+                la = float(a_att) * float(h_def) * float(league_avg_away)
+                lambda_home = min(3.20, max(0.60, lh))
+                lambda_away = min(3.20, max(0.60, la))
+            else:
+                lambda_home, lambda_away = calculate_lambdas(home_stats, away_stats, averages)
+
+            # Preserve or extract venue and referee metadata
+            venue_val = fixture.get("venue")
+            referee_val = fixture.get("referee") or {}
+
+            # Ingest Head-to-Head (H2H) match history via token pool
+            h2h_data = fixture.get("h2h_data")
+            if not h2h_data or not isinstance(h2h_data, dict) or not h2h_data.get("recentMatches"):
+                try:
+                    h2h_data = fetch_fixture_h2h(football_pool, fid)
+                except Exception as exc:
+                    print(f"    [WARN] H2H fetch error for match {fid}: {exc}")
+                    h2h_data = {}
 
             # Match comprehensive multi-market odds from The Odds API
             market_odds, has_real_odds = find_matching_multi_market_odds(
@@ -982,6 +1055,9 @@ def sync_competition(
                 "market_odds":         market_odds or {},
                 "ev_opportunities":    ev_opps or [],
                 "best_ev_opportunity": best_ev,
+                "venue":               venue_val,
+                "referee":             referee_val,
+                "h2h_data":            h2h_data or {},
                 "updated_at":          datetime.now(timezone.utc).isoformat(),
             }
 

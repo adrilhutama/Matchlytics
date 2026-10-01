@@ -53,7 +53,7 @@ class TestSyncMonthlyFixtures:
         for key in legacy_keys:
             assert key not in row, f"Legacy key '{key}' unexpectedly present in normalized payload"
 
-        expected_keys = {"id", "competition_code", "home_team_id", "away_team_id", "kickoff_time", "status"}
+        expected_keys = {"id", "competition_code", "home_team_id", "away_team_id", "kickoff_time", "status", "venue", "referee"}
         assert set(row.keys()) == expected_keys
 
     def test_ensure_team_metadata_object_signature(self):

@@ -291,6 +291,17 @@ function QuantLabWorkspace({
   const homeStandings = fixture ? (standingsMap[fixture.home_team_id] || standingsMap[`${fixture.league_id}_${fixture.home_team_id}`] || null) : null
   const awayStandings = fixture ? (standingsMap[fixture.away_team_id] || standingsMap[`${fixture.league_id}_${fixture.away_team_id}`] || null) : null
 
+  // Team strength split metrics
+  const homeAttack = fixture?.home_team?.home_attack ?? homeStandings?.home_attack ?? 1.0
+  const homeDefense = fixture?.home_team?.home_defense ?? homeStandings?.home_defense ?? 1.0
+  const awayAttack = fixture?.away_team?.away_attack ?? awayStandings?.away_attack ?? 1.0
+  const awayDefense = fixture?.away_team?.away_defense ?? awayStandings?.away_defense ?? 1.0
+
+  // Head-to-Head intelligence data
+  const h2hData = fixture?.h2h_data || {}
+  const recentMatches = Array.isArray(h2hData?.recentMatches) ? h2hData.recentMatches : []
+  const totalH2hMatches = (h2hData?.homeWins ?? 0) + (h2hData?.draws ?? 0) + (h2hData?.awayWins ?? 0) || h2hData?.numberOfMatches || recentMatches.length
+
   // Reset to original model xG
   const handleResetModelXg = () => {
     if (fixture) {
@@ -427,6 +438,10 @@ function QuantLabWorkspace({
               <span>Record: {homeStandings.home_goals_for}:{homeStandings.home_goals_against} in {homeStandings.home_played}H</span>
             )}
           </div>
+          <div className="flex items-center justify-between text-[10px] font-mono pt-2 border-t border-pitch-800/60">
+            <span className="text-slate-400">Home Attack: <strong className="text-sky-400">{Number(homeAttack).toFixed(2)}x</strong></span>
+            <span className="text-slate-400">Home Defense: <strong className="text-sky-300">{Number(homeDefense).toFixed(2)}x</strong></span>
+          </div>
         </div>
 
         {/* Away Expected Goals (Lambda A) */}
@@ -482,6 +497,10 @@ function QuantLabWorkspace({
             {awayStandings?.away_played > 0 && (
               <span>Record: {awayStandings.away_goals_for}:{awayStandings.away_goals_against} in {awayStandings.away_played}A</span>
             )}
+          </div>
+          <div className="flex items-center justify-between text-[10px] font-mono pt-2 border-t border-pitch-800/60">
+            <span className="text-slate-400">Away Attack: <strong className="text-rose-400">{Number(awayAttack).toFixed(2)}x</strong></span>
+            <span className="text-slate-400">Away Defense: <strong className="text-rose-300">{Number(awayDefense).toFixed(2)}x</strong></span>
           </div>
         </div>
 
@@ -719,6 +738,159 @@ function QuantLabWorkspace({
           <div className="pt-3 border-t border-pitch-800 text-[10px] text-slate-500 font-mono text-right">
             Monte Carlo pseudorandom Knuth transform. 10,000 runs.
           </div>
+        </div>
+      </div>
+
+      {/* Head-to-Head (H2H) Intelligence Section */}
+      <div className="p-4 sm:p-5 rounded-2xl bg-pitch-900 border border-pitch-700/80 shadow-xl space-y-4">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-pitch-800 pb-3">
+          <div className="flex items-center gap-3">
+            <div className="w-8 h-8 rounded-xl bg-amber-500/10 border border-amber-500/20 flex items-center justify-center text-amber-400 font-bold font-mono text-sm">
+              ⚔
+            </div>
+            <div>
+              <h3 className="text-sm font-bold text-slate-100 flex items-center gap-2">
+                <span>Head-to-Head Intelligence</span>
+                <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-pitch-950 text-slate-400 border border-pitch-800">
+                  {h2hData?.numberOfMatches ? `${h2hData.numberOfMatches} Encounters` : 'Recent History'}
+                </span>
+              </h3>
+              <p className="text-[11px] text-slate-400 mt-0.5">
+                Historical encounter track record and goal breakdown between {homeName} and {awayName}.
+              </p>
+            </div>
+          </div>
+          {(fixture?.venue || fixture?.referee?.name) && (
+            <div className="text-xs font-mono text-slate-400 flex flex-wrap items-center gap-2">
+              {fixture.venue && (
+                <span className="px-2 py-0.5 rounded bg-pitch-950 border border-pitch-800 text-slate-300">
+                  Stadion: {fixture.venue}
+                </span>
+              )}
+              {fixture.referee?.name && (
+                <span className="px-2 py-0.5 rounded bg-pitch-950 border border-pitch-800 text-slate-300">
+                  Wasit: {fixture.referee.name} ({fixture.referee.nationality || 'FIFA'})
+                </span>
+              )}
+            </div>
+          )}
+        </div>
+
+        {/* H2H Win Ratio & Aggregates Cards */}
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+          <div className="p-3 rounded-xl bg-pitch-950 border border-pitch-800">
+            <span className="text-[10px] uppercase font-mono text-slate-400 block mb-1">
+              {homeName} Wins
+            </span>
+            <div className="flex items-baseline gap-2">
+              <span className="text-xl font-bold font-mono text-sky-400">
+                {h2hData?.homeWins ?? 0}
+              </span>
+              <span className="text-xs text-slate-500 font-mono">
+                {totalH2hMatches > 0 ? `${Math.round(((h2hData?.homeWins ?? 0) / totalH2hMatches) * 100)}%` : '0%'}
+              </span>
+            </div>
+          </div>
+
+          <div className="p-3 rounded-xl bg-pitch-950 border border-pitch-800">
+            <span className="text-[10px] uppercase font-mono text-slate-400 block mb-1">
+              Draws
+            </span>
+            <div className="flex items-baseline gap-2">
+              <span className="text-xl font-bold font-mono text-amber-400">
+                {h2hData?.draws ?? 0}
+              </span>
+              <span className="text-xs text-slate-500 font-mono">
+                {totalH2hMatches > 0 ? `${Math.round(((h2hData?.draws ?? 0) / totalH2hMatches) * 100)}%` : '0%'}
+              </span>
+            </div>
+          </div>
+
+          <div className="p-3 rounded-xl bg-pitch-950 border border-pitch-800">
+            <span className="text-[10px] uppercase font-mono text-slate-400 block mb-1">
+              {awayName} Wins
+            </span>
+            <div className="flex items-baseline gap-2">
+              <span className="text-xl font-bold font-mono text-rose-400">
+                {h2hData?.awayWins ?? 0}
+              </span>
+              <span className="text-xs text-slate-500 font-mono">
+                {totalH2hMatches > 0 ? `${Math.round(((h2hData?.awayWins ?? 0) / totalH2hMatches) * 100)}%` : '0%'}
+              </span>
+            </div>
+          </div>
+
+          <div className="p-3 rounded-xl bg-pitch-950 border border-pitch-800">
+            <span className="text-[10px] uppercase font-mono text-slate-400 block mb-1">
+              Total Goals
+            </span>
+            <div className="flex items-baseline gap-2">
+              <span className="text-xl font-bold font-mono text-emerald-400">
+                {h2hData?.totalGoals ?? 0}
+              </span>
+              <span className="text-xs text-slate-500 font-mono">
+                {totalH2hMatches > 0 ? `${((h2hData?.totalGoals ?? 0) / totalH2hMatches).toFixed(1)} / game` : '-'}
+              </span>
+            </div>
+          </div>
+        </div>
+
+        {/* 5 Recent Encounters Table / Cards */}
+        <div className="space-y-2">
+          <span className="text-xs font-mono uppercase text-slate-400 tracking-wider block">
+            Last 5 Encounters
+          </span>
+          {recentMatches.length > 0 ? (
+            <div className="grid grid-cols-1 md:grid-cols-5 gap-2">
+              {recentMatches.map((m, idx) => {
+                const isHomeWin = (m.homeScore != null && m.awayScore != null && m.homeScore > m.awayScore)
+                const isAwayWin = (m.homeScore != null && m.awayScore != null && m.awayScore > m.homeScore)
+                const isDraw = (m.homeScore != null && m.awayScore != null && m.homeScore === m.awayScore)
+
+                return (
+                  <div
+                    key={m.id || idx}
+                    className="p-3 rounded-xl bg-pitch-950 border border-pitch-800/80 flex flex-col justify-between space-y-2 font-mono text-xs"
+                  >
+                    <div className="flex items-center justify-between text-[10px] text-slate-500 border-b border-pitch-850 pb-1">
+                      <span>{m.date || (m.utcDate ? m.utcDate.slice(0, 10) : 'Past Match')}</span>
+                      <span className="text-slate-400 uppercase font-semibold">{m.competition || 'LEAG'}</span>
+                    </div>
+
+                    <div className="space-y-1 my-1">
+                      <div className="flex items-center justify-between">
+                        <span className={`truncate text-[11px] ${isHomeWin ? 'text-slate-100 font-bold' : 'text-slate-400'}`}>
+                          {m.homeTeam || homeName}
+                        </span>
+                        <span className={`font-bold px-1.5 py-0.5 rounded text-[11px] ${isHomeWin ? 'bg-sky-500/20 text-sky-400' : 'text-slate-300'}`}>
+                          {m.homeScore != null ? m.homeScore : '-'}
+                        </span>
+                      </div>
+                      <div className="flex items-center justify-between">
+                        <span className={`truncate text-[11px] ${isAwayWin ? 'text-slate-100 font-bold' : 'text-slate-400'}`}>
+                          {m.awayTeam || awayName}
+                        </span>
+                        <span className={`font-bold px-1.5 py-0.5 rounded text-[11px] ${isAwayWin ? 'bg-rose-500/20 text-rose-400' : 'text-slate-300'}`}>
+                          {m.awayScore != null ? m.awayScore : '-'}
+                        </span>
+                      </div>
+                    </div>
+
+                    <div className="text-[10px] text-center pt-1 border-t border-pitch-850">
+                      {isHomeWin && <span className="text-sky-400 font-semibold">{m.homeTeam || homeName} Win</span>}
+                      {isAwayWin && <span className="text-rose-400 font-semibold">{m.awayTeam || awayName} Win</span>}
+                      {isDraw && <span className="text-amber-400 font-semibold">Draw</span>}
+                      {!isHomeWin && !isAwayWin && !isDraw && <span className="text-slate-500">Completed</span>}
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+          ) : (
+            <div className="p-4 rounded-xl bg-pitch-950 border border-pitch-800 text-center text-xs font-mono text-slate-500">
+              No historical head-to-head fixtures recorded for this matchup.
+            </div>
+          )}
         </div>
       </div>
 

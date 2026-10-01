@@ -584,10 +584,16 @@ export function TableRow({
                     ⚅
                   </div>
                   <div>
-                    <h4 className="text-sm font-bold text-slate-100 flex items-center gap-2">
+                    <h4 className="text-sm font-bold text-slate-100 flex flex-wrap items-center gap-2">
                       <span>{home_team_name} vs {away_team_name}</span>
                       <span className="text-[10px] font-normal font-mono px-2 py-0.5 rounded bg-pitch-900 border border-pitch-800 text-amber-300">
                         {league_name}
+                      </span>
+                      <span className="text-[10px] font-normal font-mono px-2 py-0.5 rounded bg-pitch-900 border border-pitch-800 text-slate-300">
+                        STADION: {fixture.venue || 'TBD'}
+                      </span>
+                      <span className="text-[10px] font-normal font-mono px-2 py-0.5 rounded bg-pitch-900 border border-pitch-800 text-slate-300">
+                        WASIT: {fixture.referee?.name ? `${fixture.referee.name} (${fixture.referee.nationality || 'FIFA'})` : 'TBD'}
                       </span>
                     </h4>
                     <p className="text-[11px] text-slate-400 font-mono">
