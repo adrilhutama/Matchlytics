@@ -53,14 +53,24 @@ export function TableRow({
     prob_away,
     predicted_score,
     prob_over_25,
-    odds_home,
-    odds_draw,
-    odds_away,
     value_pick,
     ev_percentage,
     market_odds,
     ev_opportunities,
   } = fixture
+
+  const h2hOdds = fixture.market_odds?.h2h || {}
+  const rawOddsHome = typeof h2hOdds.home === 'number' ? h2hOdds.home : (h2hOdds.home?.price || h2hOdds.consensus?.home)
+  const rawOddsDraw = typeof h2hOdds.draw === 'number' ? h2hOdds.draw : (h2hOdds.draw?.price || h2hOdds.consensus?.draw)
+  const rawOddsAway = typeof h2hOdds.away === 'number' ? h2hOdds.away : (h2hOdds.away?.price || h2hOdds.consensus?.away)
+
+  const oddsHome = rawOddsHome || fixture.odds_home || fixture.fair_odds_home || null
+  const oddsDraw = rawOddsDraw || fixture.odds_draw || fixture.fair_odds_draw || null
+  const oddsAway = rawOddsAway || fixture.odds_away || fixture.fair_odds_away || null
+
+  const odds_home = oddsHome
+  const odds_draw = oddsDraw
+  const odds_away = oddsAway
 
   const home_team_name = fixture.home_team?.name || fixture.home_team_name || 'Home'
   const away_team_name = fixture.away_team?.name || fixture.away_team_name || 'Away'
@@ -381,7 +391,7 @@ export function TableRow({
               }`}
             >
               <div className="text-[9px] text-slate-500 leading-none">1 ({prob_home != null ? Math.round(prob_home) : '-'}%)</div>
-              <div className="text-xs font-semibold mt-0.5">{odds_home ? Number(odds_home).toFixed(2) : '-'}</div>
+              <div className="text-xs font-semibold mt-0.5">{oddsHome ? Number(oddsHome).toFixed(2) : '-'}</div>
             </div>
 
             {/* Draw */}
@@ -393,7 +403,7 @@ export function TableRow({
               }`}
             >
               <div className="text-[9px] text-slate-500 leading-none">X ({prob_draw != null ? Math.round(prob_draw) : '-'}%)</div>
-              <div className="text-xs font-semibold mt-0.5">{odds_draw ? Number(odds_draw).toFixed(2) : '-'}</div>
+              <div className="text-xs font-semibold mt-0.5">{oddsDraw ? Number(oddsDraw).toFixed(2) : '-'}</div>
             </div>
 
             {/* Away */}
@@ -405,7 +415,7 @@ export function TableRow({
               }`}
             >
               <div className="text-[9px] text-slate-500 leading-none">2 ({prob_away != null ? Math.round(prob_away) : '-'}%)</div>
-              <div className="text-xs font-semibold mt-0.5">{odds_away ? Number(odds_away).toFixed(2) : '-'}</div>
+              <div className="text-xs font-semibold mt-0.5">{oddsAway ? Number(oddsAway).toFixed(2) : '-'}</div>
             </div>
           </div>
           {hasRealOdds && (
@@ -763,21 +773,7 @@ export function TableRow({
                     </button>
                   )}
 
-                  <button
-                    type="button"
-                    onClick={() => quantLocked && onTriggerUpgrade ? onTriggerUpgrade('Score Matrix requires a Pro pass') : onOpenMatrix(fixture)}
-                    className="min-h-[44px] py-2 px-3 rounded-xl bg-pitch-900 hover:bg-pitch-800 border border-pitch-800 text-slate-400 hover:text-slate-200 text-xs font-mono transition-colors"
-                  >
-                    Score Matrix Modal
-                  </button>
 
-                  <button
-                    type="button"
-                    onClick={() => quantLocked && onTriggerUpgrade ? onTriggerUpgrade('Quant and Kelly require a Pro pass') : onOpenQuantModal && onOpenQuantModal(fixture)}
-                    className="min-h-[44px] py-2 px-3 rounded-xl bg-pitch-900 hover:bg-pitch-800 border border-pitch-800 text-slate-400 hover:text-slate-200 text-xs font-mono transition-colors"
-                  >
-                    Kelly Modal
-                  </button>
                 </div>
 
                 {/* Primary Action CTA Button: Routes to dedicated match analysis view */}

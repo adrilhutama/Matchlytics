@@ -17,6 +17,19 @@ function parseOddsInput(val) {
   return Number.isFinite(parsedOdd) && parsedOdd > 1 ? parsedOdd : 0
 }
 
+function getResolvedFixtureOdds(fix) {
+  if (!fix) return { home: '2.10', draw: '3.40', away: '3.50' }
+  const h2h = fix.market_odds?.h2h || {}
+  const rawH = typeof h2h.home === 'number' ? h2h.home : (h2h.home?.price || h2h.consensus?.home)
+  const rawD = typeof h2h.draw === 'number' ? h2h.draw : (h2h.draw?.price || h2h.consensus?.draw)
+  const rawA = typeof h2h.away === 'number' ? h2h.away : (h2h.away?.price || h2h.consensus?.away)
+  return {
+    home: String(rawH || fix.odds_home || fix.fair_odds_home || '2.10'),
+    draw: String(rawD || fix.odds_draw || fix.fair_odds_draw || '3.40'),
+    away: String(rawA || fix.odds_away || fix.fair_odds_away || '3.50'),
+  }
+}
+
 // Safe clamp for expected goals lambda parameter
 function safeClampLambda(val, fallback = 1.35) {
   const num = Number(val)
@@ -195,41 +208,24 @@ function QuantLabWorkspace({
   currencyCode = 'IDR',
   onBackToScanner,
 }) {
-  const initialH = safeClampLambda(
-    fixture.lambdaHome ?? fixture.homeLambda ?? fixture.xG_home ?? fixture.lambda_home,
-    1.35
-  )
-  const initialA = safeClampLambda(
-    fixture.lambdaAway ?? fixture.awayLambda ?? fixture.xG_away ?? fixture.lambda_away,
-    1.10
-  )
+  const initialHomeXg = Number(fixture.home_xg) || Number(fixture.lambda_home) || Number(fixture.lambdaHome) || 1.35
+  const initialAwayXg = Number(fixture.away_xg) || Number(fixture.lambda_away) || Number(fixture.lambdaAway) || 1.10
+
+  const initialH = safeClampLambda(initialHomeXg, 1.35)
+  const initialA = safeClampLambda(initialAwayXg, 1.10)
 
   const [customLambdaH, setCustomLambdaH] = useState(initialH)
   const [customLambdaA, setCustomLambdaA] = useState(initialA)
-  const [activeMarketOdds, setActiveMarketOdds] = useState({
-    home: fixture.odds_home ? String(fixture.odds_home) : '2.10',
-    draw: fixture.odds_draw ? String(fixture.odds_draw) : '3.40',
-    away: fixture.odds_away ? String(fixture.odds_away) : '3.50',
-  })
+  const [activeMarketOdds, setActiveMarketOdds] = useState(getResolvedFixtureOdds(fixture))
 
   // Synchronize when fixture changes
   useEffect(() => {
     if (fixture) {
-      const hXg = safeClampLambda(
-        fixture.lambdaHome ?? fixture.homeLambda ?? fixture.xG_home ?? fixture.lambda_home,
-        1.35
-      )
-      const aXg = safeClampLambda(
-        fixture.lambdaAway ?? fixture.awayLambda ?? fixture.xG_away ?? fixture.lambda_away,
-        1.10
-      )
+      const hXg = safeClampLambda(Number(fixture.home_xg) || Number(fixture.lambda_home) || Number(fixture.lambdaHome) || 1.35, 1.35)
+      const aXg = safeClampLambda(Number(fixture.away_xg) || Number(fixture.lambda_away) || Number(fixture.lambdaAway) || 1.10, 1.10)
       setCustomLambdaH(hXg)
       setCustomLambdaA(aXg)
-      setActiveMarketOdds({
-        home: fixture.odds_home ? String(fixture.odds_home) : '2.10',
-        draw: fixture.odds_draw ? String(fixture.odds_draw) : '3.40',
-        away: fixture.odds_away ? String(fixture.odds_away) : '3.50',
-      })
+      setActiveMarketOdds(getResolvedFixtureOdds(fixture))
     }
   }, [fixture])
 
@@ -298,14 +294,8 @@ function QuantLabWorkspace({
   // Reset to original model xG
   const handleResetModelXg = () => {
     if (fixture) {
-      const hXg = safeClampLambda(
-        fixture.lambdaHome ?? fixture.homeLambda ?? fixture.xG_home ?? fixture.lambda_home,
-        1.35
-      )
-      const aXg = safeClampLambda(
-        fixture.lambdaAway ?? fixture.awayLambda ?? fixture.xG_away ?? fixture.lambda_away,
-        1.10
-      )
+      const hXg = safeClampLambda(Number(fixture.home_xg) || Number(fixture.lambda_home) || Number(fixture.lambdaHome) || 1.35, 1.35)
+      const aXg = safeClampLambda(Number(fixture.away_xg) || Number(fixture.lambda_away) || Number(fixture.lambdaAway) || 1.10, 1.10)
       setCustomLambdaH(hXg)
       setCustomLambdaA(aXg)
     }
@@ -432,7 +422,7 @@ function QuantLabWorkspace({
           </div>
 
           <div className="flex items-center justify-between text-[11px] font-mono text-slate-400">
-            <span>Model baseline: {fixture.lambda_home ?? '1.45'}</span>
+            <span>Model baseline: {fixture.home_xg != null ? Number(fixture.home_xg).toFixed(2) : (fixture.lambda_home ?? '1.35')}</span>
             {homeStandings?.home_played > 0 && (
               <span>Record: {homeStandings.home_goals_for}:{homeStandings.home_goals_against} in {homeStandings.home_played}H</span>
             )}
@@ -488,7 +478,7 @@ function QuantLabWorkspace({
           </div>
 
           <div className="flex items-center justify-between text-[11px] font-mono text-slate-400">
-            <span>Model baseline: {fixture.lambda_away ?? '1.15'}</span>
+            <span>Model baseline: {fixture.away_xg != null ? Number(fixture.away_xg).toFixed(2) : (fixture.lambda_away ?? '1.10')}</span>
             {awayStandings?.away_played > 0 && (
               <span>Record: {awayStandings.away_goals_for}:{awayStandings.away_goals_against} in {awayStandings.away_played}A</span>
             )}

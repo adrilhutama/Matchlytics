@@ -375,7 +375,16 @@ export function calculateParlayAggregates(legs) {
  * or fallback model fair odds.
  */
 export function isRealMarketOdds(fixture) {
-  if (!fixture || !fixture.odds_home || !fixture.odds_draw || !fixture.odds_away) {
+  if (!fixture) return false;
+  const h2h = fixture.market_odds?.h2h || {};
+  const rawH = typeof h2h.home === 'number' ? h2h.home : (h2h.home?.price || h2h.consensus?.home);
+  const rawD = typeof h2h.draw === 'number' ? h2h.draw : (h2h.draw?.price || h2h.consensus?.draw);
+  const rawA = typeof h2h.away === 'number' ? h2h.away : (h2h.away?.price || h2h.consensus?.away);
+  const oddsH = rawH || fixture.odds_home;
+  const oddsD = rawD || fixture.odds_draw;
+  const oddsA = rawA || fixture.odds_away;
+
+  if (!oddsH || !oddsD || !oddsA) {
     return false;
   }
   if (fixture.value_pick) {

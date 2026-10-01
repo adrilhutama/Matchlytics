@@ -81,9 +81,17 @@ export default function MatchCard({
     prob_home, prob_draw, prob_away,
     predicted_score,
     prob_over_25,  prob_btts,
-    odds_home, odds_draw, odds_away,
     value_pick, ev_percentage,
   } = fixture
+
+  const h2hOdds = fixture.market_odds?.h2h || {}
+  const rawH = typeof h2hOdds.home === 'number' ? h2hOdds.home : (h2hOdds.home?.price || h2hOdds.consensus?.home)
+  const rawD = typeof h2hOdds.draw === 'number' ? h2hOdds.draw : (h2hOdds.draw?.price || h2hOdds.consensus?.draw)
+  const rawA = typeof h2hOdds.away === 'number' ? h2hOdds.away : (h2hOdds.away?.price || h2hOdds.consensus?.away)
+
+  const odds_home = rawH || fixture.odds_home || fixture.fair_odds_home || null
+  const odds_draw = rawD || fixture.odds_draw || fixture.fair_odds_draw || null
+  const odds_away = rawA || fixture.odds_away || fixture.fair_odds_away || null
 
   const home_team_name = fixture.home_team?.name || fixture.home_team_name || 'Home'
   const away_team_name = fixture.away_team?.name || fixture.away_team_name || 'Away'

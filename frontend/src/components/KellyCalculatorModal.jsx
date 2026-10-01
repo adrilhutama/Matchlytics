@@ -48,38 +48,54 @@ export default function KellyCalculatorModal({
     return () => window.removeEventListener('keydown', handleKeyDown)
   }, [isOpen, onClose])
 
+  const homeName = fixture.home_team?.name || fixture.home_team_name || fixture.home_name || 'Home'
+  const awayName = fixture.away_team?.name || fixture.away_team_name || fixture.away_name || 'Away'
+
+  const h2hOdds = fixture?.market_odds?.h2h || {}
+  const rawH = typeof h2hOdds.home === 'number' ? h2hOdds.home : (h2hOdds.home?.price || h2hOdds.consensus?.home)
+  const rawD = typeof h2hOdds.draw === 'number' ? h2hOdds.draw : (h2hOdds.draw?.price || h2hOdds.consensus?.draw)
+  const rawA = typeof h2hOdds.away === 'number' ? h2hOdds.away : (h2hOdds.away?.price || h2hOdds.consensus?.away)
+
+  const oddsHome = rawH || fixture?.odds_home || fixture?.fair_odds_home || null
+  const oddsDraw = rawD || fixture?.odds_draw || fixture?.fair_odds_draw || null
+  const oddsAway = rawA || fixture?.odds_away || fixture?.fair_odds_away || null
+
   // Zero-Vig True Consensus Odds calculation
   const zeroVig = useMemo(() => {
     if (!fixture) return null
-    return calculateZeroVigOdds(fixture.odds_home, fixture.odds_draw, fixture.odds_away)
-  }, [fixture])
+    return calculateZeroVigOdds(oddsHome, oddsDraw, oddsAway)
+  }, [fixture, oddsHome, oddsDraw, oddsAway])
+
+  const fairOddsHome = fixture?.fair_odds_home || zeroVig?.fairOddsHome || 0
+  const fairOddsDraw = fixture?.fair_odds_draw || zeroVig?.fairOddsDraw || 0
+  const fairOddsAway = fixture?.fair_odds_away || zeroVig?.fairOddsAway || 0
 
   // Determine active odds and model prob for selected outcome
   const outcomeStats = useMemo(() => {
-    if (!fixture) return { odds: 0, modelProb: 0, label: 'Home Win', fairOdds: 0 }
+    if (!fixture) return { odds: 0, modelProb: 0, label: `${homeName} (Home Win)`, fairOdds: 0 }
     if (selectedOutcome === 'DRAW') {
       return {
-        odds: Number(fixture.odds_draw) || 0,
+        odds: Number(oddsDraw) || 0,
         modelProb: Number(fixture.prob_draw) || 0,
         label: 'Draw (X)',
-        fairOdds: zeroVig?.fairOddsDraw || 0,
+        fairOdds: Number(fairOddsDraw) || 0,
       }
     }
     if (selectedOutcome === 'AWAY') {
       return {
-        odds: Number(fixture.odds_away) || 0,
+        odds: Number(oddsAway) || 0,
         modelProb: Number(fixture.prob_away) || 0,
-        label: `${fixture.away_team_name} (Away Win)`,
-        fairOdds: zeroVig?.fairOddsAway || 0,
+        label: `${awayName} (Away Win)`,
+        fairOdds: Number(fairOddsAway) || 0,
       }
     }
     return {
-      odds: Number(fixture.odds_home) || 0,
+      odds: Number(oddsHome) || 0,
       modelProb: Number(fixture.prob_home) || 0,
-      label: `${fixture.home_team_name} (Home Win)`,
-      fairOdds: zeroVig?.fairOddsHome || 0,
+      label: `${homeName} (Home Win)`,
+      fairOdds: Number(fairOddsHome) || 0,
     }
-  }, [fixture, selectedOutcome, zeroVig])
+  }, [fixture, selectedOutcome, oddsHome, oddsDraw, oddsAway, fairOddsHome, fairOddsDraw, fairOddsAway, homeName, awayName])
 
   // Net Edge & Expected Value
   const edgeData = useMemo(() => {
@@ -95,30 +111,33 @@ export default function KellyCalculatorModal({
     return calculateKelly(outcomeStats.odds, outcomeStats.modelProb)
   }, [outcomeStats])
 
-  // Monte Carlo Simulation (3,000 runs)
+  // Monte Carlo Simulation (3,000 runs) using unified xG lambdas
+  const homeXg = Number(fixture?.home_xg) || Number(fixture?.lambda_home) || 1.35
+  const awayXg = Number(fixture?.away_xg) || Number(fixture?.lambda_away) || 1.10
   const sim = useMemo(() => {
     if (!fixture || !isOpen) return null
-    return runMonteCarloSimulation(fixture.lambda_home, fixture.lambda_away, 3000)
-  }, [fixture, isOpen])
+    return runMonteCarloSimulation(homeXg, awayXg, 3000)
+  }, [fixture, isOpen, homeXg, awayXg])
 
   if (!isOpen || !fixture) return null
 
   const nominalStake = Math.round((Number(bankroll) || 0) * (kelly.quarterKellyPct / 100))
-  const { dateStr, timeStr } = formatLocalizedMatchDate(fixture.match_date)
+  const matchDate = fixture.kickoff_time || fixture.match_date
+  const { dateStr, timeStr } = formatLocalizedMatchDate(matchDate)
 
   const handleSlipClick = () => {
     if (onAddToSlip) {
       onAddToSlip({
         fixtureId: fixture.id,
-        homeTeam: fixture.home_team_name,
-        awayTeam: fixture.away_team_name,
+        homeTeam: homeName,
+        awayTeam: awayName,
         pick: selectedOutcome,
         pickLabel: outcomeStats.label,
         odds: outcomeStats.odds,
         modelProb: outcomeStats.modelProb,
         ev: edgeData.evPercent,
         leagueName: fixture.league_name,
-        matchDate: fixture.match_date,
+        matchDate: matchDate,
       })
     }
   }
@@ -167,7 +186,7 @@ export default function KellyCalculatorModal({
             </span>
           </div>
           <h2 id="kelly-modal-title" className="text-lg sm:text-2xl font-bold text-slate-100 mt-1">
-            {fixture.home_team_name} vs {fixture.away_team_name}
+            {homeName} vs {awayName}
           </h2>
           <p className="text-xs text-slate-400 mt-0.5">
             Zero-vig fair value calculation, margin of safety audit, and Kelly criterion fractional sizing.
@@ -177,9 +196,9 @@ export default function KellyCalculatorModal({
         {/* Outcome Selector Tabs */}
         <div className="flex items-center gap-2 mb-5 p-1 rounded-xl bg-pitch-950 border border-pitch-800" role="tablist" aria-label="Select outcome to analyze">
           {[
-            { id: 'HOME', label: `1 · ${fixture.home_team_name}`, odds: fixture.odds_home, prob: fixture.prob_home },
-            { id: 'DRAW', label: 'X · Draw', odds: fixture.odds_draw, prob: fixture.prob_draw },
-            { id: 'AWAY', label: `2 · ${fixture.away_team_name}`, odds: fixture.odds_away, prob: fixture.prob_away },
+            { id: 'HOME', label: `${homeName} (1)`, odds: oddsHome, prob: fixture.prob_home },
+            { id: 'DRAW', label: 'Draw (X)', odds: oddsDraw, prob: fixture.prob_draw },
+            { id: 'AWAY', label: `${awayName} (2)`, odds: oddsAway, prob: fixture.prob_away },
           ].map((item) => {
             const isSelected = selectedOutcome === item.id
             const isModelPick = fixture.value_pick === item.id

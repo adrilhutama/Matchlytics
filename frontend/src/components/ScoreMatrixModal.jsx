@@ -22,24 +22,28 @@ export default function ScoreMatrixModal({ fixture, isOpen, onClose, standingsMa
     return () => window.removeEventListener('keydown', handleKeyDown)
   }, [isOpen, onClose])
 
+  const initialHomeXg = Number(fixture?.home_xg) || Number(fixture?.lambda_home) || 1.35
+  const initialAwayXg = Number(fixture?.away_xg) || Number(fixture?.lambda_away) || 1.10
+
   // Compute matrix dynamically
   const matrixData = useMemo(() => {
     if (!fixture) return null
-    return computePoissonMatrix(fixture.lambda_home, fixture.lambda_away, 5)
-  }, [fixture])
+    return computePoissonMatrix(initialHomeXg, initialAwayXg, 5)
+  }, [fixture, initialHomeXg, initialAwayXg])
 
   if (!isOpen || !fixture || !matrixData) return null
 
   const homeStandings = standingsMap?.[fixture?.home_team_id] || standingsMap?.[`${fixture?.league_id}_${fixture?.home_team_id}`] || null
   const awayStandings = standingsMap?.[fixture?.away_team_id] || standingsMap?.[`${fixture?.league_id}_${fixture?.away_team_id}`] || null
 
-  const {
-    home_team_name, home_team_logo,
-    away_team_name, away_team_logo,
-    league_name,
-    lambda_home, lambda_away,
-    predicted_score,
-  } = fixture
+  const home_team_name = fixture.home_team?.name || fixture.home_team_name || fixture.home_name || 'Home'
+  const away_team_name = fixture.away_team?.name || fixture.away_team_name || fixture.away_name || 'Away'
+  const home_team_logo = fixture.home_team?.crest_url || fixture.home_team_logo
+  const away_team_logo = fixture.away_team?.crest_url || fixture.away_team_logo
+  const league_name = fixture.league_name || 'Match Analytics'
+  const lambda_home = initialHomeXg
+  const lambda_away = initialAwayXg
+  const predicted_score = fixture.predicted_score || `${matrixData.mostProbable.home}-${matrixData.mostProbable.away}`
 
   const {
     matrix,
@@ -114,7 +118,7 @@ export default function ScoreMatrixModal({ fixture, isOpen, onClose, standingsMa
             )}
             <div className="min-w-0">
               <p className="text-xs sm:text-sm font-semibold text-slate-200 truncate">{home_team_name}</p>
-              <p className="text-xs text-sky-400 font-mono">xG λ: {lambda_home ?? '1.35'}</p>
+              <p className="text-xs text-sky-400 font-mono">xG λ: {Number(initialHomeXg).toFixed(2)}</p>
             </div>
           </div>
 
@@ -122,7 +126,7 @@ export default function ScoreMatrixModal({ fixture, isOpen, onClose, standingsMa
           <div className="flex items-center gap-2.5 min-w-0 justify-end text-right">
             <div className="min-w-0">
               <p className="text-xs sm:text-sm font-semibold text-slate-200 truncate">{away_team_name}</p>
-              <p className="text-xs text-rose-400 font-mono">xG λ: {lambda_away ?? '1.35'}</p>
+              <p className="text-xs text-rose-400 font-mono">xG λ: {Number(initialAwayXg).toFixed(2)}</p>
             </div>
             {away_team_logo && (
               <img
@@ -213,7 +217,7 @@ export default function ScoreMatrixModal({ fixture, isOpen, onClose, standingsMa
             <span className="w-2.5 h-2.5 rounded-full bg-amber-400 animate-pulse" />
             <span className="text-xs font-semibold text-amber-300">Most Probable Scoreline:</span>
             <span className="text-sm font-bold text-amber-200 font-mono">
-              {mostProbable.home} - {mostProbable.away}
+              {fixture.predicted_score ? fixture.predicted_score.replace('-', ' - ') : `${mostProbable.home} - ${mostProbable.away}`}
             </span>
           </div>
           <span className="text-xs font-mono font-semibold text-amber-400">
