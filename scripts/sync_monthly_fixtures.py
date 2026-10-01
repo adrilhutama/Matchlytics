@@ -62,43 +62,26 @@ def fetch_fixtures_range(competition_code: str, from_date: str, to_date: str) ->
 def parse_fixture_row(m: dict, league: dict, comp_code: str | None = None) -> dict:
     """
     Extract and map fields from a football-data.org match object to Supabase fixture row.
-    Adheres strictly to the normalized Supabase schema without obsolete logo columns.
+    Adheres strictly to the normalized schema with only essential relational columns:
+    id, competition_code, home_team_id, away_team_id, kickoff_time, status.
     """
     comp = m.get("competition", {})
     home = m.get("homeTeam", {})
     away = m.get("awayTeam", {})
-    area = m.get("area", {})
-    season_info = m.get("season", {})
 
     code = comp_code or league.get("code") or comp.get("code") or ""
-
-    season_val = SEASON
-    if season_info and season_info.get("startDate"):
-        try:
-            season_val = int(season_info["startDate"][:4])
-        except (ValueError, TypeError):
-            season_val = SEASON
-
     raw_status = m.get("status", "SCHEDULED")
     status = "NS" if raw_status in ("SCHEDULED", "TIMED") else raw_status
     utc_date = m.get("utcDate")
 
-    # Normalized payload without obsolete home_team_logo and away_team_logo
+    # Strictly normalized payload matching new schema
     return {
         "id":               m["id"],
         "competition_code": code,
-        "league_id":        league.get("id") or comp.get("id"),
-        "league_name":      league.get("name") or comp.get("name"),
-        "league_logo":      comp.get("emblem") or "",
-        "league_country":   area.get("name") or "",
-        "season":           season_val,
-        "match_date":       utc_date,
+        "home_team_id":     home.get("id"),
+        "away_team_id":     away.get("id"),
         "kickoff_time":     utc_date,
         "status":           status,
-        "home_team_id":     home.get("id"),
-        "home_team_name":   home.get("name"),
-        "away_team_id":     away.get("id"),
-        "away_team_name":   away.get("name"),
     }
 
 

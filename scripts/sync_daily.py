@@ -634,6 +634,16 @@ def load_team_standings_and_averages() -> tuple[dict[Any, dict], dict[str, dict]
     return standings_map, league_averages
 
 
+def load_teams_map() -> dict[int, dict]:
+    """Load cached team metadata from public.teams for fast name and crest resolution."""
+    try:
+        res = supabase.table("teams").select("id, name, short_name, tla, crest_url, competition_code").execute()
+        return {t["id"]: t for t in (res.data or []) if t.get("id")}
+    except Exception as exc:
+        print(f"    [WARN] Could not preload teams table: {exc}")
+        return {}
+
+
 # ---- Fixtures Loader ----------------------------------------
 
 def load_upcoming_fixtures(days_ahead: int = 30) -> list[dict]:
@@ -642,20 +652,39 @@ def load_upcoming_fixtures(days_ahead: int = 30) -> list[dict]:
     from_date = now.isoformat()
     to_date = (now + timedelta(days=days_ahead)).isoformat()
 
-    try:
-        res = (
-            supabase.table("fixtures")
-            .select("*")
-            .gte("match_date", from_date)
-            .lte("match_date", to_date)
-            .eq("status", "NS")
-            .order("match_date", desc=False)
-            .execute()
-        )
-        return res.data or []
-    except Exception as exc:
-        print(f"    [ERROR] Failed to load fixtures from Supabase: {exc}")
-        return []
+    # Try querying with kickoff_time first (normalized schema), then match_date
+    for date_col in ("kickoff_time", "match_date"):
+        try:
+            res = (
+                supabase.table("fixtures")
+                .select("*, home_team:teams!fixtures_home_team_id_fkey(id, name, short_name, crest_url), away_team:teams!fixtures_away_team_id_fkey(id, name, short_name, crest_url)")
+                .gte(date_col, from_date)
+                .lte(date_col, to_date)
+                .eq("status", "NS")
+                .order(date_col, desc=False)
+                .execute()
+            )
+            if res.data:
+                return res.data
+        except Exception:
+            pass
+
+        try:
+            res = (
+                supabase.table("fixtures")
+                .select("*")
+                .gte(date_col, from_date)
+                .lte(date_col, to_date)
+                .eq("status", "NS")
+                .order(date_col, desc=False)
+                .execute()
+            )
+            if res.data:
+                return res.data
+        except Exception:
+            pass
+
+    return []
 
 
 # ---- Single Competition Sync --------------------------------
@@ -666,13 +695,18 @@ def sync_competition(
     standings_map: dict[Any, dict],
     league_averages: dict[str, dict],
     ev_collector: list[dict] | None = None,
+    teams_map: dict[int, dict] | None = None,
 ) -> tuple[int, int]:
     # Process upcoming fixtures for one league using pre-loaded standings
     code = league["code"]
     name = league["name"]
     lid  = league["id"]
 
-    league_fixtures = [f for f in fixtures if f["league_id"] == lid]
+    # Match by competition_code (normalized) or league_id (legacy)
+    league_fixtures = [
+        f for f in fixtures
+        if f.get("competition_code") == code or f.get("league_id") == lid
+    ]
     if not league_fixtures:
         return 0, 0
 
@@ -684,15 +718,36 @@ def sync_competition(
 
     updated = 0
     ev_count = 0
+    t_map = teams_map or {}
 
     for fixture in league_fixtures:
         fid       = fixture["id"]
         home_id   = fixture.get("home_team_id")
         away_id   = fixture.get("away_team_id")
-        home_name = fixture.get("home_team_name", "")
-        away_name = fixture.get("away_team_name", "")
-        home_logo = fixture.get("home_team_logo") or fixture.get("home_crest")
-        away_logo = fixture.get("away_team_logo") or fixture.get("away_crest")
+
+        home_team_meta = t_map.get(home_id, {}) if home_id else {}
+        away_team_meta = t_map.get(away_id, {}) if away_id else {}
+
+        home_name = (
+            fixture.get("home_team_name")
+            or (fixture.get("home_team") or {}).get("name")
+            or home_team_meta.get("name", "")
+        )
+        away_name = (
+            fixture.get("away_team_name")
+            or (fixture.get("away_team") or {}).get("name")
+            or away_team_meta.get("name", "")
+        )
+        home_logo = (
+            fixture.get("home_team_logo")
+            or (fixture.get("home_team") or {}).get("crest_url")
+            or home_team_meta.get("crest_url")
+        )
+        away_logo = (
+            fixture.get("away_team_logo")
+            or (fixture.get("away_team") or {}).get("crest_url")
+            or away_team_meta.get("crest_url")
+        )
 
         # Ingestion & Team Metadata Caching in public.teams
         ensure_team_metadata(home_id, home_name, home_logo, code, supabase)
@@ -763,6 +818,7 @@ def sync_competition(
 
             update_row = {
                 "id":                  fid,
+                "competition_code":    code,
                 "home_team_id":        home_id,
                 "away_team_id":        away_id,
                 "home_xg":             lambda_home,
@@ -968,6 +1024,10 @@ def main() -> None:
     standings_map, league_averages = load_team_standings_and_averages()
     print(f"Loaded {len(standings_map)} standings records across {len(league_averages)} league(s).")
 
+    print("Loading normalized team metadata records from database...")
+    teams_map = load_teams_map()
+    print(f"Loaded {len(teams_map)} team metadata records.")
+
     # 3. Load upcoming fixtures
     upcoming_fixtures = load_upcoming_fixtures(days_ahead=30)
     print(f"Upcoming fixtures (next 30 days, all competitions): {len(upcoming_fixtures)}")
@@ -983,7 +1043,7 @@ def main() -> None:
 
     for league in ACTIVE_LEAGUES:
         updated, ev_count = sync_competition(
-            league, upcoming_fixtures, standings_map, league_averages, all_ev_picks
+            league, upcoming_fixtures, standings_map, league_averages, all_ev_picks, teams_map
         )
         total_updated += updated
         league_breakdown.append({

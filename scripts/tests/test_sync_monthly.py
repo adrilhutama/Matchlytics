@@ -29,18 +29,32 @@ class TestSyncMonthlyFixtures:
 
         row = parse_fixture_row(sample_match, league, "PL")
 
-        # Must contain normalized relational columns
+        # Must contain only normalized relational columns
         assert row["id"] == 501928
         assert row["competition_code"] == "PL"
         assert row["home_team_id"] == 64
         assert row["away_team_id"] == 65
-        assert row["match_date"] == "2026-10-15T19:00:00Z"
         assert row["kickoff_time"] == "2026-10-15T19:00:00Z"
         assert row["status"] == "NS"
 
-        # Strictly forbidden: obsolete logo columns
-        assert "home_team_logo" not in row
-        assert "away_team_logo" not in row
+        # Explicitly verify legacy flat columns are completely removed
+        legacy_keys = [
+            "away_team_name",
+            "home_team_name",
+            "league_country",
+            "league_id",
+            "league_logo",
+            "league_name",
+            "match_date",
+            "season",
+            "home_team_logo",
+            "away_team_logo",
+        ]
+        for key in legacy_keys:
+            assert key not in row, f"Legacy key '{key}' unexpectedly present in normalized payload"
+
+        expected_keys = {"id", "competition_code", "home_team_id", "away_team_id", "kickoff_time", "status"}
+        assert set(row.keys()) == expected_keys
 
     def test_ensure_team_metadata_object_signature(self):
         mock_client = MagicMock()
