@@ -41,18 +41,26 @@ def calculate_brier_score(prob_home: float, prob_draw: float, prob_away: float, 
     return (ph - yh) ** 2 + (pd - yd) ** 2 + (pa - ya) ** 2
 
 
-def fetch_and_settle_completed_matches(base_url: str, headers: dict, supabase: Any, pool: Any = None) -> int:
+def fetch_and_settle_completed_matches(
+    base_url: str,
+    headers: dict,
+    supabase: Any,
+    pool: Any = None,
+    competitions: str | list[str] = "PL,PD,SA,BL1,FL1,CL",
+) -> int:
     """
-    Query football-data.org for fixtures finished in the last 48 hours,
+    Query football-data.org for fixtures finished in the last 48 hours across active competitions,
     and update their final scores and status in Supabase.
     """
     try:
         today = date.today()
         from_str = (today - timedelta(days=2)).strftime("%Y-%m-%d")
         to_str = today.strftime("%Y-%m-%d")
+        comp_str = ",".join(competitions) if isinstance(competitions, list) else str(competitions)
 
         url = f"{base_url}/matches"
         params = {
+            "competitions": comp_str,
             "dateFrom": from_str,
             "dateTo": to_str,
             "status": "FINISHED",

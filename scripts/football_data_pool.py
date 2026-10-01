@@ -1,7 +1,14 @@
 # ============================================================
 # scripts/football_data_pool.py
-# Intelligent Football-Data.org API client with multi-token pool rotation,
-# 62-second HTTP 429 cooldown handling, and automatic instant failover.
+# Production-grade, header-aware API Key Pool for Football-Data.org v4
+# adhering strictly to official documentation (https://docs.football-data.org/general/v4/).
+#
+# Features:
+# - Multi-token pool rotation with round-robin dispatch among eligible tokens
+# - Live telemetry parsed from X-Requests-Available-Minute and X-RequestCounter-Reset
+# - Immediate failover on HTTP 429 with reset_seconds + 1s cooldown
+# - Automatic token cooldown when requests_available reaches 0
+# - Safety micro-pacing of 100ms between calls to avoid IP burst limits
 # Zero em dash characters used (R-02 compliance).
 # ============================================================
 
@@ -22,8 +29,9 @@ if not logger.handlers:
     logger.setLevel(logging.INFO)
 
 DEFAULT_BASE_URL: str = "https://api.football-data.org/v4"
-DEFAULT_COOLDOWN_SECONDS: float = 62.0
+DEFAULT_FALLBACK_RESET_SECONDS: float = 60.0
 DEFAULT_TIMEOUT_SECONDS: float = 15.0
+DEFAULT_MICRO_PACING_SECONDS: float = 0.100  # 100ms safety pacing
 
 
 def sanitize_token(token: str | None) -> str:
@@ -64,55 +72,154 @@ def parse_football_data_tokens(
 class FootballTokenInfo:
     """
     State tracker for an individual API token in the pool.
-    Tracks active status, cooldown expiry timestamp, and usage metrics.
+    Maintains telemetry dictionary:
+      - requests_available: parsed from response header X-Requests-Available-Minute
+      - reset_seconds: parsed from response header X-RequestCounter-Reset
+      - cooldown_until: timestamp until token is safe to use again
     """
 
     def __init__(self, token: str):
         self.token: str = token.strip()
         self.sanitized: str = sanitize_token(self.token)
+        self.requests_available: int | None = None
+        self.reset_seconds: int | None = None
         self.cooldown_until: float = 0.0
         self.calls_made: int = 0
         self.failed_calls: int = 0
+
+    def update_from_headers(self, headers: Any, current_time: float | None = None) -> None:
+        """
+        Parse official Football-Data.org response headers:
+          - X-Requests-Available-Minute: Requests remaining in current minute window
+          - X-RequestCounter-Reset: Seconds remaining until request counter resets
+        """
+        if not headers or not hasattr(headers, "get"):
+            return
+
+        now = time.time() if current_time is None else current_time
+
+        req_avail = headers.get("X-Requests-Available-Minute") or headers.get("x-requests-available-minute")
+        reset_sec = headers.get("X-RequestCounter-Reset") or headers.get("x-requestcounter-reset")
+
+        if req_avail is not None:
+            try:
+                self.requests_available = int(req_avail)
+            except (ValueError, TypeError):
+                pass
+
+        if reset_sec is not None:
+            try:
+                self.reset_seconds = int(reset_sec)
+            except (ValueError, TypeError):
+                pass
+
+        # If quota is exhausted before 429 occurs, proactively place on cooldown
+        if self.requests_available is not None and self.requests_available <= 0:
+            sec = float(self.reset_seconds) if (self.reset_seconds is not None and self.reset_seconds > 0) else DEFAULT_FALLBACK_RESET_SECONDS
+            self.cooldown_until = now + sec + 1.0
+            logger.warning(
+                f"[FootballDataPool Telemetry] Token {self.sanitized} has 0 requests available. "
+                f"Cooldown set to {sec + 1.0:.1f}s (until {self.cooldown_until:.2f})."
+            )
+
+    def mark_429(
+        self,
+        resp_headers: Any = None,
+        current_time: float | None = None,
+    ) -> float:
+        """
+        Handle HTTP 429:
+        - Read X-RequestCounter-Reset header (fallback to 60s if missing).
+        - Mark token cooldown_until = time.time() + reset_seconds + 1.
+        Returns the applied cooldown duration.
+        """
+        now = time.time() if current_time is None else current_time
+        reset_val = None
+
+        if resp_headers and hasattr(resp_headers, "get"):
+            raw_reset = resp_headers.get("X-RequestCounter-Reset") or resp_headers.get("x-requestcounter-reset")
+            if raw_reset is not None:
+                try:
+                    reset_val = float(raw_reset)
+                except (ValueError, TypeError):
+                    pass
+
+        if reset_val is None or reset_val <= 0:
+            reset_val = DEFAULT_FALLBACK_RESET_SECONDS
+
+        self.reset_seconds = int(reset_val)
+        self.requests_available = 0
+        cooldown_duration = reset_val + 1.0
+        self.cooldown_until = now + cooldown_duration
+
+        logger.warning(
+            f"[FootballDataPool 429] Token {self.sanitized} rate limited. "
+            f"X-RequestCounter-Reset={reset_val:.0f}s. Cooldown until {self.cooldown_until:.2f} ({cooldown_duration:.1f}s)."
+        )
+        return cooldown_duration
 
     def is_on_cooldown(self, current_time: float | None = None) -> bool:
         """Return True if this token is currently in cooldown."""
         now = time.time() if current_time is None else current_time
         return now < self.cooldown_until
 
-    def mark_cooldown(
-        self,
-        seconds: float = DEFAULT_COOLDOWN_SECONDS,
-        reason: str = "HTTP 429 (10 req/min exceeded)",
-        current_time: float | None = None,
-    ) -> None:
-        """Mark token as temporarily inactive for the specified cooldown duration."""
+    def has_available_requests(self, current_time: float | None = None) -> bool:
+        """
+        Return True if requests are available.
+        If cooldown has passed, clears expired exhaustion telemetry.
+        """
         now = time.time() if current_time is None else current_time
-        self.cooldown_until = now + seconds
-        logger.warning(
-            f"[FootballDataPool Alert] Token {self.sanitized} entering {seconds:.1f}s cooldown: {reason}"
-        )
+        if now >= self.cooldown_until and self.requests_available is not None and self.requests_available <= 0:
+            self.requests_available = None
+            self.reset_seconds = None
+        return self.requests_available is None or self.requests_available > 0
+
+    def is_eligible(self, current_time: float | None = None) -> bool:
+        """
+        Token selection check:
+        Token is eligible if not in cooldown and has available requests.
+        """
+        return not self.is_on_cooldown(current_time) and self.has_available_requests(current_time)
 
     def remaining_cooldown(self, current_time: float | None = None) -> float:
-        """Return remaining cooldown seconds (0.0 if active)."""
+        """Return remaining cooldown seconds (0.0 if not in cooldown)."""
         now = time.time() if current_time is None else current_time
         return max(0.0, self.cooldown_until - now)
 
     def reset_cooldown(self) -> None:
-        """Manually clear cooldown state."""
+        """Manually clear cooldown state and telemetry."""
         self.cooldown_until = 0.0
+        self.requests_available = None
+        self.reset_seconds = None
+
+    @property
+    def telemetry(self) -> dict[str, Any]:
+        """Return per-token telemetry dictionary."""
+        now = time.time()
+        return {
+            "token": self.sanitized,
+            "requests_available": self.requests_available,
+            "reset_seconds": self.reset_seconds,
+            "cooldown_until": self.cooldown_until,
+            "is_on_cooldown": self.is_on_cooldown(now),
+            "is_eligible": self.is_eligible(now),
+            "calls_made": self.calls_made,
+            "failed_calls": self.failed_calls,
+        }
 
     def __repr__(self) -> str:
         status = "COOLDOWN" if self.is_on_cooldown() else "ACTIVE"
-        return f"<FootballToken {self.sanitized} status={status} calls={self.calls_made}>"
+        avail = self.requests_available if self.requests_available is not None else "unknown"
+        return f"<FootballToken {self.sanitized} status={status} avail={avail} calls={self.calls_made}>"
 
 
 class FootballDataPoolManager:
     """
-    Manages a pool of Football-Data.org API tokens with:
-    - Round-robin token rotation per request
-    - 62-second cooldown on HTTP 429
-    - Instant retry with next active token
-    - Safe logging with token masking
+    Header-aware Football-Data.org API token pool manager with:
+    - Round-robin token dispatch among eligible tokens
+    - Real-time telemetry from X-Requests-Available-Minute and X-RequestCounter-Reset
+    - Immediate failover on HTTP 429 with reset_seconds + 1s cooldown
+    - Micro-pacing of 100ms between requests to avoid IP burst limits
     """
 
     def __init__(
@@ -120,7 +227,7 @@ class FootballDataPoolManager:
         tokens: list[str] | None = None,
         base_url: str = DEFAULT_BASE_URL,
         request_timeout: float = DEFAULT_TIMEOUT_SECONDS,
-        cooldown_seconds: float = DEFAULT_COOLDOWN_SECONDS,
+        micro_pacing_seconds: float = DEFAULT_MICRO_PACING_SECONDS,
     ):
         raw_tokens = tokens if tokens is not None else parse_football_data_tokens()
         cleaned_tokens: list[str] = []
@@ -134,7 +241,8 @@ class FootballDataPoolManager:
         self.current_index: int = 0
         self.base_url: str = base_url.rstrip("/")
         self.request_timeout: float = request_timeout
-        self.cooldown_seconds: float = cooldown_seconds
+        self.micro_pacing_seconds: float = micro_pacing_seconds
+        self.last_request_time: float = 0.0
 
         logger.info(
             f"[INFO] Initialized Football-Data Pool with {len(self.pool)} token(s). "
@@ -148,14 +256,14 @@ class FootballDataPoolManager:
 
     @property
     def active_tokens(self) -> list[FootballTokenInfo]:
-        """List of tokens not currently in cooldown."""
-        return [t for t in self.pool if not t.is_on_cooldown()]
+        """List of tokens currently eligible for dispatch."""
+        return [t for t in self.pool if t.is_eligible()]
 
     def get_next_active_token(self, current_time: float | None = None) -> FootballTokenInfo | None:
         """
-        Select the next available active token using round-robin rotation.
-        Advances current_index pointer immediately so consecutive requests alternate tokens.
-        Returns None if all tokens are currently in cooldown.
+        Select an active token that is not in cooldown and has available requests,
+        applying round-robin among eligible tokens to distribute load evenly.
+        Advances current_index pointer immediately so successive requests alternate tokens.
         """
         if not self.pool:
             return None
@@ -164,7 +272,7 @@ class FootballDataPoolManager:
         for offset in range(n):
             idx = (self.current_index + offset) % n
             token_info = self.pool[idx]
-            if not token_info.is_on_cooldown(current_time):
+            if token_info.is_eligible(current_time):
                 self.current_index = (idx + 1) % n
                 return token_info
 
@@ -174,6 +282,17 @@ class FootballDataPoolManager:
         """Reset cooldown on all tokens."""
         for t in self.pool:
             t.reset_cooldown()
+
+    def _apply_micro_pacing(self) -> None:
+        """Enforce safety micro-pacing of 100ms between calls to avoid IP-level burst throttling."""
+        if self.micro_pacing_seconds <= 0:
+            return
+        now = time.time()
+        elapsed = now - self.last_request_time
+        if elapsed < self.micro_pacing_seconds and self.last_request_time > 0:
+            sleep_time = self.micro_pacing_seconds - elapsed
+            time.sleep(sleep_time)
+        self.last_request_time = time.time()
 
     def get(
         self,
@@ -186,9 +305,9 @@ class FootballDataPoolManager:
         **kwargs: Any,
     ) -> requests.Response:
         """
-        Execute an HTTP GET request with round-robin rotation across active tokens.
-        If HTTP 429 is encountered, marks token with 62-second cooldown and instantly
-        retries with the next active token in the pool.
+        Execute an HTTP GET request with round-robin dispatch among eligible tokens.
+        If HTTP 429 is encountered, marks token cooldown to reset_seconds + 1s and instantly
+        retries with the next healthy token in the pool.
         """
         get_fn = session_get or requests.get
         req_timeout = timeout or self.request_timeout
@@ -201,6 +320,7 @@ class FootballDataPoolManager:
         # If pool is empty, execute unauthenticated or with provided headers
         if not self.pool:
             logger.warning("[FootballDataPool] No tokens configured. Executing request without pool rotation.")
+            self._apply_micro_pacing()
             return get_fn(full_url, params=params, headers=headers, timeout=req_timeout, **kwargs)
 
         attempts = 0
@@ -212,7 +332,7 @@ class FootballDataPoolManager:
             token_info = self.get_next_active_token(current_time=cur_time)
 
             if not token_info:
-                logger.error("[FootballDataPool Alert] All configured tokens are currently in cooldown!")
+                logger.error("[FootballDataPool Alert] All configured tokens are in cooldown or out of requests!")
                 break
 
             req_headers = dict(headers or {})
@@ -221,20 +341,21 @@ class FootballDataPoolManager:
             attempts += 1
             token_info.calls_made += 1
 
+            self._apply_micro_pacing()
+
             try:
                 resp = get_fn(full_url, params=params, headers=req_headers, timeout=req_timeout, **kwargs)
                 last_response = resp
 
+                # Update per-token telemetry from response headers
+                token_info.update_from_headers(resp.headers, current_time=cur_time)
+
                 if resp.status_code == 429:
                     token_info.failed_calls += 1
-                    token_info.mark_cooldown(
-                        seconds=self.cooldown_seconds,
-                        reason="HTTP 429 (10 req/min exceeded)",
-                        current_time=cur_time,
-                    )
+                    token_info.mark_429(resp.headers, current_time=cur_time)
                     logger.warning(
-                        f"[FootballDataPool 429] Token {token_info.sanitized} hit rate limit. "
-                        f"Cooldown set to {self.cooldown_seconds}s. Retrying instantly with next active token..."
+                        f"[FootballDataPool 429] Rate limit reached on {token_info.sanitized}. "
+                        f"Retrying immediately with next healthy token..."
                     )
                     continue
 
@@ -257,21 +378,11 @@ class FootballDataPoolManager:
         return dummy_resp
 
     def get_pool_status(self) -> dict[str, Any]:
-        """Return snapshot of pool token states."""
-        now = time.time()
+        """Return snapshot of pool token telemetry and states."""
         return {
             "total_tokens": len(self.pool),
             "active_tokens": len(self.active_tokens),
-            "tokens": [
-                {
-                    "token": t.sanitized,
-                    "status": "COOLDOWN" if t.is_on_cooldown(now) else "ACTIVE",
-                    "cooldown_remaining": round(t.remaining_cooldown(now), 1),
-                    "calls_made": t.calls_made,
-                    "failed_calls": t.failed_calls,
-                }
-                for t in self.pool
-            ],
+            "tokens": [t.telemetry for t in self.pool],
         }
 
 

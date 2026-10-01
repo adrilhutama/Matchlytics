@@ -62,7 +62,40 @@ def fetch_fixtures_range(competition_code: str, from_date: str, to_date: str, po
     return data.get("matches", [])
 
 
-def parse_fixture_row(m: dict, league: dict, comp_code: str | None = None) -> dict:
+def fetch_cross_league_fixtures(
+    competition_codes: list[str] | str = "PL,PD,SA,BL1,FL1,CL",
+    from_date: str = "",
+    to_date: str = "",
+    pool: Any = None,
+) -> list[dict]:
+    """
+    Fetch scheduled fixtures across multiple competitions in a single query
+    supported in v4: params={"competitions": "PL,PD,SA,BL1,FL1,CL", "dateFrom": start_date, "dateTo": end_date}
+    """
+    client = pool or football_pool
+    comp_str = ",".join(competition_codes) if isinstance(competition_codes, list) else str(competition_codes)
+    url = f"{BASE_URL}/matches"
+    params = {
+        "competitions": comp_str,
+        "dateFrom": from_date,
+        "dateTo":   to_date,
+        "status":   "SCHEDULED",
+    }
+    resp = client.get(url, params=params, timeout=15)
+    if resp.status_code != 200:
+        error_msg = resp.text
+        try:
+            error_msg = resp.json().get("message", error_msg)
+        except Exception:
+            pass
+        print(f"    [football-data.org Error] Multi-competition ({comp_str}): {resp.status_code} - {error_msg}")
+        return []
+
+    data = resp.json()
+    return data.get("matches", [])
+
+
+def parse_fixture_row(m: dict, league: dict | None = None, comp_code: str | None = None) -> dict:
     """
     Extract and map fields from a football-data.org match object to Supabase fixture row.
     Adheres strictly to the normalized schema with only essential relational columns:
@@ -72,7 +105,7 @@ def parse_fixture_row(m: dict, league: dict, comp_code: str | None = None) -> di
     home = m.get("homeTeam", {})
     away = m.get("awayTeam", {})
 
-    code = comp_code or league.get("code") or comp.get("code") or ""
+    code = comp_code or (league.get("code") if league else None) or comp.get("code") or ""
     raw_status = m.get("status", "SCHEDULED")
     status = "NS" if raw_status in ("SCHEDULED", "TIMED") else raw_status
     utc_date = m.get("utcDate")
@@ -116,8 +149,35 @@ def main() -> None:
     to_str   = (today + timedelta(days=30)).strftime("%Y-%m-%d")
 
     print(f"Syncing fixtures from {from_str} to {to_str}...")
-    total = 0
+    comp_codes = [l["code"] for l in ACTIVE_LEAGUES]
+    comp_str = ",".join(comp_codes)
+    print(f"Attempting optimized multi-competition query for: {comp_str}")
 
+    multi_matches = fetch_cross_league_fixtures(comp_codes, from_str, to_str)
+    if multi_matches:
+        print(f"  [Multi-Competition Success] Ingested {len(multi_matches)} match(es) across leagues in 1 call.")
+        rows = []
+        for m in multi_matches:
+            comp_code = m.get("competition", {}).get("code", "")
+            home_team = m.get("homeTeam", {})
+            away_team = m.get("awayTeam", {})
+
+            if home_team:
+                ensure_team_metadata(supabase, home_team, comp_code)
+            if away_team:
+                ensure_team_metadata(supabase, away_team, comp_code)
+
+            row = parse_fixture_row(m, comp_code=comp_code)
+            if row:
+                rows.append(row)
+
+        upsert_fixtures(rows, supabase)
+        print(f"\nDone. Total fixtures synced via multi-competition query: {len(rows)}")
+        return
+
+    # Fallback to per-competition ingestion if multi-competition returns no matches
+    print("Multi-competition returned empty. Falling back to per-league queries...")
+    total = 0
     for league in ACTIVE_LEAGUES:
         code = league["code"]
         name = league["name"]
@@ -129,7 +189,6 @@ def main() -> None:
                 home_team = m.get("homeTeam", {})
                 away_team = m.get("awayTeam", {})
 
-                # Ingestion & team metadata caching in public.teams
                 if home_team:
                     ensure_team_metadata(supabase, home_team, code)
                 if away_team:

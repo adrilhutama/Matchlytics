@@ -98,10 +98,10 @@ Sports/
 │   ├── sync_standings.py       # Standings and home/away form splits synchronization
 │   ├── telegram_notifier.py    # Telegram SITREP message generator & bot client
 │   ├── requirements.txt        # Python package dependencies
-│   └── tests/                  # Pytest test suite (79 unit & integration tests)
+│   └── tests/                  # Pytest test suite (84 unit & integration tests)
 │       ├── test_engine.py          # Poisson matrix, EV calculation, strength models
 │       ├── test_evaluator.py       # Brier score, totals/handicap EV, settlement
-│       ├── test_football_data_pool.py # Token rotation, HTTP 429 62s cooldown, failover
+│       ├── test_football_data_pool.py # Header-aware telemetry, 429 reset handling, rotation
 │       ├── test_odds_pool.py       # Key rotation, HTTP 429 failover, rate pacing
 │       └── test_sync_monthly.py    # Fixture parsing, schema adaptation
 ├── supabase/
@@ -197,7 +197,7 @@ When editing or generating code in this repository, you must observe these stric
 ### 6.1 Python Testing & Verification
 All scripts and quantitative formulas must pass the pytest test suite before committing changes.
 ```bash
-# Run all tests (79 tests across engine, evaluator, football-data pool, odds pool, monthly sync)
+# Run all tests (84 tests across engine, evaluator, football-data pool, odds pool, monthly sync)
 python -m pytest scripts/tests/ -v
 
 # Run individual test modules

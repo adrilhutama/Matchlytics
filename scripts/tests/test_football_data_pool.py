@@ -1,7 +1,7 @@
 # ============================================================
 # scripts/tests/test_football_data_pool.py
 # Unit tests for Football-Data.org API token pool rotation,
-# 62-second cooldown handling on HTTP 429, and automatic failover.
+# live header telemetry, 429 reset handling, and round-robin dispatch.
 # Run: python -m pytest scripts/tests/test_football_data_pool.py -v
 # Zero em dash characters used (R-02 compliance).
 # ============================================================
@@ -16,6 +16,8 @@ from scripts.football_data_pool import (
     parse_football_data_tokens,
     sanitize_token,
 )
+from scripts.sync_monthly_fixtures import fetch_cross_league_fixtures
+from scripts.sync_daily import fetch_cross_league_matches
 
 
 class TestTokenPoolParsing:
@@ -64,144 +66,246 @@ class TestTokenSanitization:
         assert sanitize_token("") == "<none>"
 
 
-class TestRoundRobinRotation:
-    """Test round-robin switching across active tokens in pool."""
+class TestHeaderAwareTelemetry:
+    """Test parsing of response headers: X-Requests-Available-Minute & X-RequestCounter-Reset."""
 
-    def test_round_robin_sequence(self):
-        tokens = ["tok_alpha_1111", "tok_bravo_2222", "tok_charlie_3333"]
-        manager = FootballDataPoolManager(tokens=tokens)
+    def test_header_extraction_on_success(self):
+        token_info = FootballTokenInfo("tok_live_1")
+        mock_headers = {
+            "X-Requests-Available-Minute": "8",
+            "X-RequestCounter-Reset": "45",
+        }
+        token_info.update_from_headers(mock_headers, current_time=1000.0)
 
-        captured_headers = []
+        assert token_info.requests_available == 8
+        assert token_info.reset_seconds == 45
+        assert token_info.is_on_cooldown(current_time=1000.0) is False
+        assert token_info.is_eligible(current_time=1000.0) is True
+
+    def test_proactive_cooldown_when_available_requests_reach_zero(self):
+        token_info = FootballTokenInfo("tok_quota_exhausted")
+        mock_headers = {
+            "X-Requests-Available-Minute": "0",
+            "X-RequestCounter-Reset": "25",
+        }
+        base_time = 1000.0
+        token_info.update_from_headers(mock_headers, current_time=base_time)
+
+        assert token_info.requests_available == 0
+        assert token_info.reset_seconds == 25
+        # Cooldown should be base_time + 25 + 1.0 = 1026.0
+        assert token_info.cooldown_until == 1026.0
+        assert token_info.is_on_cooldown(current_time=base_time + 10.0) is True
+        assert token_info.is_eligible(current_time=base_time + 10.0) is False
+
+        # After reset time expires, token becomes eligible again
+        assert token_info.is_on_cooldown(current_time=base_time + 27.0) is False
+        assert token_info.is_eligible(current_time=base_time + 27.0) is True
+
+    def test_telemetry_dictionary_structure(self):
+        token_info = FootballTokenInfo("tok_telem_test")
+        token_info.requests_available = 5
+        token_info.reset_seconds = 30
+        token_info.cooldown_until = 1500.0
+        token_info.calls_made = 4
+        token_info.failed_calls = 1
+
+        telem = token_info.telemetry
+        assert telem["token"] == "tok_***test"
+        assert telem["requests_available"] == 5
+        assert telem["reset_seconds"] == 30
+        assert telem["cooldown_until"] == 1500.0
+        assert telem["calls_made"] == 4
+        assert telem["failed_calls"] == 1
+        assert "is_on_cooldown" in telem
+        assert "is_eligible" in telem
+
+
+class TestHTTP429ResetHeaderHandling:
+    """Test handling of HTTP 429 with X-RequestCounter-Reset and fallback to 60s."""
+
+    def test_429_uses_reset_header_with_safety_buffer(self):
+        tokens = ["tok_limited", "tok_healthy"]
+        manager = FootballDataPoolManager(tokens=tokens, micro_pacing_seconds=0.0)
+
+        base_time = 2000.0
+        current_time = base_time
+
+        def mock_get(url, params=None, headers=None, timeout=15, **kwargs):
+            resp = MagicMock(spec=requests.Response)
+            if headers.get("X-Auth-Token") == "tok_limited":
+                resp.status_code = 429
+                resp.headers = {"X-RequestCounter-Reset": "15"}
+                resp.text = '{"message": "Rate limit reached"}'
+            else:
+                resp.status_code = 200
+                resp.headers = {
+                    "X-Requests-Available-Minute": "9",
+                    "X-RequestCounter-Reset": "55",
+                }
+                resp.json.return_value = {"matches": [{"id": 1}]}
+            return resp
+
+        resp = manager.get(
+            "matches",
+            session_get=mock_get,
+            current_time_fn=lambda: current_time,
+        )
+
+        assert resp.status_code == 200
+        # Token 1 should be on cooldown for 15s + 1s = 16s
+        assert manager.pool[0].reset_seconds == 15
+        assert manager.pool[0].cooldown_until == base_time + 16.0
+        assert manager.pool[0].is_on_cooldown(current_time=base_time) is True
+        assert manager.pool[0].is_eligible(current_time=base_time) is False
+
+        # Token 2 should be healthy and active
+        assert manager.pool[1].requests_available == 9
+        assert manager.pool[1].is_eligible(current_time=base_time) is True
+
+    def test_429_fallback_to_60s_when_header_missing(self):
+        token_info = FootballTokenInfo("tok_no_reset_header")
+        base_time = 3000.0
+        # Headers missing X-RequestCounter-Reset
+        cooldown_duration = token_info.mark_429(resp_headers={}, current_time=base_time)
+
+        assert cooldown_duration == 61.0  # 60s fallback + 1s safety buffer
+        assert token_info.reset_seconds == 60
+        assert token_info.cooldown_until == base_time + 61.0
+        assert token_info.is_on_cooldown(current_time=base_time + 30.0) is True
+        assert token_info.is_on_cooldown(current_time=base_time + 62.0) is False
+
+
+class TestRoundRobinDispatch:
+    """Test round-robin switching across active, eligible tokens in pool."""
+
+    def test_round_robin_among_eligible_tokens(self):
+        tokens = ["tok_1", "tok_2", "tok_3"]
+        manager = FootballDataPoolManager(tokens=tokens, micro_pacing_seconds=0.0)
+
+        dispatched = []
 
         def mock_get(url, params=None, headers=None, timeout=15, **kwargs):
             resp = MagicMock(spec=requests.Response)
             resp.status_code = 200
-            resp.json.return_value = {"matches": []}
-            captured_headers.append(headers.get("X-Auth-Token") if headers else None)
+            resp.headers = {
+                "X-Requests-Available-Minute": "5",
+                "X-RequestCounter-Reset": "40",
+            }
+            dispatched.append(headers.get("X-Auth-Token"))
             return resp
 
-        # Call 1 -> uses tok_alpha
-        resp = manager.get("competitions/PL/matches", session_get=mock_get)
-        assert resp.status_code == 200
-        assert manager.pool[0].calls_made == 1
-        assert captured_headers[-1] == "tok_alpha_1111"
+        # Dispatch 4 calls
+        for _ in range(4):
+            manager.get("matches", session_get=mock_get)
 
-        # Call 2 -> uses tok_bravo
-        resp = manager.get("competitions/PL/matches", session_get=mock_get)
-        assert resp.status_code == 200
-        assert manager.pool[1].calls_made == 1
-        assert captured_headers[-1] == "tok_bravo_2222"
+        assert dispatched == ["tok_1", "tok_2", "tok_3", "tok_1"]
 
-        # Call 3 -> uses tok_charlie
-        resp = manager.get("competitions/PL/matches", session_get=mock_get)
-        assert resp.status_code == 200
-        assert manager.pool[2].calls_made == 1
-        assert captured_headers[-1] == "tok_charlie_3333"
+    def test_skips_ineligible_tokens_in_round_robin(self):
+        tokens = ["tok_exhausted_0", "tok_valid_1", "tok_valid_2"]
+        manager = FootballDataPoolManager(tokens=tokens, micro_pacing_seconds=0.0)
 
-        # Call 4 -> wraps back to tok_alpha
-        resp = manager.get("competitions/PL/matches", session_get=mock_get)
-        assert resp.status_code == 200
-        assert manager.pool[0].calls_made == 2
-        assert captured_headers[-1] == "tok_alpha_1111"
+        # Mark tok_exhausted_0 as in cooldown
+        manager.pool[0].mark_429({"X-RequestCounter-Reset": "30"}, current_time=100.0)
 
-
-class TestHTTP429CooldownHandling:
-    """Test handling of HTTP 429 rate limit with 62-second cooldown and failover."""
-
-    def test_failover_on_http_429(self):
-        tokens = ["tok_rate_limited_1", "tok_healthy_2"]
-        manager = FootballDataPoolManager(tokens=tokens, cooldown_seconds=62.0)
-
-        call_count = 0
+        dispatched = []
 
         def mock_get(url, params=None, headers=None, timeout=15, **kwargs):
-            nonlocal call_count
-            call_count += 1
             resp = MagicMock(spec=requests.Response)
-            # First token hits 429
-            if headers.get("X-Auth-Token") == "tok_rate_limited_1":
-                resp.status_code = 429
-                resp.text = '{"message": "API rate limit reached (10 requests per minute)"}'
-            else:
-                resp.status_code = 200
-                resp.json.return_value = {"matches": [{"id": 1001}]}
+            resp.status_code = 200
+            resp.headers = {
+                "X-Requests-Available-Minute": "7",
+                "X-RequestCounter-Reset": "30",
+            }
+            dispatched.append(headers.get("X-Auth-Token"))
             return resp
 
-        resp = manager.get("competitions/PL/matches", session_get=mock_get)
+        # Dispatch 3 calls at time 100.0 (tok_exhausted_0 must be skipped)
+        for _ in range(3):
+            manager.get("matches", session_get=mock_get, current_time_fn=lambda: 100.0)
 
-        assert resp.status_code == 200
-        assert call_count == 2
-        # Token 1 should be on cooldown
-        assert manager.pool[0].is_on_cooldown() is True
-        assert manager.pool[0].calls_made == 1
-        assert manager.pool[0].failed_calls == 1
-        # Token 2 should be active and succeeded
-        assert manager.pool[1].is_on_cooldown() is False
-        assert manager.pool[1].calls_made == 1
-        assert manager.pool[1].failed_calls == 0
+        assert dispatched == ["tok_valid_1", "tok_valid_2", "tok_valid_1"]
 
-    def test_cooldown_expiry(self):
-        token_info = FootballTokenInfo("test_token_val")
-        base_time = 1000.0
-
-        assert token_info.is_on_cooldown(current_time=base_time) is False
-
-        # Mark cooldown for 62 seconds
-        token_info.mark_cooldown(seconds=62.0, current_time=base_time)
-        assert token_info.is_on_cooldown(current_time=base_time + 10.0) is True
-        assert token_info.remaining_cooldown(current_time=base_time + 10.0) == 52.0
-
-        # After 62 seconds has elapsed
-        assert token_info.is_on_cooldown(current_time=base_time + 62.0) is False
-        assert token_info.is_on_cooldown(current_time=base_time + 63.0) is False
-        assert token_info.remaining_cooldown(current_time=base_time + 63.0) == 0.0
-
-    def test_active_tokens_filtering(self):
-        tokens = ["tok_1", "tok_2", "tok_3"]
-        manager = FootballDataPoolManager(tokens=tokens)
-        assert len(manager.active_tokens) == 3
-
-        # Put tok_1 on cooldown
-        manager.pool[0].mark_cooldown(seconds=62.0)
-        assert len(manager.active_tokens) == 2
-        assert manager.pool[0] not in manager.active_tokens
-        assert manager.pool[1] in manager.active_tokens
-        assert manager.pool[2] in manager.active_tokens
-
-    def test_all_tokens_exhausted_graceful_exit(self):
-        tokens = ["tok_exhaust_1", "tok_exhaust_2"]
-        manager = FootballDataPoolManager(tokens=tokens, cooldown_seconds=62.0)
+    def test_all_tokens_exhausted_returns_429(self):
+        tokens = ["tok_a", "tok_b"]
+        manager = FootballDataPoolManager(tokens=tokens, micro_pacing_seconds=0.0)
 
         def mock_get_429(url, params=None, headers=None, timeout=15, **kwargs):
             resp = MagicMock(spec=requests.Response)
             resp.status_code = 429
-            resp.text = "Rate limit exceeded"
+            resp.headers = {"X-RequestCounter-Reset": "20"}
+            resp.text = "Exhausted"
             return resp
 
-        resp = manager.get("competitions/PL/matches", session_get=mock_get_429)
-
+        resp = manager.get("matches", session_get=mock_get_429)
         assert resp.status_code == 429
-        # Both tokens entered cooldown
-        assert manager.pool[0].is_on_cooldown() is True
-        assert manager.pool[1].is_on_cooldown() is True
         assert len(manager.active_tokens) == 0
 
-    def test_empty_pool_unauthenticated_request(self):
-        manager = FootballDataPoolManager(tokens=[])
-        assert manager.token_count == 0
-
-        def mock_get(url, params=None, headers=None, timeout=15, **kwargs):
-            resp = MagicMock(spec=requests.Response)
-            resp.status_code = 200
-            return resp
-
-        resp = manager.get("https://api.football-data.org/v4/competitions", session_get=mock_get)
-        assert resp.status_code == 200
-
-    def test_get_pool_status(self):
-        tokens = ["tok_status_1", "tok_status_2"]
-        manager = FootballDataPoolManager(tokens=tokens)
+    def test_get_pool_status_contains_telemetry(self):
+        tokens = ["tok_st_1", "tok_st_2"]
+        manager = FootballDataPoolManager(tokens=tokens, micro_pacing_seconds=0.0)
         status = manager.get_pool_status()
         assert status["total_tokens"] == 2
         assert status["active_tokens"] == 2
         assert len(status["tokens"]) == 2
+        assert "requests_available" in status["tokens"][0]
+        assert "reset_seconds" in status["tokens"][0]
+        assert "cooldown_until" in status["tokens"][0]
+
+
+class TestMicroPacing:
+    """Test safety micro-pacing of 100ms."""
+
+    def test_default_micro_pacing_is_100ms(self):
+        manager = FootballDataPoolManager(tokens=["tok_pace"])
+        assert manager.micro_pacing_seconds == 0.100
+
+
+class TestMultiCompetitionOptimization:
+    """Test multi-competition matchday queries supported in Football-Data v4."""
+
+    def test_fetch_cross_league_fixtures_params(self):
+        mock_pool = MagicMock()
+        mock_resp = MagicMock()
+        mock_resp.status_code = 200
+        mock_resp.json.return_value = {"matches": [{"id": 501, "competition": {"code": "PL"}}]}
+        mock_pool.get.return_value = mock_resp
+
+        matches = fetch_cross_league_fixtures(
+            competition_codes=["PL", "PD", "SA", "BL1", "FL1", "CL"],
+            from_date="2026-10-01",
+            to_date="2026-10-31",
+            pool=mock_pool,
+        )
+
+        assert len(matches) == 1
+        mock_pool.get.assert_called_once()
+        args, kwargs = mock_pool.get.call_args
+        params = kwargs.get("params", {})
+        assert params.get("competitions") == "PL,PD,SA,BL1,FL1,CL"
+        assert params.get("dateFrom") == "2026-10-01"
+        assert params.get("dateTo") == "2026-10-31"
+        assert params.get("status") == "SCHEDULED"
+
+    def test_fetch_cross_league_matches_daily_params(self):
+        mock_pool = MagicMock()
+        mock_resp = MagicMock()
+        mock_resp.status_code = 200
+        mock_resp.json.return_value = {"matches": [{"id": 601}]}
+        mock_pool.get.return_value = mock_resp
+
+        matches = fetch_cross_league_matches(
+            competition_codes="PL,PD,SA,BL1,FL1,CL",
+            date_from="2026-10-02",
+            date_to="2026-10-09",
+            status="SCHEDULED",
+            pool=mock_pool,
+        )
+
+        assert len(matches) == 1
+        mock_pool.get.assert_called_once()
+        args, kwargs = mock_pool.get.call_args
+        params = kwargs.get("params", {})
+        assert params.get("competitions") == "PL,PD,SA,BL1,FL1,CL"
+        assert params.get("dateFrom") == "2026-10-02"
+        assert params.get("dateTo") == "2026-10-09"

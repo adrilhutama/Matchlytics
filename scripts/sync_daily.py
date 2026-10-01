@@ -111,6 +111,45 @@ def fetch_head_to_head_history(match_id: int | str, pool: Any = None) -> dict:
         print(f"    [ERROR] H2H fetch exception for match {match_id}: {exc}")
         return {}
 
+
+def fetch_cross_league_matches(
+    competition_codes: list[str] | str = "PL,PD,SA,BL1,FL1,CL",
+    date_from: str | None = None,
+    date_to: str | None = None,
+    status: str = "SCHEDULED",
+    pool: Any = None,
+) -> list[dict]:
+    """
+    Fetch cross-league matchdays using multi-competition filtering supported in v4:
+    params={"competitions": "PL,PD,SA,BL1,FL1,CL", "dateFrom": start_date, "dateTo": end_date}
+    """
+    client = pool or football_pool
+    if isinstance(competition_codes, list):
+        comp_str = ",".join(competition_codes)
+    else:
+        comp_str = str(competition_codes)
+
+    today = date.today()
+    start_date = date_from or today.strftime("%Y-%m-%d")
+    end_date = date_to or (today + timedelta(days=7)).strftime("%Y-%m-%d")
+
+    url = f"{BASE_URL}/matches"
+    params = {
+        "competitions": comp_str,
+        "dateFrom": start_date,
+        "dateTo": end_date,
+        "status": status,
+    }
+    try:
+        resp = client.get(url, params=params, timeout=15)
+        if resp.status_code == 200:
+            return resp.json().get("matches", [])
+        print(f"    [WARN] Multi-competition fetch ({comp_str}): HTTP {resp.status_code}")
+        return []
+    except Exception as exc:
+        print(f"    [ERROR] Multi-competition fetch error: {exc}")
+        return []
+
 # ---- Normalized Schema & Team Metadata Caching --------------
 
 DEFAULT_LEAGUE_SHIELDS: dict[str, str] = {
