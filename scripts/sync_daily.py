@@ -881,7 +881,7 @@ def sync_competition(
             kickoff_val = fixture.get("kickoff_time") or fixture.get("match_date")
             status_val = fixture.get("status", "NS")
 
-            # Strictly normalized schema matching public.fixtures without lambda_away or legacy columns
+            # Strictly normalized schema matching public.fixtures without deprecated flat columns
             update_row = {
                 "id":                  fid,
                 "competition_code":    code,
@@ -898,10 +898,6 @@ def sync_competition(
                 "fair_odds_home":      fair_h,
                 "fair_odds_draw":      fair_d,
                 "fair_odds_away":      fair_a,
-                "odds_home":           final_odds_home,
-                "odds_draw":           final_odds_draw,
-                "odds_away":           final_odds_away,
-                "value_pick":          final_value_pick,
                 "prob_over_15":        p_o15,
                 "prob_under_15":       p_u15,
                 "prob_over_25":        p_o25,
@@ -910,7 +906,6 @@ def sync_competition(
                 "prob_under_35":       p_u35,
                 "prob_btts_yes":       p_btts_yes,
                 "prob_btts_no":        p_btts_no,
-                "prob_btts":           p_btts_yes,
                 "score_matrix":        p_matrix,
                 "market_odds":         market_odds or {},
                 "ev_opportunities":    ev_opps or [],
