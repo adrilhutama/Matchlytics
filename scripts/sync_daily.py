@@ -469,6 +469,7 @@ def write_github_step_summary(
 # ---- Main Pipeline Orchestrator ------------------------------
 
 def main() -> None:
+    LAST_QUOTA_REMAINING: Any = "N/A"
     now_str = date.today().isoformat()
     print(f"Daily Odds & Analytics sync starting: {now_str} UTC")
 

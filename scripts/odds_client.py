@@ -116,7 +116,13 @@ class OddsPoolManager:
         request_delay: float = REQUEST_DELAY_SECONDS,
     ):
         raw_keys = keys if keys is not None else ODDS_API_KEYS
-        self.pool: list[OddsKeyInfo] = [OddsKeyInfo(k) for k in raw_keys if k and k.strip()]
+        cleaned_keys: list[str] = []
+        for k in raw_keys:
+            if isinstance(k, str):
+                cleaned = k.strip().strip("'\"")
+                if cleaned:
+                    cleaned_keys.append(cleaned)
+        self.pool: list[OddsKeyInfo] = [OddsKeyInfo(k) for k in cleaned_keys]
         self.current_index: int = 0
         self.base_url: str = base_url.rstrip("/")
         self.request_timeout: float = request_timeout

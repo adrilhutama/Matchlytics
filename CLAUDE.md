@@ -40,7 +40,7 @@ Matchlytics is a decoupled football analytics SaaS platform with **no applicatio
 |---|---|---|
 | `api.football-data.org/v4` | Standings, home/away splits, fixture metadata, official results (settlement) | `sync_standings.py`, `sync_monthly_fixtures.py`, `evaluator.py` |
 | `api.the-odds-api.com/v4` | Real decimal odds (Bet365/Pinnacle consensus) | `sync_daily.py` (`_fetch_odds`) |
-| Supabase (PostgreSQL) | Single source of truth for analytics, auth, subscriptions, and both frontends | — |
+| Supabase (PostgreSQL) | Single source of truth for analytics, auth, subscriptions, and both frontends |  -  |
 
 Public UI copy deliberately never names the raw data vendors ("Consensus Sharp Aggregation", "Tier-1 European Fixture Telemetry", etc.); internal pipeline code and this doc use the real vendor names.
 
@@ -48,7 +48,7 @@ Public UI copy deliberately never names the raw data vendors ("Consensus Sharp A
 
 1. **Standings Sync** (`sync_standings.yml`, daily 03:00 UTC) - computes per-team `home_*`/`away_*` attack & defense strengths from league tables, upserts into `team_standings`.
 2. **Fixtures Sync** (`sync_fixtures.yml`, Mondays 02:00 UTC) - upserts upcoming matches into `fixtures` on a rolling window.
-3. **Odds & Analytics** (`sync_odds_analytics.yml`, twice daily 06:00 and 14:00 UTC) - joins standings lambdas with real odds, runs the Poisson engine, detects +EV bets, settles finished matches via `evaluator.py`, posts a Telegram SITREP, writes a Step Summary.
+3. **Odds & Analytics** (`sync_daily.yml`, twice daily 06:00 and 14:00 UTC) - joins standings lambdas with real odds, runs the Poisson engine, detects +EV bets, settles finished matches via `evaluator.py`, posts a Telegram SITREP, writes a Step Summary.
 
 All three are idempotent; `sync_daily.py` is the main entry point for a complete local analytics cycle.
 
@@ -84,7 +84,7 @@ Pricing is a single source of truth driven by env vars shared between `Subscript
 
 ### Frontend (`frontend/`)
 
-Vite + React 18 + Tailwind CSS 3, PWA (service worker precache, install prompt component), deployed on Vercel (`vercel.json`, root `frontend/`). Reads Supabase with the anon key; realtime channels keep the dashboard live. No router library: single app with view state, filters, and tier gating in `App.jsx`; components in `src/components/`. Design system: pitch-dark palette tokens in `src/index.css`, DM Sans + DM Mono, single amber accent. Two strict house rules enforced across all UI copy: **zero em dashes (`—`) anywhere** (use periods/colons), and no fabricated vendor names, stats, or dead links (all public-facing claims are either live data, explicitly labelled EXAMPLE, or tied to a real destination).
+Vite + React 18 + Tailwind CSS 3, PWA (service worker precache, install prompt component), deployed on Vercel (`vercel.json`, root `frontend/`). Reads Supabase with the anon key; realtime channels keep the dashboard live. No router library: single app with view state, filters, and tier gating in `App.jsx`; components in `src/components/`. Design system: pitch-dark palette tokens in `src/index.css`, DM Sans + DM Mono, single amber accent. Two strict house rules enforced across all UI copy: **zero em dashes (` - `) anywhere** (use periods/colons), and no fabricated vendor names, stats, or dead links (all public-facing claims are either live data, explicitly labelled EXAMPLE, or tied to a real destination).
 
 ## Secrets Required (GitHub or `.env`)
 

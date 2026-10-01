@@ -62,14 +62,16 @@ def parse_odds_api_keys(
     Supports either:
       - ODDS_API_KEYS: Comma-delimited list of keys ("key1,key2,key3")
       - ODDS_API_KEY: Single key fallback for backwards compatibility
-    Strips whitespace and filters out empty strings.
+    Cleans surrounding quotes and whitespace, splitting strictly by comma.
     """
-    raw_multi = os.getenv("ODDS_API_KEYS", "") if env_keys_val is None else env_keys_val
-    keys = [k.strip() for k in raw_multi.split(",") if k.strip()]
-    if not keys:
-        single = (os.getenv("ODDS_API_KEY", "") if env_single_val is None else env_single_val).strip()
-        if single:
-            keys = [single]
+    if env_keys_val is not None or env_single_val is not None:
+        raw = (env_keys_val if env_keys_val is not None and env_keys_val != "" else env_single_val) or ""
+    else:
+        raw = os.getenv("ODDS_API_KEYS") or os.getenv("ODDS_API_KEY") or ""
+
+    raw = raw.strip().strip("'\"")
+    keys = [k.strip().strip("'\"") for k in raw.split(",") if k.strip().strip("'\"")]
+    print(f"[INFO] Initialized Odds API Pool with {len(keys)} key(s).")
     return keys
 
 
