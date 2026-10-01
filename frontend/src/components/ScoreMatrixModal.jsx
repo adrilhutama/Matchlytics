@@ -36,14 +36,14 @@ export default function ScoreMatrixModal({ fixture, isOpen, onClose, standingsMa
   const homeStandings = standingsMap?.[fixture?.home_team_id] || standingsMap?.[`${fixture?.league_id}_${fixture?.home_team_id}`] || null
   const awayStandings = standingsMap?.[fixture?.away_team_id] || standingsMap?.[`${fixture?.league_id}_${fixture?.away_team_id}`] || null
 
-  const home_team_name = fixture.home_team?.name || fixture.home_team_name || fixture.home_name || 'Home'
-  const away_team_name = fixture.away_team?.name || fixture.away_team_name || fixture.away_name || 'Away'
-  const home_team_logo = fixture.home_team?.crest_url || fixture.home_team_logo
-  const away_team_logo = fixture.away_team?.crest_url || fixture.away_team_logo
-  const league_name = fixture.league_name || 'Match Analytics'
+  const home_team_name = fixture?.home_team?.name || fixture?.home_team_name || fixture?.home_name || 'Home'
+  const away_team_name = fixture?.away_team?.name || fixture?.away_team_name || fixture?.away_name || 'Away'
+  const home_team_logo = fixture?.home_team?.crest_url || fixture?.home_team_logo
+  const away_team_logo = fixture?.away_team?.crest_url || fixture?.away_team_logo
+  const league_name = fixture?.league_name || 'Match Analytics'
   const lambda_home = initialHomeXg
   const lambda_away = initialAwayXg
-  const predicted_score = fixture.predicted_score || `${matrixData.mostProbable.home}-${matrixData.mostProbable.away}`
+  const predicted_score = fixture?.predicted_score || `${matrixData?.mostProbable?.home}-${matrixData?.mostProbable?.away}`
 
   const {
     matrix,

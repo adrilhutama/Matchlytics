@@ -142,19 +142,25 @@ export default function CommandPalette({
         },
       }))
 
-    const matchItems = fixtures.map((f) => ({
-      id: `fix-${f.id}`,
-      category: 'Fixtures',
-      title: `${f.home_team_name} vs ${f.away_team_name}`,
-      subtitle: `${f.league_name || 'League'} : Kickoff ${f.match_date ? new Date(f.match_date).toLocaleDateString(undefined, { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : 'TBD'}${f.value_pick ? ` : +EV ${f.value_pick} (+${f.ev_percentage}%)` : ''}`,
-      icon: f.value_pick ? '★' : '⚽',
-      isVal: Boolean(f.value_pick),
-      action: () => {
-        onSelectFixture(f)
-        onSelectWorkspace('quant_lab')
-        onClose()
-      },
-    }))
+    const matchItems = (fixtures || [])
+      .filter(Boolean)
+      .map((f) => {
+        const home = f?.home_team?.name || f?.home_team_name || 'Home';
+        const away = f?.away_team?.name || f?.away_team_name || 'Away';
+        return {
+          id: `fix-${f?.id}`,
+          category: 'Fixtures',
+          title: `${home} vs ${away}`,
+          subtitle: `${f?.league_name || 'League'} : Kickoff ${f?.match_date ? new Date(f.match_date).toLocaleDateString(undefined, { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : 'TBD'}${f?.value_pick ? ` : +EV ${f.value_pick} (+${f?.ev_percentage}%)` : ''}`,
+          icon: f?.value_pick ? '★' : '⚽',
+          isVal: Boolean(f?.value_pick),
+          action: () => {
+            onSelectFixture(f)
+            onSelectWorkspace('quant_lab')
+            onClose()
+          },
+        };
+      })
 
     const all = [...workspaceActions, ...filterActions, ...leagueActions, ...matchItems]
 

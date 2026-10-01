@@ -208,8 +208,8 @@ function QuantLabWorkspace({
   currencyCode = 'IDR',
   onBackToScanner,
 }) {
-  const initialHomeXg = Number(fixture.home_xg) || Number(fixture.lambda_home) || Number(fixture.lambdaHome) || 1.35
-  const initialAwayXg = Number(fixture.away_xg) || Number(fixture.lambda_away) || Number(fixture.lambdaAway) || 1.10
+  const initialHomeXg = Number(fixture?.home_xg) || Number(fixture?.lambda_home) || Number(fixture?.lambdaHome) || 1.35
+  const initialAwayXg = Number(fixture?.away_xg) || Number(fixture?.lambda_away) || Number(fixture?.lambdaAway) || 1.10
 
   const initialH = safeClampLambda(initialHomeXg, 1.35)
   const initialA = safeClampLambda(initialAwayXg, 1.10)
@@ -221,8 +221,8 @@ function QuantLabWorkspace({
   // Synchronize when fixture changes
   useEffect(() => {
     if (fixture) {
-      const hXg = safeClampLambda(Number(fixture.home_xg) || Number(fixture.lambda_home) || Number(fixture.lambdaHome) || 1.35, 1.35)
-      const aXg = safeClampLambda(Number(fixture.away_xg) || Number(fixture.lambda_away) || Number(fixture.lambdaAway) || 1.10, 1.10)
+      const hXg = safeClampLambda(Number(fixture?.home_xg) || Number(fixture?.lambda_home) || Number(fixture?.lambdaHome) || 1.35, 1.35)
+      const aXg = safeClampLambda(Number(fixture?.away_xg) || Number(fixture?.lambda_away) || Number(fixture?.lambdaAway) || 1.10, 1.10)
       setCustomLambdaH(hXg)
       setCustomLambdaA(aXg)
       setActiveMarketOdds(getResolvedFixtureOdds(fixture))
@@ -249,12 +249,12 @@ function QuantLabWorkspace({
   }, [activeMarketOdds])
 
   // Safe team names and crests
-  const homeName = fixture.home_team?.name || fixture.home_team_name || fixture.homeTeam || 'Home Team'
-  const awayName = fixture.away_team?.name || fixture.away_team_name || fixture.awayTeam || 'Away Team'
-  const homeLogo = fixture.home_team?.crest_url || fixture.home_team_logo || fixture.homeLogo
-  const awayLogo = fixture.away_team?.crest_url || fixture.away_team_logo || fixture.awayLogo
-  const leagueName = fixture.league_name || fixture.league || 'League'
-  const matchDate = fixture.match_date || fixture.date
+  const homeName = fixture?.home_team?.name || fixture?.home_team_name || fixture?.homeTeam || 'Home Team'
+  const awayName = fixture?.away_team?.name || fixture?.away_team_name || fixture?.awayTeam || 'Away Team'
+  const homeLogo = fixture?.home_team?.crest_url || fixture?.home_team_logo || fixture?.homeLogo
+  const awayLogo = fixture?.away_team?.crest_url || fixture?.away_team_logo || fixture?.awayLogo
+  const leagueName = fixture?.league_name || fixture?.league || 'League'
+  const matchDate = fixture?.match_date || fixture?.date || fixture?.kickoff_time
 
   // Calculate Edge & Kelly for each 1X2 outcome (with comma decimal support)
   const valueEvaluations = useMemo(() => {
@@ -288,8 +288,8 @@ function QuantLabWorkspace({
   }, [matrixData, activeMarketOdds, effectiveBankroll, homeName, awayName])
 
   // Standings metadata for active match
-  const homeStandings = fixture ? (standingsMap[fixture.home_team_id] || standingsMap[`${fixture.league_id}_${fixture.home_team_id}`] || null) : null
-  const awayStandings = fixture ? (standingsMap[fixture.away_team_id] || standingsMap[`${fixture.league_id}_${fixture.away_team_id}`] || null) : null
+  const homeStandings = fixture ? (standingsMap[fixture?.home_team_id] || standingsMap[`${fixture?.league_id}_${fixture?.home_team_id}`] || null) : null
+  const awayStandings = fixture ? (standingsMap[fixture?.away_team_id] || standingsMap[`${fixture?.league_id}_${fixture?.away_team_id}`] || null) : null
 
   // Team strength split metrics
   const homeAttack = fixture?.home_team?.home_attack ?? homeStandings?.home_attack ?? 1.0
@@ -305,11 +305,19 @@ function QuantLabWorkspace({
   // Reset to original model xG
   const handleResetModelXg = () => {
     if (fixture) {
-      const hXg = safeClampLambda(Number(fixture.home_xg) || Number(fixture.lambda_home) || Number(fixture.lambdaHome) || 1.35, 1.35)
-      const aXg = safeClampLambda(Number(fixture.away_xg) || Number(fixture.lambda_away) || Number(fixture.lambdaAway) || 1.10, 1.10)
+      const hXg = safeClampLambda(Number(fixture?.home_xg) || Number(fixture?.lambda_home) || Number(fixture?.lambdaHome) || 1.35, 1.35)
+      const aXg = safeClampLambda(Number(fixture?.away_xg) || Number(fixture?.lambda_away) || Number(fixture?.lambdaAway) || 1.10, 1.10)
       setCustomLambdaH(hXg)
       setCustomLambdaA(aXg)
     }
+  }
+
+  if (!fixture) {
+    return (
+      <div className="flex items-center justify-center p-8 text-neutral-400 font-mono text-sm bg-pitch-950/40 rounded-2xl border border-pitch-800 max-w-xl mx-auto my-12">
+        No fixture selected or data unavailable.
+      </div>
+    )
   }
 
   return (
@@ -1053,16 +1061,16 @@ export default function QuantLab({
   currencyCode = 'IDR',
   onBackToScanner,
 }) {
-  const matchPool = (allFixtures && allFixtures.length > 0) ? allFixtures : (fixtures || [])
+  const matchPool = ((allFixtures && allFixtures.length > 0) ? allFixtures : (fixtures || [])).filter(Boolean)
   const targetFixture = fixture || selectedFixture || (matchPool.length > 0 ? (
-    [...matchPool].filter(f => Boolean(f.value_pick)).sort((a,b) => (b.ev_percentage || 0) - (a.ev_percentage || 0))[0] || matchPool[0]
+    [...matchPool].filter(f => Boolean(f?.value_pick)).sort((a,b) => (b?.ev_percentage || 0) - (a?.ev_percentage || 0))[0] || matchPool[0]
   ) : null)
 
   // Safe Null Guard at top of QuantLab
   if (!targetFixture) {
     return (
-      <div className="p-8 text-center text-zinc-500 font-mono text-sm bg-pitch-950/40 rounded-2xl border border-pitch-800 max-w-xl mx-auto my-12">
-        No fixture selected for Quant Lab.
+      <div className="flex items-center justify-center p-8 text-neutral-400 font-mono text-sm bg-pitch-950/40 rounded-2xl border border-pitch-800 max-w-xl mx-auto my-12">
+        No fixture selected or data unavailable.
       </div>
     )
   }

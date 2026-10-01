@@ -72,6 +72,8 @@ export default function MatchCard({
   quantLocked = false,
   onTriggerUpgrade,
 }) {
+  if (!fixture) return null
+
   const [isExpanded, setIsExpanded] = useState(false)
   const [activeMarketTab, setActiveMarketTab] = useState('h2h')
   const triggerUpgrade = quantLocked ? onTriggerUpgrade : null
@@ -84,30 +86,30 @@ export default function MatchCard({
     value_pick, ev_percentage,
   } = fixture
 
-  const h2hOdds = fixture.market_odds?.h2h || {}
+  const h2hOdds = fixture?.market_odds?.h2h || {}
   const rawH = typeof h2hOdds.home === 'number' ? h2hOdds.home : (h2hOdds.home?.price || h2hOdds.consensus?.home)
   const rawD = typeof h2hOdds.draw === 'number' ? h2hOdds.draw : (h2hOdds.draw?.price || h2hOdds.consensus?.draw)
   const rawA = typeof h2hOdds.away === 'number' ? h2hOdds.away : (h2hOdds.away?.price || h2hOdds.consensus?.away)
 
-  const odds_home = rawH || fixture.odds_home || fixture.fair_odds_home || null
-  const odds_draw = rawD || fixture.odds_draw || fixture.fair_odds_draw || null
-  const odds_away = rawA || fixture.odds_away || fixture.fair_odds_away || null
+  const odds_home = rawH || fixture?.odds_home || fixture?.fair_odds_home || null
+  const odds_draw = rawD || fixture?.odds_draw || fixture?.fair_odds_draw || null
+  const odds_away = rawA || fixture?.odds_away || fixture?.fair_odds_away || null
 
-  const home_team_name = fixture.home_team?.name || fixture.home_team_name || 'Home'
-  const away_team_name = fixture.away_team?.name || fixture.away_team_name || 'Away'
-  const home_team_logo = fixture.home_team?.crest_url || fixture.home_team_logo
-  const away_team_logo = fixture.away_team?.crest_url || fixture.away_team_logo
-  const match_date = fixture.kickoff_time || fixture.match_date
-  const lambda_home = fixture.home_xg != null ? fixture.home_xg : fixture.lambda_home
-  const lambda_away = fixture.away_xg != null ? fixture.away_xg : fixture.lambda_away
+  const home_team_name = fixture?.home_team?.name || fixture?.home_team_name || 'Home'
+  const away_team_name = fixture?.away_team?.name || fixture?.away_team_name || 'Away'
+  const home_team_logo = fixture?.home_team?.crest_url || fixture?.home_team_logo
+  const away_team_logo = fixture?.away_team?.crest_url || fixture?.away_team_logo
+  const match_date = fixture?.kickoff_time || fixture?.match_date
+  const lambda_home = fixture?.home_xg != null ? fixture.home_xg : fixture?.lambda_home
+  const lambda_away = fixture?.away_xg != null ? fixture.away_xg : fixture?.lambda_away
 
   const homeLogo = home_team_logo
   const awayLogo = away_team_logo
   const homeName = home_team_name
   const awayName = away_team_name
 
-  const homeStandings = standingsMap[fixture.home_team_id] || standingsMap[`${fixture.league_id}_${fixture.home_team_id}`] || null
-  const awayStandings = standingsMap[fixture.away_team_id] || standingsMap[`${fixture.league_id}_${fixture.away_team_id}`] || null
+  const homeStandings = standingsMap[fixture?.home_team_id] || standingsMap[`${fixture?.league_id}_${fixture?.home_team_id}`] || null
+  const awayStandings = standingsMap[fixture?.away_team_id] || standingsMap[`${fixture?.league_id}_${fixture?.away_team_id}`] || null
 
   const isValue = Boolean(value_pick)
   const hasRealOdds = isRealMarketOdds(fixture)

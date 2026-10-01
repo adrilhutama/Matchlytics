@@ -107,7 +107,8 @@ function AppInner() {
   const [portfolioPositions, setPortfolioPositions] = useState(() => {
     try {
       const saved = localStorage.getItem('matchlytics_portfolio_positions_v1')
-      return saved ? JSON.parse(saved) : []
+      const parsed = saved ? JSON.parse(saved) : []
+      return Array.isArray(parsed) ? parsed.filter(Boolean) : []
     } catch {
       return []
     }
@@ -173,7 +174,7 @@ function AppInner() {
 
   // Dedicated match deep route check: /match/:id or #/match/:id or ?match=:id
   useEffect(() => {
-    if (typeof window === 'undefined' || fixtures.length === 0) return
+    if (typeof window === 'undefined' || !fixtures || fixtures.length === 0) return
 
     const getTargetMatchId = () => {
       const hash = window.location.hash
@@ -190,7 +191,7 @@ function AppInner() {
 
     const matchId = getTargetMatchId()
     if (matchId) {
-      const found = fixtures.find((f) => String(f.id) === String(matchId))
+      const found = (fixtures || []).find((f) => f && String(f.id) === String(matchId)) || null
       if (found) {
         setSelectedLabFixture(found)
         setActiveWorkspace('quant_lab')
@@ -200,7 +201,7 @@ function AppInner() {
     const handleLocationChange = () => {
       const updatedId = getTargetMatchId()
       if (updatedId) {
-        const found = fixtures.find((f) => String(f.id) === String(updatedId))
+        const found = (fixtures || []).find((f) => f && String(f.id) === String(updatedId)) || null
         if (found) {
           setSelectedLabFixture(found)
           setActiveWorkspace('quant_lab')
@@ -267,11 +268,12 @@ function AppInner() {
 
   // Auto-select initial fixture for Quant Lab prioritizing highest +EV match
   useEffect(() => {
-    if (!selectedLabFixture && fixtures.length > 0) {
-      const sortedByValue = [...fixtures]
-        .filter((f) => Boolean(f.value_pick))
-        .sort((a, b) => (b.ev_percentage || 0) - (a.ev_percentage || 0))
-      setSelectedLabFixture(sortedByValue[0] || fixtures[0])
+    const valid = (fixtures || []).filter(Boolean)
+    if (!selectedLabFixture && valid.length > 0) {
+      const sortedByValue = [...valid]
+        .filter((f) => Boolean(f?.value_pick))
+        .sort((a, b) => (b?.ev_percentage || 0) - (a?.ev_percentage || 0))
+      setSelectedLabFixture(sortedByValue[0] || valid[0] || null)
     }
   }, [fixtures, selectedLabFixture])
 
@@ -409,10 +411,11 @@ function AppInner() {
       return
     }
     if (ws === 'quant_lab' && !selectedLabFixture && fixtures.length > 0) {
-      const sortedByValue = [...fixtures]
-        .filter((f) => Boolean(f.value_pick))
-        .sort((a, b) => (b.ev_percentage || 0) - (a.ev_percentage || 0))
-      setSelectedLabFixture(sortedByValue[0] || fixtures[0])
+      const valid = (fixtures || []).filter(Boolean)
+      const sortedByValue = [...valid]
+        .filter((f) => Boolean(f?.value_pick))
+        .sort((a, b) => (b?.ev_percentage || 0) - (a?.ev_percentage || 0))
+      setSelectedLabFixture(sortedByValue[0] || valid[0] || null)
     }
     setActiveWorkspace(ws)
     window.scrollTo({ top: 0, behavior: 'smooth' })
@@ -481,7 +484,7 @@ function AppInner() {
         }
       }
 
-      setFixtures(data || [])
+      setFixtures((data || []).filter(Boolean))
       setLastUpdated(new Date())
 
       if (isSilent) {
@@ -533,7 +536,7 @@ function AppInner() {
       }
 
       if (data) {
-        setSettledFixtures(data)
+        setSettledFixtures((data || []).filter(Boolean))
       }
     } catch (err) {
       console.error('[Supabase fetchSettledFixtures error]:', err)
@@ -629,50 +632,50 @@ function AppInner() {
 
   // Client-side filtering & sorting
   const displayedFixtures = useMemo(() => {
-    let result = fixtures
+    let result = (fixtures || []).filter(Boolean)
 
     if (showWatchlistOnly) {
-      result = result.filter((f) => watchlist.includes(f.id))
+      result = result.filter((f) => f?.id && watchlist.includes(f.id))
     } else if (activeLeague !== 'all') {
-      result = result.filter((f) => f.league_id === activeLeague)
+      result = result.filter((f) => f?.league_id === activeLeague)
     }
 
     // Market category and +EV edge filtering
     if (valueOnly) {
       if (selectedMarket === 'all') {
         result = result.filter(
-          (f) => Boolean(f.value_pick) || (Array.isArray(f.ev_opportunities) && f.ev_opportunities.length > 0)
+          (f) => Boolean(f?.value_pick) || (Array.isArray(f?.ev_opportunities) && f.ev_opportunities.length > 0)
         )
       } else if (selectedMarket === 'h2h') {
         result = result.filter(
-          (f) => Boolean(f.value_pick) || f.ev_opportunities?.some((o) => o.market === 'h2h')
+          (f) => Boolean(f?.value_pick) || f?.ev_opportunities?.some((o) => o?.market === 'h2h')
         )
       } else if (selectedMarket === 'totals') {
         result = result.filter(
-          (f) => f.ev_opportunities?.some((o) => o.market === 'totals')
+          (f) => f?.ev_opportunities?.some((o) => o?.market === 'totals')
         )
       } else if (selectedMarket === 'spreads') {
         result = result.filter(
-          (f) => f.ev_opportunities?.some((o) => o.market === 'spreads')
+          (f) => f?.ev_opportunities?.some((o) => o?.market === 'spreads')
         )
       }
     } else {
       if (selectedMarket === 'totals') {
         result = result.filter(
-          (f) => f.market_odds?.totals || f.ev_opportunities?.some((o) => o.market === 'totals') || f.prob_over_25 != null
+          (f) => f?.market_odds?.totals || f?.ev_opportunities?.some((o) => o?.market === 'totals') || f?.prob_over_25 != null
         )
       } else if (selectedMarket === 'spreads') {
         result = result.filter(
-          (f) => f.market_odds?.spreads || f.ev_opportunities?.some((o) => o.market === 'spreads')
+          (f) => f?.market_odds?.spreads || f?.ev_opportunities?.some((o) => o?.market === 'spreads')
         )
       } else if (selectedMarket === 'h2h') {
         result = result.filter(
-          (f) => f.odds_home || f.market_odds?.h2h || f.value_pick
+          (f) => f?.odds_home || f?.market_odds?.h2h || f?.value_pick
         )
       }
     }
 
-    result = result.filter((f) => isDateInRange(f.kickoff_time || f.match_date, dateRange))
+    result = result.filter((f) => isDateInRange(f?.kickoff_time || f?.match_date, dateRange))
 
     if (searchQuery.trim()) {
       result = result.filter((f) => matchesSearch(f, searchQuery))
@@ -699,7 +702,7 @@ function AppInner() {
 
   const currentLeagueLabel = LEAGUES.find((l) => l.id === activeLeague)?.label
   const currentDateRangeLabel = DATE_RANGES.find((r) => r.id === dateRange)?.label
-  const valueCount = fixtures.filter((f) => Boolean(f.value_pick)).length
+  const valueCount = (fixtures || []).filter((f) => Boolean(f?.value_pick)).length
 
   useEffect(() => {
     if (activeFeed === 'value') {
@@ -818,13 +821,13 @@ function AppInner() {
       <PerformanceModal
         isOpen={isBacktestOpen}
         onClose={() => setIsBacktestOpen(false)}
-        fixtures={settledFixtures}
+        fixtures={(settledFixtures || []).filter(Boolean)}
       />
 
       <CommandPalette
         isOpen={isCommandPaletteOpen}
         onClose={() => setIsCommandPaletteOpen(false)}
-        fixtures={fixtures}
+        fixtures={(fixtures || []).filter(Boolean)}
         onSelectFixture={(f) => {
           handleSelectForLab(f)
         }}
@@ -852,8 +855,8 @@ function AppInner() {
         <LandingPage
           onEnterApp={handleEnterApp}
           onOpenBacktest={() => setIsBacktestOpen(true)}
-          fixtures={fixtures}
-          settledFixtures={settledFixtures}
+          fixtures={(fixtures || []).filter(Boolean)}
+          settledFixtures={(settledFixtures || []).filter(Boolean)}
           fixturesLoading={loading}
           dataError={error}
           lastUpdated={lastUpdated}
@@ -1120,7 +1123,7 @@ function AppInner() {
           {/* Workspace 4: Track Record & Model Ledger */}
           {activeWorkspace === 'ledger' && (
             <ModelLedger
-              settledFixtures={settledFixtures}
+              settledFixtures={(settledFixtures || []).filter(Boolean)}
             />
           )}
         </main>

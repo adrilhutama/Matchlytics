@@ -65,7 +65,7 @@ export default function TerminalScanner({
       {/* Presentation Mode: Default Master Table */}
       {viewMode === 'table' && (
         <TableView
-          fixtures={fixtures}
+          fixtures={(fixtures || []).filter(Boolean)}
           watchlist={watchlist}
           onToggleWatchlist={onToggleWatchlist}
           onOpenMatrix={onOpenMatrix}
@@ -83,16 +83,17 @@ export default function TerminalScanner({
       {/* Presentation Mode: Secondary Grid Cards */}
       {viewMode === 'cards' && (
         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3 sm:gap-4">
-          {fixtures.map((fixture, idx) => {
-            const fixtureSlipPicks = slipLegs
-              .filter((l) => l.fixtureId === fixture.id)
+          {(fixtures || []).filter(Boolean).map((fixture, idx) => {
+            if (!fixture?.id) return null
+            const fixtureSlipPicks = (slipLegs || [])
+              .filter((l) => l?.fixtureId === fixture.id)
               .map((l) => l.pick)
 
             return (
               <MatchCard
                 key={fixture.id}
                 fixture={fixture}
-                isPinned={watchlist.includes(fixture.id)}
+                isPinned={watchlist?.includes(fixture.id)}
                 onToggleWatchlist={onToggleWatchlist}
                 onOpenMatrix={onOpenMatrix}
                 onOpenQuantModal={onOpenQuantModal}

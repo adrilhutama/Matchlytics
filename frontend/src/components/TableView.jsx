@@ -44,6 +44,8 @@ export function TableRow({
 }) {
   const [activeMarketTab, setActiveMarketTab] = useState('h2h')
 
+  if (!fixture) return null
+
   const {
     id,
     league_name,
@@ -59,26 +61,26 @@ export function TableRow({
     ev_opportunities,
   } = fixture
 
-  const h2hOdds = fixture.market_odds?.h2h || {}
+  const h2hOdds = fixture?.market_odds?.h2h || {}
   const rawOddsHome = typeof h2hOdds.home === 'number' ? h2hOdds.home : (h2hOdds.home?.price || h2hOdds.consensus?.home)
   const rawOddsDraw = typeof h2hOdds.draw === 'number' ? h2hOdds.draw : (h2hOdds.draw?.price || h2hOdds.consensus?.draw)
   const rawOddsAway = typeof h2hOdds.away === 'number' ? h2hOdds.away : (h2hOdds.away?.price || h2hOdds.consensus?.away)
 
-  const oddsHome = rawOddsHome || fixture.odds_home || fixture.fair_odds_home || null
-  const oddsDraw = rawOddsDraw || fixture.odds_draw || fixture.fair_odds_draw || null
-  const oddsAway = rawOddsAway || fixture.odds_away || fixture.fair_odds_away || null
+  const oddsHome = rawOddsHome || fixture?.odds_home || fixture?.fair_odds_home || null
+  const oddsDraw = rawOddsDraw || fixture?.odds_draw || fixture?.fair_odds_draw || null
+  const oddsAway = rawOddsAway || fixture?.odds_away || fixture?.fair_odds_away || null
 
   const odds_home = oddsHome
   const odds_draw = oddsDraw
   const odds_away = oddsAway
 
-  const home_team_name = fixture.home_team?.name || fixture.home_team_name || 'Home'
-  const away_team_name = fixture.away_team?.name || fixture.away_team_name || 'Away'
-  const home_team_logo = fixture.home_team?.crest_url || fixture.home_team_logo
-  const away_team_logo = fixture.away_team?.crest_url || fixture.away_team_logo
-  const match_date = fixture.kickoff_time || fixture.match_date
-  const lambda_home = fixture.home_xg != null ? fixture.home_xg : fixture.lambda_home
-  const lambda_away = fixture.away_xg != null ? fixture.away_xg : fixture.lambda_away
+  const home_team_name = fixture?.home_team?.name || fixture?.home_team_name || 'Home'
+  const away_team_name = fixture?.away_team?.name || fixture?.away_team_name || 'Away'
+  const home_team_logo = fixture?.home_team?.crest_url || fixture?.home_team_logo
+  const away_team_logo = fixture?.away_team?.crest_url || fixture?.away_team_logo
+  const match_date = fixture?.kickoff_time || fixture?.match_date
+  const lambda_home = fixture?.home_xg != null ? fixture.home_xg : fixture?.lambda_home
+  const lambda_away = fixture?.away_xg != null ? fixture.away_xg : fixture?.lambda_away
 
   const homeLogo = home_team_logo
   const awayLogo = away_team_logo
@@ -89,12 +91,12 @@ export function TableRow({
   const { relativeBadge, timeStr } = formatLocalizedMatchDate(match_date)
 
   const homeStandings =
-    standingsMap[fixture.home_team_id] ||
-    standingsMap[`${fixture.league_id}_${fixture.home_team_id}`] ||
+    standingsMap[fixture?.home_team_id] ||
+    standingsMap[`${fixture?.league_id}_${fixture?.home_team_id}`] ||
     null
   const awayStandings =
-    standingsMap[fixture.away_team_id] ||
-    standingsMap[`${fixture.league_id}_${fixture.away_team_id}`] ||
+    standingsMap[fixture?.away_team_id] ||
+    standingsMap[`${fixture?.league_id}_${fixture?.away_team_id}`] ||
     null
 
   // Zero-vig calculation
@@ -823,7 +825,10 @@ export default function TableView({
 }) {
   const [expandedIds, setExpandedIds] = useState(new Set())
 
+  const validFixtures = (fixtures || []).filter(Boolean)
+
   const toggleRow = (id) => {
+    if (!id) return
     setExpandedIds((prev) => {
       const next = new Set(prev)
       if (next.has(id)) {
@@ -861,9 +866,10 @@ export default function TableView({
             </tr>
           </thead>
           <tbody>
-            {fixtures.map((fixture) => {
+            {validFixtures.map((fixture) => {
+              if (!fixture?.id) return null
               const isExpanded = expandedIds.has(fixture.id)
-              const isPinned = watchlist.includes(fixture.id)
+              const isPinned = watchlist?.includes(fixture.id)
 
               return (
                 <TableRow

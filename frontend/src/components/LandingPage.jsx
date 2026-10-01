@@ -129,12 +129,12 @@ function pickFields(fixture) {
   if (!fixture || !fixture.value_pick) return null
   const pickKey = { HOME: 'H', DRAW: 'D', AWAY: 'A' }[fixture.value_pick]
   if (pickKey === 'H') {
-    return { key: 'H', label: `${fixture.home_team_name ?? 'Home'} Win`, odds: fixture.odds_home, prob: fixture.prob_home }
+    return { key: 'H', label: `${fixture?.home_team?.name || fixture?.home_team_name || 'Home'} Win`, odds: fixture?.odds_home, prob: fixture?.prob_home }
   }
   if (pickKey === 'D') {
-    return { key: 'D', label: 'Draw', odds: fixture.odds_draw, prob: fixture.prob_draw }
+    return { key: 'D', label: 'Draw', odds: fixture?.odds_draw, prob: fixture?.prob_draw }
   }
-  return { key: 'A', label: `${fixture.away_team_name ?? 'Away'} Win`, odds: fixture.odds_away, prob: fixture.prob_away }
+  return { key: 'A', label: `${fixture?.away_team?.name || fixture?.away_team_name || 'Away'} Win`, odds: fixture?.odds_away, prob: fixture?.prob_away }
 }
 
 // ------------------------------------------------------------------
@@ -144,7 +144,7 @@ function pickFields(fixture) {
 function getShortPickLabel(fixture) {
   if (!fixture || !fixture.value_pick) return 'Edge'
   if (fixture.value_pick === 'DRAW') return 'Draw'
-  const team = fixture.value_pick === 'HOME' ? fixture.home_team_name : fixture.away_team_name
+  const team = fixture.value_pick === 'HOME' ? (fixture?.home_team?.name || fixture?.home_team_name) : (fixture?.away_team?.name || fixture?.away_team_name)
   if (!team) return fixture.value_pick === 'HOME' ? 'Home' : 'Away'
   const clean = team.replace(/\s+(FC|AFC|CF|SSC|BC)$/i, '').trim()
   return clean.length > 13 ? clean.slice(0, 11) + '...' : clean
@@ -239,9 +239,9 @@ function HeroMonitor({ evPicks, fixturesLoading, dataError }) {
         {/* Match line */}
         <div className="flex flex-wrap items-center justify-between gap-2">
           <p className="text-base sm:text-lg font-bold text-slate-100 tracking-tight min-w-0 truncate">
-            {fixture.home_team_name ?? '?'}
+            {fixture?.home_team?.name || fixture?.home_team_name || '?'}
             <span className="text-slate-500 font-mono font-normal text-sm mx-1.5">vs</span>
-            {fixture.away_team_name ?? '?'}
+            {fixture?.away_team?.name || fixture?.away_team_name || '?'}
           </p>
           <span className="text-[11px] text-slate-500 font-mono">{fixture.league_name ?? ''}</span>
         </div>
@@ -488,7 +488,7 @@ function ValueFinderPanel({ evPicks, fixturesLoading }) {
               >
                 <div className="min-w-0 pr-2">
                   <p className="text-xs font-semibold text-slate-200 truncate">
-                    {f.home_team_name} vs {f.away_team_name}
+                    {f?.home_team?.name || f?.home_team_name || 'Home'} vs {f?.away_team?.name || f?.away_team_name || 'Away'}
                   </p>
                   <p className="text-[10px] font-mono text-slate-500 mt-0.5">
                     {pf?.label} @ {Number(pf?.odds || 0).toFixed(2)} &middot; {f.league_name}
@@ -584,7 +584,7 @@ function ParlayPanel({ evPicks }) {
   const hasReal = realLegs.length === 2 && realLegs.every((l) => l.odds && l.modelProb)
 
   const legs = hasReal
-    ? realLegs.map((l, i) => ({ ...l, label: pickFields(evPicks[i]).label, match: `${evPicks[i].home_team_name} vs ${evPicks[i].away_team_name}` }))
+    ? realLegs.map((l, i) => ({ ...l, label: pickFields(evPicks[i])?.label, match: `${evPicks[i]?.home_team?.name || evPicks[i]?.home_team_name || 'Home'} vs ${evPicks[i]?.away_team?.name || evPicks[i]?.away_team_name || 'Away'}` }))
     : [
         { label: 'Home Win', match: 'Arsenal vs Chelsea', odds: 1.85, modelProb: 0.59 },
         { label: 'Over 2.5 Goals', match: 'Real Madrid vs Sevilla', odds: 1.72, modelProb: 0.63 },

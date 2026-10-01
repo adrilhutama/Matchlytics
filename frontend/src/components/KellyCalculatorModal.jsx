@@ -48,8 +48,8 @@ export default function KellyCalculatorModal({
     return () => window.removeEventListener('keydown', handleKeyDown)
   }, [isOpen, onClose])
 
-  const homeName = fixture.home_team?.name || fixture.home_team_name || fixture.home_name || 'Home'
-  const awayName = fixture.away_team?.name || fixture.away_team_name || fixture.away_name || 'Away'
+  const homeName = fixture?.home_team?.name || fixture?.home_team_name || fixture?.home_name || 'Home'
+  const awayName = fixture?.away_team?.name || fixture?.away_team_name || fixture?.away_name || 'Away'
 
   const h2hOdds = fixture?.market_odds?.h2h || {}
   const rawH = typeof h2hOdds.home === 'number' ? h2hOdds.home : (h2hOdds.home?.price || h2hOdds.consensus?.home)
@@ -136,11 +136,13 @@ export default function KellyCalculatorModal({
         odds: outcomeStats.odds,
         modelProb: outcomeStats.modelProb,
         ev: edgeData.evPercent,
-        leagueName: fixture.league_name,
+        leagueName: fixture?.league_name,
         matchDate: matchDate,
       })
     }
   }
+
+  if (!isOpen || !fixture) return null
 
   return (
     <div

@@ -309,7 +309,8 @@ export function getParlaySlip() {
   if (typeof window === 'undefined') return [];
   try {
     const raw = localStorage.getItem(PARLAY_STORAGE_KEY);
-    return raw ? JSON.parse(raw) : [];
+    const parsed = raw ? JSON.parse(raw) : [];
+    return Array.isArray(parsed) ? parsed.filter((leg) => Boolean(leg && (leg.fixtureId != null || leg.id != null))) : [];
   } catch (err) {
     console.error('Failed to load parlay slip:', err);
     return [];
@@ -508,11 +509,12 @@ export function isDateInRange(isoString, rangeKey) {
  * Diacritic-insensitive team & league search matching
  */
 export function matchesSearch(fixture, query) {
+  if (!fixture) return false;
   if (!query || !query.trim()) return true;
   const q = query.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().trim();
-  const home = (fixture.home_team?.name || fixture.home_team_name || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
-  const away = (fixture.away_team?.name || fixture.away_team_name || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
-  const league = (fixture.league_name || fixture.competition_code || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
+  const home = (fixture?.home_team?.name || fixture?.home_team_name || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
+  const away = (fixture?.away_team?.name || fixture?.away_team_name || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
+  const league = (fixture?.league_name || fixture?.competition_code || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
   return home.includes(q) || away.includes(q) || league.includes(q);
 }
 
@@ -520,26 +522,26 @@ export function matchesSearch(fixture, query) {
  * Multi-criteria sorting
  */
 export function sortFixtures(fixtures, sortKey) {
-  const list = [...fixtures];
+  const list = (fixtures || []).filter(Boolean);
   switch (sortKey) {
     case 'kickoff_asc':
-      return list.sort((a, b) => new Date(a.kickoff_time || a.match_date || 0) - new Date(b.kickoff_time || b.match_date || 0));
+      return list.sort((a, b) => new Date(a?.kickoff_time || a?.match_date || 0) - new Date(b?.kickoff_time || b?.match_date || 0));
     case 'ev_desc':
       return list.sort((a, b) => {
-        const evA = a.ev_percentage != null ? Number(a.ev_percentage) : -999;
-        const evB = b.ev_percentage != null ? Number(b.ev_percentage) : -999;
+        const evA = a?.ev_percentage != null ? Number(a.ev_percentage) : -999;
+        const evB = b?.ev_percentage != null ? Number(b.ev_percentage) : -999;
         return evB - evA;
       });
     case 'home_prob_desc':
       return list.sort((a, b) => {
-        const pA = a.prob_home != null ? Number(a.prob_home) : -1;
-        const pB = b.prob_home != null ? Number(b.prob_home) : -1;
+        const pA = a?.prob_home != null ? Number(a.prob_home) : -1;
+        const pB = b?.prob_home != null ? Number(b.prob_home) : -1;
         return pB - pA;
       });
     case 'xg_total_desc':
       return list.sort((a, b) => {
-        const xgA = (Number(a.lambda_home) || 0) + (Number(a.lambda_away) || 0);
-        const xgB = (Number(b.lambda_home) || 0) + (Number(b.lambda_away) || 0);
+        const xgA = (Number(a?.lambda_home) || 0) + (Number(a?.lambda_away) || 0);
+        const xgB = (Number(b?.lambda_home) || 0) + (Number(b?.lambda_away) || 0);
         return xgB - xgA;
       });
     default:
@@ -699,7 +701,8 @@ export function getWatchlist() {
   if (typeof window === 'undefined') return [];
   try {
     const raw = localStorage.getItem(WATCHLIST_STORAGE_KEY);
-    return raw ? JSON.parse(raw) : [];
+    const parsed = raw ? JSON.parse(raw) : [];
+    return Array.isArray(parsed) ? parsed.filter(Boolean) : [];
   } catch (err) {
     console.error('Failed to load watchlist:', err);
     return [];

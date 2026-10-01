@@ -46,7 +46,7 @@ export default function WorkspaceNav({
         </svg>
       ),
       fixtureLabel: selectedLabFixture
-        ? `${(selectedLabFixture.home_team_name || 'Home').split(' ')[0]} v ${(selectedLabFixture.away_team_name || 'Away').split(' ')[0]}`
+        ? `${(selectedLabFixture?.home_team?.name || selectedLabFixture?.home_team_name || 'Home').split(' ')[0]} v ${(selectedLabFixture?.away_team?.name || selectedLabFixture?.away_team_name || 'Away').split(' ')[0]}`
         : 'Single-Match Lab',
       showLockBadge: isTierLocked,
     },
