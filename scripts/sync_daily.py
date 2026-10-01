@@ -85,41 +85,21 @@ def teams_match(name1: str, name2: str) -> bool:
 # ---- The Odds API (v4) --------------------------------------
 
 def fetch_real_odds(league_code: str) -> list[dict]:
-    # Fetch live 1X2 market odds for a league from The Odds API
+    # Fetch live 1X2 market odds for a league via OddsPoolManager
     global LAST_QUOTA_REMAINING
     sport_key = ODDS_SPORT_KEYS.get(league_code)
     if not sport_key:
         return []
 
-    if not ODDS_API_KEY:
-        print(f"    [INFO] ODDS_API_KEY not configured. Skipping real odds fetch for {league_code}.")
+    if odds_pool.key_count == 0:
+        print(f"    [INFO] No Odds API keys configured in pool. Skipping real odds fetch for {league_code}.")
         return []
 
-    url = f"{ODDS_API_BASE}/{sport_key}/odds"
-    params = {
-        "apiKey":     ODDS_API_KEY,
-        "regions":    "eu",
-        "markets":    "h2h",
-        "oddsFormat": "decimal",
-    }
-    try:
-        resp = requests.get(url, params=params, timeout=15)
-        if resp.status_code == 200:
-            events = resp.json()
-            remaining = resp.headers.get("x-requests-remaining")
-            if remaining is not None:
-                try:
-                    LAST_QUOTA_REMAINING = int(remaining)
-                except ValueError:
-                    pass
-            rem_str = f" ({remaining} requests remaining this month)" if remaining else ""
-            print(f"    [The Odds API] Fetched {len(events)} events for {sport_key}{rem_str}")
-            return events
-        print(f"    [The Odds API Error] {sport_key}: HTTP {resp.status_code} - {resp.text[:120]}")
-        return []
-    except Exception as exc:
-        print(f"    [The Odds API Error] Failed to fetch odds for {sport_key}: {exc}")
-        return []
+    events = odds_pool.fetch_odds_events(sport_key)
+    quota_sum = odds_pool.get_quota_summary()
+    if quota_sum.get("total_remaining") is not None:
+        LAST_QUOTA_REMAINING = quota_sum["total_remaining"]
+    return events
 
 
 def extract_event_odds(event: dict) -> tuple[float | None, float | None, float | None]:
@@ -510,6 +490,12 @@ def main() -> None:
     # Sort value picks descending by expected value
     all_ev_picks.sort(key=lambda x: x.get("ev_percentage", 0.0), reverse=True)
     print(f"\nDone. Total fixtures updated: {total_updated} | +EV found: {len(all_ev_picks)}")
+
+    # Log Odds API Key Pool Quota Summary
+    odds_pool.log_quota_summary()
+    quota_sum = odds_pool.get_quota_summary()
+    if quota_sum.get("total_remaining") is not None:
+        LAST_QUOTA_REMAINING = quota_sum["total_remaining"]
 
     # 5. Database housekeeping: prune matches finished > 45 days ago
     print("Running database housekeeping (clean_stale_fixtures)...")

@@ -6,7 +6,13 @@
 
 import os
 from dotenv import load_dotenv
-from supabase import create_client, Client
+from typing import Any
+
+try:
+    from supabase import create_client, Client
+except (ImportError, Exception):
+    create_client = None
+    Client = Any
 
 load_dotenv()
 
@@ -46,9 +52,30 @@ HEADERS = {
 # Backward-compatibility alias
 API_KEY = FOOTBALL_DATA_TOKEN
 
-# ---- The Odds API (v4) credentials ---------------------------
-ODDS_API_KEY = os.getenv("ODDS_API_KEY")
-ODDS_API_BASE = "https://api.the-odds-api.com/v4/sports"
+# ---- The Odds API (v4) credentials & Key Pool ----------------
+def parse_odds_api_keys(
+    env_keys_val: str | None = None,
+    env_single_val: str | None = None,
+) -> list[str]:
+    """
+    Parse The Odds API key pool from environment variables.
+    Supports either:
+      - ODDS_API_KEYS: Comma-delimited list of keys ("key1,key2,key3")
+      - ODDS_API_KEY: Single key fallback for backwards compatibility
+    Strips whitespace and filters out empty strings.
+    """
+    raw_multi = os.getenv("ODDS_API_KEYS", "") if env_keys_val is None else env_keys_val
+    keys = [k.strip() for k in raw_multi.split(",") if k.strip()]
+    if not keys:
+        single = (os.getenv("ODDS_API_KEY", "") if env_single_val is None else env_single_val).strip()
+        if single:
+            keys = [single]
+    return keys
+
+
+ODDS_API_KEYS: list[str] = parse_odds_api_keys()
+ODDS_API_KEY: str | None = ODDS_API_KEYS[0] if ODDS_API_KEYS else None
+ODDS_API_BASE: str = "https://api.the-odds-api.com/v4/sports"
 
 ODDS_SPORT_KEYS: dict[str, str] = {
     "PL":  "soccer_epl",
@@ -69,13 +96,19 @@ GITHUB_REPOSITORY: str | None = os.getenv("GITHUB_REPOSITORY")
 # Accept both naming conventions so the module works regardless
 # of whether the GitHub secret is called SUPABASE_SERVICE_ROLE_KEY
 # or SUPABASE_SERVICE_KEY.
-SUPABASE_URL: str = _require_env("SUPABASE_URL")
-SUPABASE_SERVICE_KEY: str = _require_env(
-    "SUPABASE_SERVICE_ROLE_KEY",   # primary: matches GitHub secret name
-    "SUPABASE_SERVICE_KEY",        # fallback: alternative naming
+SUPABASE_URL: str = os.environ.get("SUPABASE_URL", "").strip()
+SUPABASE_SERVICE_KEY: str = (
+    os.environ.get("SUPABASE_SERVICE_ROLE_KEY", "").strip()
+    or os.environ.get("SUPABASE_SERVICE_KEY", "").strip()
 )
 
-supabase: Client = create_client(SUPABASE_URL, SUPABASE_SERVICE_KEY)
+if create_client and SUPABASE_URL and SUPABASE_SERVICE_KEY:
+    try:
+        supabase: Any = create_client(SUPABASE_URL, SUPABASE_SERVICE_KEY)
+    except Exception:
+        supabase = None
+else:
+    supabase = None
 
 # ---- Active competitions / leagues --------------------------
 ACTIVE_LEAGUES: list[dict] = [
