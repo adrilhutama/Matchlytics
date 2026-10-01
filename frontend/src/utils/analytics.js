@@ -501,9 +501,9 @@ export function isDateInRange(isoString, rangeKey) {
 export function matchesSearch(fixture, query) {
   if (!query || !query.trim()) return true;
   const q = query.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().trim();
-  const home = (fixture.home_team_name || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
-  const away = (fixture.away_team_name || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
-  const league = (fixture.league_name || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
+  const home = (fixture.home_team?.name || fixture.home_team_name || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
+  const away = (fixture.away_team?.name || fixture.away_team_name || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
+  const league = (fixture.league_name || fixture.competition_code || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
   return home.includes(q) || away.includes(q) || league.includes(q);
 }
 
@@ -514,7 +514,7 @@ export function sortFixtures(fixtures, sortKey) {
   const list = [...fixtures];
   switch (sortKey) {
     case 'kickoff_asc':
-      return list.sort((a, b) => new Date(a.match_date || 0) - new Date(b.match_date || 0));
+      return list.sort((a, b) => new Date(a.kickoff_time || a.match_date || 0) - new Date(b.kickoff_time || b.match_date || 0));
     case 'ev_desc':
       return list.sort((a, b) => {
         const evA = a.ev_percentage != null ? Number(a.ev_percentage) : -999;

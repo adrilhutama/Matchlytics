@@ -46,13 +46,8 @@ export function TableRow({
 
   const {
     id,
-    home_team_name,
-    home_team_logo,
-    away_team_name,
-    away_team_logo,
     league_name,
     league_logo,
-    match_date,
     prob_home,
     prob_draw,
     prob_away,
@@ -63,16 +58,22 @@ export function TableRow({
     odds_away,
     value_pick,
     ev_percentage,
-    lambda_home,
-    lambda_away,
     market_odds,
     ev_opportunities,
   } = fixture
 
-  const homeLogo = fixture.home_team?.crest_url || home_team_logo
-  const awayLogo = fixture.away_team?.crest_url || away_team_logo
-  const homeName = fixture.home_team?.name || home_team_name
-  const awayName = fixture.away_team?.name || away_team_name
+  const home_team_name = fixture.home_team?.name || fixture.home_team_name || 'Home'
+  const away_team_name = fixture.away_team?.name || fixture.away_team_name || 'Away'
+  const home_team_logo = fixture.home_team?.crest_url || fixture.home_team_logo
+  const away_team_logo = fixture.away_team?.crest_url || fixture.away_team_logo
+  const match_date = fixture.kickoff_time || fixture.match_date
+  const lambda_home = fixture.home_xg != null ? fixture.home_xg : fixture.lambda_home
+  const lambda_away = fixture.away_xg != null ? fixture.away_xg : fixture.lambda_away
+
+  const homeLogo = home_team_logo
+  const awayLogo = away_team_logo
+  const homeName = home_team_name
+  const awayName = away_team_name
 
   const hasRealOdds = isRealMarketOdds(fixture)
   const { relativeBadge, timeStr } = formatLocalizedMatchDate(match_date)

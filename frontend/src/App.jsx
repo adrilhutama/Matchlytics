@@ -442,33 +442,43 @@ function AppInner() {
     if (!isSilent) setLoading(true)
     setError(null)
 
-    const { from, to } = buildDateRange()
-
     try {
-      // Query fixtures with joined normalized team metadata
+      // Robust column-based foreign key syntax and kickoff_time ordering
       let { data, error: sbErr } = await supabase
         .from('fixtures')
         .select(`
           *,
-          home_team:teams!fixtures_home_team_id_fkey(id, name, short_name, crest_url),
-          away_team:teams!fixtures_away_team_id_fkey(id, name, short_name, crest_url)
+          home_team:teams!home_team_id(id, name, short_name, crest_url),
+          away_team:teams!away_team_id(id, name, short_name, crest_url)
         `)
-        .gte('match_date', from)
-        .lte('match_date', to)
         .in('status', UPCOMING_STATUSES)
-        .order('match_date', { ascending: true })
+        .order('kickoff_time', { ascending: true })
 
       if (sbErr) {
-        // Fallback to flat select if foreign key constraint is not yet available
+        console.error('[Supabase fetchFixtures error]:', sbErr)
+        // Resilient fallback: plain select('*') ordered by kickoff_time
         const fallbackRes = await supabase
           .from('fixtures')
           .select('*')
-          .gte('match_date', from)
-          .lte('match_date', to)
           .in('status', UPCOMING_STATUSES)
-          .order('match_date', { ascending: true })
-        if (fallbackRes.error) throw sbErr
-        data = fallbackRes.data
+          .order('kickoff_time', { ascending: true })
+
+        if (fallbackRes.error) {
+          console.error('[Supabase fetchFixtures fallback error]:', fallbackRes.error)
+          // Unconstrained fallback: plain select without strict ordering
+          const unconstrainedRes = await supabase
+            .from('fixtures')
+            .select('*')
+            .limit(250)
+
+          if (unconstrainedRes.error) {
+            console.error('[Supabase fetchFixtures unconstrained error]:', unconstrainedRes.error)
+            throw unconstrainedRes.error
+          }
+          data = unconstrainedRes.data
+        } else {
+          data = fallbackRes.data
+        }
       }
 
       setFixtures(data || [])
@@ -479,7 +489,7 @@ function AppInner() {
         setTimeout(() => setRealtimeToast(false), 3500)
       }
     } catch (err) {
-      console.error('Error fetching fixtures:', err)
+      console.error('[Supabase fetchFixtures error]:', err)
       setError('Unable to load upcoming fixtures. Verify Supabase connection.')
     } finally {
       if (!isSilent) setLoading(false)
@@ -493,28 +503,40 @@ function AppInner() {
         .from('fixtures')
         .select(`
           *,
-          home_team:teams!fixtures_home_team_id_fkey(id, name, short_name, crest_url),
-          away_team:teams!fixtures_away_team_id_fkey(id, name, short_name, crest_url)
+          home_team:teams!home_team_id(id, name, short_name, crest_url),
+          away_team:teams!away_team_id(id, name, short_name, crest_url)
         `)
         .in('status', ['FT', 'FINISHED', 'AET', 'PEN'])
-        .order('match_date', { ascending: false })
+        .order('kickoff_time', { ascending: false })
         .limit(150)
 
       if (stErr) {
+        console.error('[Supabase fetchSettledFixtures error]:', stErr)
         const fallbackRes = await supabase
           .from('fixtures')
           .select('*')
           .in('status', ['FT', 'FINISHED', 'AET', 'PEN'])
-          .order('match_date', { ascending: false })
+          .order('kickoff_time', { ascending: false })
           .limit(150)
-        data = fallbackRes.data
+
+        if (fallbackRes.error) {
+          console.error('[Supabase fetchSettledFixtures fallback error]:', fallbackRes.error)
+          const unconstrainedRes = await supabase
+            .from('fixtures')
+            .select('*')
+            .in('status', ['FT', 'FINISHED', 'AET', 'PEN'])
+            .limit(100)
+          data = unconstrainedRes.data
+        } else {
+          data = fallbackRes.data
+        }
       }
 
       if (data) {
         setSettledFixtures(data)
       }
     } catch (err) {
-      console.warn('Settled fixtures query failed:', err)
+      console.error('[Supabase fetchSettledFixtures error]:', err)
     }
   }, [])
 
@@ -650,7 +672,7 @@ function AppInner() {
       }
     }
 
-    result = result.filter((f) => isDateInRange(f.match_date, dateRange))
+    result = result.filter((f) => isDateInRange(f.kickoff_time || f.match_date, dateRange))
 
     if (searchQuery.trim()) {
       result = result.filter((f) => matchesSearch(f, searchQuery))
