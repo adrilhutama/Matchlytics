@@ -1,7 +1,7 @@
 # ============================================================
 # scripts/sync_monthly_fixtures.py
 # Pulls scheduled fixtures for the next 30 days from API-Football
-# and upserts fixture metadata to Supabase.
+# and upserts normalized fixture and team metadata to Supabase.
 #
 # Run manually or on a separate monthly workflow to conserve
 # the 100 req/day free-tier quota.
@@ -11,17 +11,30 @@ from __future__ import annotations
 
 import time
 from datetime import date, timedelta
+from typing import Any
 
 import requests
 
-from config import (
-    BASE_URL,
-    HEADERS,
-    REQUEST_DELAY,
-    SEASON,
-    ACTIVE_LEAGUES,
-    supabase,
-)
+try:
+    from scripts.config import (
+        BASE_URL,
+        HEADERS,
+        REQUEST_DELAY,
+        SEASON,
+        ACTIVE_LEAGUES,
+        supabase,
+    )
+    from scripts.sync_daily import ensure_team_metadata
+except ModuleNotFoundError:
+    from config import (
+        BASE_URL,
+        HEADERS,
+        REQUEST_DELAY,
+        SEASON,
+        ACTIVE_LEAGUES,
+        supabase,
+    )
+    from sync_daily import ensure_team_metadata
 
 
 def fetch_fixtures_range(competition_code: str, from_date: str, to_date: str) -> list[dict]:
@@ -46,13 +59,18 @@ def fetch_fixtures_range(competition_code: str, from_date: str, to_date: str) ->
     return data.get("matches", [])
 
 
-def parse_fixture_row(m: dict, league: dict) -> dict:
-    """Extract and map fields from a football-data.org match object to Supabase fixture row."""
+def parse_fixture_row(m: dict, league: dict, comp_code: str | None = None) -> dict:
+    """
+    Extract and map fields from a football-data.org match object to Supabase fixture row.
+    Adheres strictly to the normalized Supabase schema without obsolete logo columns.
+    """
     comp = m.get("competition", {})
     home = m.get("homeTeam", {})
     away = m.get("awayTeam", {})
     area = m.get("area", {})
     season_info = m.get("season", {})
+
+    code = comp_code or league.get("code") or comp.get("code") or ""
 
     season_val = SEASON
     if season_info and season_info.get("startDate"):
@@ -63,31 +81,47 @@ def parse_fixture_row(m: dict, league: dict) -> dict:
 
     raw_status = m.get("status", "SCHEDULED")
     status = "NS" if raw_status in ("SCHEDULED", "TIMED") else raw_status
+    utc_date = m.get("utcDate")
 
+    # Normalized payload without obsolete home_team_logo and away_team_logo
     return {
-        "id":              m["id"],
-        "league_id":       league.get("id") or comp.get("id"),
-        "league_name":     league.get("name") or comp.get("name"),
-        "league_logo":     comp.get("emblem") or "",
-        "league_country":  area.get("name") or "",
-        "season":          season_val,
-        "match_date":      m.get("utcDate"),
-        "status":          status,
-        "home_team_id":    home.get("id"),
-        "home_team_name":  home.get("name"),
-        "home_team_logo":  home.get("crest"),
-        "away_team_id":    away.get("id"),
-        "away_team_name":  away.get("name"),
-        "away_team_logo":  away.get("crest"),
+        "id":               m["id"],
+        "competition_code": code,
+        "league_id":        league.get("id") or comp.get("id"),
+        "league_name":      league.get("name") or comp.get("name"),
+        "league_logo":      comp.get("emblem") or "",
+        "league_country":   area.get("name") or "",
+        "season":           season_val,
+        "match_date":       utc_date,
+        "kickoff_time":     utc_date,
+        "status":           status,
+        "home_team_id":     home.get("id"),
+        "home_team_name":   home.get("name"),
+        "away_team_id":     away.get("id"),
+        "away_team_name":   away.get("name"),
     }
 
 
-def upsert_fixtures(rows: list[dict]) -> None:
-    """Upsert a batch of fixture rows into Supabase."""
-    if not rows:
+def upsert_fixtures(rows: list[dict], supabase_client: Any = None) -> None:
+    """Upsert a batch of fixture rows into Supabase with resilient schema fallback."""
+    client = supabase_client or supabase
+    if not rows or not client:
         return
-    supabase.table("fixtures").upsert(rows, on_conflict="id").execute()
-    print(f"    Upserted {len(rows)} fixture(s).")
+    try:
+        client.table("fixtures").upsert(rows, on_conflict="id").execute()
+        print(f"    Upserted {len(rows)} fixture(s).")
+    except Exception as exc:
+        err_msg = str(exc)
+        if "PGRST204" in err_msg or "Could not find the" in err_msg:
+            import re
+            m = re.search(r"Could not find the '([^']+)' column", err_msg)
+            if m:
+                missing_col = m.group(1)
+                print(f"    [Schema Adaptation] Dropping missing column '{missing_col}' and retrying upsert...")
+                stripped_rows = [{k: v for k, v in r.items() if k != missing_col} for r in rows]
+                upsert_fixtures(stripped_rows, client)
+                return
+        print(f"    [WARN] Upsert fixtures error: {exc}")
 
 
 def main() -> None:
@@ -104,8 +138,22 @@ def main() -> None:
         print(f"  Competition: {name} ({code}) [ID={league['id']}]")
         try:
             raw = fetch_fixtures_range(code, from_str, to_str)
-            rows = [parse_fixture_row(m, league) for m in raw]
-            upsert_fixtures(rows)
+            rows = []
+            for m in raw:
+                home_team = m.get("homeTeam", {})
+                away_team = m.get("awayTeam", {})
+
+                # Ingestion & team metadata caching in public.teams
+                if home_team:
+                    ensure_team_metadata(supabase, home_team, code)
+                if away_team:
+                    ensure_team_metadata(supabase, away_team, code)
+
+                row = parse_fixture_row(m, league, code)
+                if row:
+                    rows.append(row)
+
+            upsert_fixtures(rows, supabase)
             total += len(rows)
         except requests.HTTPError as exc:
             print(f"    HTTP error for {name}: {exc}")

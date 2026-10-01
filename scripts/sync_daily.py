@@ -92,19 +92,59 @@ MAX_PARLAY_ODDS: float = 250.00
 
 
 def ensure_team_metadata(
-    team_id: int | None,
-    team_name: str | None,
-    crest_url: str | None,
-    competition_code: str,
-    supabase_client: Any,
-    tla: str | None = None,
-    short_name: str | None = None,
+    *args: Any,
+    **kwargs: Any,
 ) -> int | None:
     """
     Ensure team exists in public.teams table.
     Upserts metadata: id, name, short_name, tla, crest_url, and competition_code.
     Guardrail: If crest_url is missing, fallback to local league shield placeholder.
+
+    Supported calling patterns:
+    1) ensure_team_metadata(supabase_client, team_dict, competition_code)
+    2) ensure_team_metadata(team_id, team_name, crest_url, competition_code, supabase_client, tla=..., short_name=...)
+    3) ensure_team_metadata(team_dict, competition_code, supabase_client)
     """
+    supabase_client: Any = None
+    team_id: int | None = None
+    team_name: str | None = None
+    crest_url: str | None = None
+    competition_code: str = ""
+    tla: str | None = None
+    short_name: str | None = None
+
+    if len(args) >= 1 and hasattr(args[0], "table"):
+        supabase_client = args[0]
+        team_data = args[1] if len(args) > 1 else kwargs.get("team")
+        competition_code = args[2] if len(args) > 2 else kwargs.get("competition_code", "")
+        if isinstance(team_data, dict):
+            team_id = team_data.get("id")
+            team_name = team_data.get("name")
+            crest_url = team_data.get("crest") or team_data.get("crest_url")
+            tla = team_data.get("tla")
+            short_name = team_data.get("shortName") or team_data.get("short_name")
+        else:
+            team_id = team_data
+            team_name = kwargs.get("team_name")
+            crest_url = kwargs.get("crest_url")
+    elif len(args) >= 1 and isinstance(args[0], dict):
+        team_data = args[0]
+        team_id = team_data.get("id")
+        team_name = team_data.get("name")
+        crest_url = team_data.get("crest") or team_data.get("crest_url")
+        tla = team_data.get("tla")
+        short_name = team_data.get("shortName") or team_data.get("short_name")
+        competition_code = args[1] if len(args) > 1 else kwargs.get("competition_code", "")
+        supabase_client = args[2] if len(args) > 2 else kwargs.get("supabase_client", kwargs.get("supabase"))
+    else:
+        team_id = args[0] if len(args) > 0 else kwargs.get("team_id")
+        team_name = args[1] if len(args) > 1 else kwargs.get("team_name")
+        crest_url = args[2] if len(args) > 2 else kwargs.get("crest_url")
+        competition_code = args[3] if len(args) > 3 else kwargs.get("competition_code", "")
+        supabase_client = args[4] if len(args) > 4 else kwargs.get("supabase_client", kwargs.get("supabase"))
+        tla = kwargs.get("tla")
+        short_name = kwargs.get("short_name")
+
     if not team_id or not team_name:
         return team_id
 
