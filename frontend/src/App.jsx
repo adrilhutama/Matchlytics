@@ -125,6 +125,7 @@ function AppInner() {
   // Navigation state for scanner
   const [activeFeed,          setActiveFeed]          = useState('all')
   const [activeLeague,        setActiveLeague]        = useState('all')
+  const [selectedMarket,      setSelectedMarket]      = useState('all')
   const [showWatchlistOnly,   setShowWatchlistOnly]   = useState(false)
   const [valueOnly,           setValueOnly]           = useState(false)
   const [dateRange,           setDateRangeState]      = useState('all')
@@ -460,8 +461,39 @@ function AppInner() {
       result = result.filter((f) => f.league_id === activeLeague)
     }
 
+    // Market category and +EV edge filtering
     if (valueOnly) {
-      result = result.filter((f) => Boolean(f.value_pick))
+      if (selectedMarket === 'all') {
+        result = result.filter(
+          (f) => Boolean(f.value_pick) || (Array.isArray(f.ev_opportunities) && f.ev_opportunities.length > 0)
+        )
+      } else if (selectedMarket === 'h2h') {
+        result = result.filter(
+          (f) => Boolean(f.value_pick) || f.ev_opportunities?.some((o) => o.market === 'h2h')
+        )
+      } else if (selectedMarket === 'totals') {
+        result = result.filter(
+          (f) => f.ev_opportunities?.some((o) => o.market === 'totals')
+        )
+      } else if (selectedMarket === 'spreads') {
+        result = result.filter(
+          (f) => f.ev_opportunities?.some((o) => o.market === 'spreads')
+        )
+      }
+    } else {
+      if (selectedMarket === 'totals') {
+        result = result.filter(
+          (f) => f.market_odds?.totals || f.ev_opportunities?.some((o) => o.market === 'totals') || f.prob_over_25 != null
+        )
+      } else if (selectedMarket === 'spreads') {
+        result = result.filter(
+          (f) => f.market_odds?.spreads || f.ev_opportunities?.some((o) => o.market === 'spreads')
+        )
+      } else if (selectedMarket === 'h2h') {
+        result = result.filter(
+          (f) => f.odds_home || f.market_odds?.h2h || f.value_pick
+        )
+      }
     }
 
     result = result.filter((f) => isDateInRange(f.match_date, dateRange))
@@ -471,7 +503,7 @@ function AppInner() {
     }
 
     return sortFixtures(result, sortOption)
-  }, [fixtures, activeLeague, showWatchlistOnly, watchlist, valueOnly, dateRange, searchQuery, sortOption])
+  }, [fixtures, activeLeague, showWatchlistOnly, watchlist, valueOnly, selectedMarket, dateRange, searchQuery, sortOption])
 
   // Slice-based pagination for smooth 60 FPS rendering
   const paginatedFixtures = useMemo(() => {
@@ -482,6 +514,7 @@ function AppInner() {
     setActiveLeague('all')
     setShowWatchlistOnly(false)
     setValueOnly(false)
+    setSelectedMarket('all')
     setDateRange(canAccessMonthly ? 'all' : canAccessWeekly ? 'week' : 'today')
     setRangeTouched(true)
     setSearchQuery('')
@@ -809,6 +842,8 @@ function AppInner() {
                     onSearchChange={setSearchQuery}
                     dateRange={dateRange}
                     onDateRangeChange={setDateRange}
+                    selectedMarket={selectedMarket}
+                    onMarketChange={setSelectedMarket}
                     leagues={LEAGUES}
                     activeLeague={activeLeague}
                     onLeagueChange={(id) => {

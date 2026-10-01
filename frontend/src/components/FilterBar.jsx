@@ -24,6 +24,13 @@ const UPGRADE_HINTS = {
   all:  'Upgrade to Annual to view the full 30-day season',
 }
 
+export const MARKET_CATEGORIES = [
+  { id: 'all',     label: 'All Markets' },
+  { id: 'h2h',     label: '1X2 Moneyline' },
+  { id: 'totals',  label: 'Totals (O/U)' },
+  { id: 'spreads', label: 'Asian Handicap' },
+]
+
 export const SORT_OPTIONS = [
   { id: 'kickoff_asc',    label: 'Kickoff Time (Asc)' },
   { id: 'ev_desc',        label: 'Expected Value (+EV %)' },
@@ -36,6 +43,8 @@ export default function FilterBar({
   onSearchChange,
   dateRange,
   onDateRangeChange,
+  selectedMarket = 'all',
+  onMarketChange = () => {},
   leagues = [],
   activeLeague,
   onLeagueChange,
@@ -173,7 +182,32 @@ export default function FilterBar({
         </div>
       </div>
 
-      {/* ---- Row 3: Horizon Selector Pills & Finger-Friendly +EV Toggle ---- */}
+            {/* ---- Row 2.5: Market Category Selector Pills ---- */}
+      <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar py-1 touch-pan-x" role="group" aria-label="Filter by market category">
+        <span className="text-[10px] text-slate-500 font-mono uppercase tracking-wider pl-1 flex-shrink-0">
+          Market:
+        </span>
+        {MARKET_CATEGORIES.map((cat) => {
+          const isActive = selectedMarket === cat.id
+          return (
+            <button
+              key={cat.id}
+              type="button"
+              onClick={() => onMarketChange(cat.id)}
+              aria-pressed={isActive}
+              className={`flex-shrink-0 min-h-[38px] px-3 py-1.5 text-xs font-semibold rounded-xl transition-all border focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500 active:scale-95 touch-manipulation ${
+                isActive
+                  ? 'bg-amber-500/20 text-amber-300 border-amber-500/60 shadow-sm'
+                  : 'bg-pitch-900 text-slate-400 border-pitch-700 hover:border-slate-500 hover:text-slate-200'
+              }`}
+            >
+              {cat.label}
+            </button>
+          )
+        })}
+      </div>
+
+{/* ---- Row 3: Horizon Selector Pills & Finger-Friendly +EV Toggle ---- */}
       <div className="flex items-center justify-between gap-2 pt-1 border-t border-pitch-800/80">
         {/* Date Range Pills with short labels on mobile and full on desktop */}
         <div

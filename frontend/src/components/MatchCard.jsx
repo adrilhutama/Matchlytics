@@ -16,7 +16,12 @@ import {
   calculateEdgeAndEV,
   getMarginOfSafety,
   getKellyFraction,
+  calculatePoissonMatrix,
+  calculateTotalsFromMatrix,
+  calculateSpreadsFromMatrix,
+  calculateMarketEV,
 } from '../utils/analytics'
+import { TotalsMarketView, SpreadsMarketView } from './MultiMarketViews'
 
 function TeamLogo({ src, name }) {
   return (
@@ -68,6 +73,7 @@ export default function MatchCard({
   onTriggerUpgrade,
 }) {
   const [isExpanded, setIsExpanded] = useState(false)
+  const [activeMarketTab, setActiveMarketTab] = useState('h2h')
   const triggerUpgrade = quantLocked ? onTriggerUpgrade : null
 
   const {
@@ -97,6 +103,98 @@ export default function MatchCard({
     if (value_pick === 'DRAW') return { valueOdds: odds_draw, valueProb: prob_draw, valueLabel: 'Draw (X)' }
     return { valueOdds: odds_away, valueProb: prob_away, valueLabel: `${away_team_name} Win` }
   }, [value_pick, odds_home, odds_draw, odds_away, prob_home, prob_draw, prob_away, home_team_name, away_team_name])
+
+  // Compute Poisson matrix & multi-market probability distribution
+  const matrix = useMemo(() => {
+    if (lambda_home != null && lambda_away != null) {
+      return calculatePoissonMatrix(Number(lambda_home), Number(lambda_away))
+    }
+    return null
+  }, [lambda_home, lambda_away])
+
+  const totalsProbs = useMemo(() => {
+    if (matrix) {
+      return calculateTotalsFromMatrix(matrix)
+    }
+    return {}
+  }, [matrix])
+
+  const spreadsProbs = useMemo(() => {
+    if (matrix) {
+      return calculateSpreadsFromMatrix(matrix)
+    }
+    return {}
+  }, [matrix])
+
+  // Multi-market EV detection for header badges
+  const totalsEdge = useMemo(() => {
+    if (Array.isArray(fixture.ev_opportunities)) {
+      const opp = fixture.ev_opportunities.find((o) => o.market === 'totals' && o.ev_pct >= 2.0)
+      if (opp) {
+        const outcome = opp.outcome || (opp.pick?.includes('OVER') ? 'Over' : 'Under')
+        return {
+          label: `${outcome} ${opp.line ?? '2.5'}`,
+          ev: Number(opp.ev_pct).toFixed(1),
+        }
+      }
+    }
+    if (fixture.market_odds?.totals && totalsProbs) {
+      for (const line of ['1.5', '2.5', '3.5']) {
+        const bOver = fixture.market_odds.totals[line]?.over
+        const pOver = totalsProbs[line]?.over ?? (line === '2.5' ? Number(prob_over_25) : null)
+        if (bOver && pOver) {
+          const ev = calculateMarketEV(pOver, bOver)
+          if (ev && ev >= 2.0) {
+            return { label: `Over ${line}`, ev }
+          }
+        }
+        const bUnder = fixture.market_odds.totals[line]?.under
+        const pUnder = totalsProbs[line]?.under ?? (line === '2.5' ? Math.max(0, 100 - Number(prob_over_25)) : null)
+        if (bUnder && pUnder) {
+          const ev = calculateMarketEV(pUnder, bUnder)
+          if (ev && ev >= 2.0) {
+            return { label: `Under ${line}`, ev }
+          }
+        }
+      }
+    }
+    return null
+  }, [fixture.ev_opportunities, fixture.market_odds, totalsProbs, prob_over_25])
+
+  const spreadsEdge = useMemo(() => {
+    if (Array.isArray(fixture.ev_opportunities)) {
+      const opp = fixture.ev_opportunities.find((o) => o.market === 'spreads' && o.ev_pct >= 2.0)
+      if (opp) {
+        const outcome = opp.outcome || (opp.pick?.includes('HOME') ? home_team_name : away_team_name)
+        const lineStr = opp.line != null ? (Number(opp.line) > 0 ? `+${opp.line}` : `${opp.line}`) : ''
+        return {
+          label: `${outcome} ${lineStr}`.trim(),
+          ev: Number(opp.ev_pct).toFixed(1),
+        }
+      }
+    }
+    if (fixture.market_odds?.spreads && spreadsProbs) {
+      for (const line of ['-0.5', '0.0', '+0.5', '-1.0', '+1.0']) {
+        const bHome = fixture.market_odds.spreads[line]?.home
+        const pHome = spreadsProbs[line]?.home
+        if (bHome && pHome) {
+          const ev = calculateMarketEV(pHome, bHome)
+          if (ev && ev >= 2.0) {
+            return { label: `${home_team_name} ${line}`, ev }
+          }
+        }
+        const bAway = fixture.market_odds.spreads[line]?.away
+        const pAway = spreadsProbs[line]?.away
+        if (bAway && pAway) {
+          const ev = calculateMarketEV(pAway, bAway)
+          if (ev && ev >= 2.0) {
+            return { label: `${away_team_name} ${line}`, ev }
+          }
+        }
+      }
+    }
+    return null
+  }, [fixture.ev_opportunities, fixture.market_odds, spreadsProbs, home_team_name, away_team_name])
 
   // Margin of safety and Quarter-Kelly stake recommendation
   const { marginSafety, recKellyPct } = useMemo(() => {
@@ -153,6 +251,30 @@ export default function MatchCard({
                 <span>{hasRealOdds ? 'Consensus Sharp Feed' : 'Model Fair Only'}</span>
               </span>
             </div>
+
+            {/* Multi-Market EV Badges in Header */}
+            {(totalsEdge || spreadsEdge) && (
+              <div className="flex flex-wrap items-center gap-1.5 pt-0.5">
+                {totalsEdge && (
+                  <span
+                    className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-mono font-bold bg-amber-500/15 text-amber-300 border border-amber-500/30"
+                    title="Identified +EV Edge in Totals market"
+                  >
+                    <span>★</span>
+                    <span>+EV Totals: {totalsEdge.label} (+{totalsEdge.ev}%)</span>
+                  </span>
+                )}
+                {spreadsEdge && (
+                  <span
+                    className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-mono font-bold bg-sky-500/15 text-sky-300 border border-sky-500/30"
+                    title="Identified +EV Edge in Asian Handicap market"
+                  >
+                    <span>★</span>
+                    <span>+EV Spread: {spreadsEdge.label} (+{spreadsEdge.ev}%)</span>
+                  </span>
+                )}
+              </div>
+            )}
           </div>
 
           {/* Right Header: Timing & Pin Button */}
@@ -279,85 +401,166 @@ export default function MatchCard({
               </div>
             )}
 
-            {/* Zero-Vig Consensus Comparison & Odds */}
-            {(odds_home || odds_draw || odds_away) && (
-              <div>
-                <OddsComparison
-                  oddsHome={odds_home}
-                  oddsDraw={odds_draw}
-                  oddsAway={odds_away}
-                  probHome={prob_home}
-                  probDraw={prob_draw}
-                  probAway={prob_away}
-                  valuePick={value_pick}
-                  slipPicks={slipPicks}
-                  onToggleSlipPick={onToggleSlip ? (pick, odds, prob, label) => {
-                    onToggleSlip({
-                      fixtureId: fixture.id,
-                      homeTeam: home_team_name,
-                      awayTeam: away_team_name,
-                      pick,
-                      pickLabel: label,
-                      odds,
-                      modelProb: prob,
-                      ev: ((Number(prob) / 100) * Number(odds) - 1) * 100,
-                      leagueName: league_name,
-                      matchDate: match_date,
-                    })
-                  } : null}
-                  onOpenQuant={onOpenQuantModal ? () => onOpenQuantModal(fixture) : null}
-                />
-              </div>
-            )}
+            {/* Multi-Market Secondary Tabs Selector */}
+            <div className="flex items-center gap-1 p-1 bg-pitch-900/90 rounded-xl border border-pitch-800">
+              <button
+                type="button"
+                onClick={() => setActiveMarketTab('h2h')}
+                className={`flex-1 py-1.5 px-2 rounded-lg text-xs font-semibold transition-all flex items-center justify-center gap-1.5 touch-manipulation min-h-[36px] ${
+                  activeMarketTab === 'h2h'
+                    ? 'bg-pitch-800 text-amber-400 font-bold shadow-sm border border-pitch-700'
+                    : 'text-slate-400 hover:text-slate-200'
+                }`}
+              >
+                <span>1X2 Moneyline</span>
+                {isValue && (
+                  <span className="w-1.5 h-1.5 rounded-full bg-amber-400 animate-pulse" />
+                )}
+              </button>
+              <button
+                type="button"
+                onClick={() => setActiveMarketTab('totals')}
+                className={`flex-1 py-1.5 px-2 rounded-lg text-xs font-semibold transition-all flex items-center justify-center gap-1.5 touch-manipulation min-h-[36px] ${
+                  activeMarketTab === 'totals'
+                    ? 'bg-pitch-800 text-amber-400 font-bold shadow-sm border border-pitch-700'
+                    : 'text-slate-400 hover:text-slate-200'
+                }`}
+              >
+                <span>Totals (O/U)</span>
+                {totalsEdge && (
+                  <span className="w-1.5 h-1.5 rounded-full bg-amber-400 animate-pulse" />
+                )}
+              </button>
+              <button
+                type="button"
+                onClick={() => setActiveMarketTab('spreads')}
+                className={`flex-1 py-1.5 px-2 rounded-lg text-xs font-semibold transition-all flex items-center justify-center gap-1.5 touch-manipulation min-h-[36px] ${
+                  activeMarketTab === 'spreads'
+                    ? 'bg-pitch-800 text-amber-400 font-bold shadow-sm border border-pitch-700'
+                    : 'text-slate-400 hover:text-slate-200'
+                }`}
+              >
+                <span>Asian Handicap</span>
+                {spreadsEdge && (
+                  <span className="w-1.5 h-1.5 rounded-full bg-sky-400 animate-pulse" />
+                )}
+              </button>
+            </div>
 
-            {/* Value Bet Detailed Strip */}
-            {isValue && (
-              <div className="p-2.5 rounded-xl bg-pitch-950/70 border border-amber-500/20 space-y-2">
-                <div className="flex flex-wrap items-center justify-between gap-2">
-                  <ValueBadge
-                    pick={value_pick}
-                    evPct={ev_percentage}
-                    odds={valueOdds}
-                    modelProb={valueProb}
-                    onClick={onOpenQuantModal ? () => onOpenQuantModal(fixture) : null}
-                  />
+            {/* Tab Panel 1: 1X2 Moneyline & Value Strip */}
+            {activeMarketTab === 'h2h' && (
+              <div className="space-y-3">
+                {(odds_home || odds_draw || odds_away) && (
+                  <div>
+                    <OddsComparison
+                      oddsHome={odds_home}
+                      oddsDraw={odds_draw}
+                      oddsAway={odds_away}
+                      probHome={prob_home}
+                      probDraw={prob_draw}
+                      probAway={prob_away}
+                      valuePick={value_pick}
+                      slipPicks={slipPicks}
+                      onToggleSlipPick={onToggleSlip ? (pick, odds, prob, label) => {
+                        onToggleSlip({
+                          fixtureId: fixture.id,
+                          homeTeam: home_team_name,
+                          awayTeam: away_team_name,
+                          pick,
+                          pickLabel: label,
+                          odds,
+                          modelProb: prob,
+                          ev: ((Number(prob) / 100) * Number(odds) - 1) * 100,
+                          leagueName: league_name,
+                          matchDate: match_date,
+                        })
+                      } : null}
+                      onOpenQuant={onOpenQuantModal ? () => onOpenQuantModal(fixture) : null}
+                    />
+                  </div>
+                )}
 
-                  {/* Add to Parlay Slip Button */}
-                  {onToggleSlip && valueOdds && (
-                    <button
-                      type="button"
-                      onClick={() => onToggleSlip({
-                        fixtureId: fixture.id,
-                        homeTeam: home_team_name,
-                        awayTeam: away_team_name,
-                        pick: value_pick,
-                        pickLabel: valueLabel,
-                        odds: valueOdds,
-                        modelProb: valueProb,
-                        ev: ev_percentage,
-                        leagueName: league_name,
-                        matchDate: match_date,
-                      })}
-                      className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 ${
-                        isValuePickInSlip
-                          ? 'bg-amber-500 text-pitch-950'
-                          : 'bg-pitch-900 border border-pitch-700 text-slate-300 hover:text-amber-400'
-                      }`}
-                    >
-                      <span>{isValuePickInSlip ? '✓ In Slip' : '+ Slip'}</span>
-                    </button>
-                  )}
-                </div>
+                {/* Value Bet Detailed Strip */}
+                {isValue && (
+                  <div className="p-2.5 rounded-xl bg-pitch-950/70 border border-amber-500/20 space-y-2">
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <ValueBadge
+                        pick={value_pick}
+                        evPct={ev_percentage}
+                        odds={valueOdds}
+                        modelProb={valueProb}
+                        onClick={onOpenQuantModal ? () => onOpenQuantModal(fixture) : null}
+                      />
 
-                {marginSafety && (
-                  <div className="flex items-center justify-between text-[10px] text-slate-400 font-mono">
-                    <span className={`px-1.5 py-0.5 rounded border ${marginSafety.colorClass}`}>
-                      {marginSafety.label}
-                    </span>
-                    <span>Target: {value_pick} @ {valueOdds ? Number(valueOdds).toFixed(2) : '-'}</span>
+                      {/* Add to Parlay Slip Button */}
+                      {onToggleSlip && valueOdds && (
+                        <button
+                          type="button"
+                          onClick={() => onToggleSlip({
+                            fixtureId: fixture.id,
+                            homeTeam: home_team_name,
+                            awayTeam: away_team_name,
+                            pick: value_pick,
+                            pickLabel: valueLabel,
+                            odds: valueOdds,
+                            modelProb: valueProb,
+                            ev: ev_percentage,
+                            leagueName: league_name,
+                            matchDate: match_date,
+                          })}
+                          className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 min-h-[36px] ${
+                            isValuePickInSlip
+                              ? 'bg-amber-500 text-pitch-950'
+                              : 'bg-pitch-900 border border-pitch-700 text-slate-300 hover:text-amber-400'
+                          }`}
+                        >
+                          <span>{isValuePickInSlip ? '✓ In Slip' : '+ Slip'}</span>
+                        </button>
+                      )}
+                    </div>
+
+                    {marginSafety && (
+                      <div className="flex items-center justify-between text-[10px] text-slate-400 font-mono">
+                        <span className={`px-1.5 py-0.5 rounded border ${marginSafety.colorClass}`}>
+                          {marginSafety.label}
+                        </span>
+                        <span>Target: {value_pick} @ {valueOdds ? Number(valueOdds).toFixed(2) : '-'}</span>
+                      </div>
+                    )}
                   </div>
                 )}
               </div>
+            )}
+
+            {/* Tab Panel 2: Totals (Over / Under) */}
+            {activeMarketTab === 'totals' && (
+              <TotalsMarketView
+                totalsProbs={totalsProbs}
+                marketTotals={fixture.market_odds?.totals || {}}
+                fallbackOver25={prob_over_25}
+                slipPicks={slipPicks}
+                onToggleSlip={onToggleSlip}
+                homeTeam={home_team_name}
+                awayTeam={away_team_name}
+                fixtureId={fixture.id}
+                leagueName={league_name}
+                matchDate={match_date}
+              />
+            )}
+
+            {/* Tab Panel 3: Asian Handicap (Spreads) */}
+            {activeMarketTab === 'spreads' && (
+              <SpreadsMarketView
+                spreadsProbs={spreadsProbs}
+                marketSpreads={fixture.market_odds?.spreads || {}}
+                slipPicks={slipPicks}
+                onToggleSlip={onToggleSlip}
+                homeTeam={home_team_name}
+                awayTeam={away_team_name}
+                fixtureId={fixture.id}
+                leagueName={league_name}
+                matchDate={match_date}
+              />
             )}
 
             {/* Primary Action Buttons Bar */}

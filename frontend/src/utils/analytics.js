@@ -714,3 +714,74 @@ export function toggleWatchlistItem(watchlist, fixtureId) {
   saveWatchlist(next);
   return next;
 }
+
+/**
+ * Multi-Market Totals (Over / Under) Probabilities from 6x6 Score Matrix
+ */
+export function calculatePoissonMatrix(lambdaHome, lambdaAway, maxGoals = 5) {
+  const result = computePoissonMatrix(lambdaHome, lambdaAway, maxGoals);
+  return result.matrix;
+}
+
+export function calculateTotalsFromMatrix(matrix, lines = [1.5, 2.5, 3.5]) {
+  const grid = Array.isArray(matrix) ? matrix : (matrix?.matrix || []);
+  if (!grid || grid.length === 0) return {};
+  const res = {};
+  for (const line of lines) {
+    let over = 0;
+    for (const row of grid) {
+      for (const cell of row) {
+        if (cell.home + cell.away > line) {
+          over += cell.prob;
+        }
+      }
+    }
+    const under = Math.max(0, 100 - over);
+    res[String(line)] = {
+      over: Math.round(over * 10) / 10,
+      under: Math.round(under * 10) / 10,
+    };
+  }
+  return res;
+}
+
+/**
+ * Multi-Market Asian Handicap Probabilities from 6x6 Score Matrix
+ */
+export function calculateSpreadsFromMatrix(matrix, lines = [-1.5, -1.0, -0.5, 0.0, 0.5, 1.0, 1.5]) {
+  const grid = Array.isArray(matrix) ? matrix : (matrix?.matrix || []);
+  if (!grid || grid.length === 0) return {};
+  const res = {};
+  for (const line of lines) {
+    let pHome = 0;
+    let pAway = 0;
+    let pPush = 0;
+    for (const row of grid) {
+      for (const cell of row) {
+        const diff = (cell.home + line) - cell.away;
+        if (diff > 1e-5) pHome += cell.prob;
+        else if (diff < -1e-5) pAway += cell.prob;
+        else pPush += cell.prob;
+      }
+    }
+    const lineKey = line > 0 ? `+${line}` : `${line}`;
+    res[lineKey] = {
+      home: Math.round(pHome * 10) / 10,
+      away: Math.round(pAway * 10) / 10,
+      push: Math.round(pPush * 10) / 10,
+    };
+  }
+  return res;
+}
+
+/**
+ * Calculate expected value for arbitrary market outcomes
+ */
+export function calculateMarketEV(modelProbPct, odds, pushProbPct = 0) {
+  const o = Number(odds);
+  const p = Number(modelProbPct) / 100;
+  const push = Number(pushProbPct) / 100;
+  if (!o || o <= 1 || !p || p <= 0) return null;
+  const ev = (p * o + push * 1.0) - 1.0;
+  return Math.round(ev * 1000) / 10;
+}
