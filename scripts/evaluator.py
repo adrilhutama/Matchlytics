@@ -14,6 +14,14 @@ from typing import Any
 
 import requests
 
+try:
+    from scripts.football_data_pool import football_pool
+except ImportError:
+    try:
+        from football_data_pool import football_pool
+    except ImportError:
+        football_pool = None
+
 
 
 def calculate_brier_score(prob_home: float, prob_draw: float, prob_away: float, actual_outcome: str) -> float:
@@ -33,7 +41,7 @@ def calculate_brier_score(prob_home: float, prob_draw: float, prob_away: float, 
     return (ph - yh) ** 2 + (pd - yd) ** 2 + (pa - ya) ** 2
 
 
-def fetch_and_settle_completed_matches(base_url: str, headers: dict, supabase: Any) -> int:
+def fetch_and_settle_completed_matches(base_url: str, headers: dict, supabase: Any, pool: Any = None) -> int:
     """
     Query football-data.org for fixtures finished in the last 48 hours,
     and update their final scores and status in Supabase.
@@ -50,7 +58,11 @@ def fetch_and_settle_completed_matches(base_url: str, headers: dict, supabase: A
             "status": "FINISHED",
         }
 
-        resp = requests.get(url, headers=headers, params=params, timeout=12)
+        client = pool or football_pool
+        if client and hasattr(client, "get"):
+            resp = client.get(url, headers=headers, params=params, timeout=12)
+        else:
+            resp = requests.get(url, headers=headers, params=params, timeout=12)
         if resp.status_code != 200:
             print(f"    [WARN] Settlement fetch status {resp.status_code}: {resp.text[:120]}")
             return 0

@@ -33,6 +33,7 @@ jobs:
         env:
           ODDS_API_KEYS:             ${{ secrets.ODDS_API_KEYS || secrets.ODDS_API_KEY }}
           ODDS_API_KEY:              ${{ secrets.ODDS_API_KEY }}
+          FOOTBALL_DATA_TOKENS:      ${{ secrets.FOOTBALL_DATA_TOKENS || secrets.FOOTBALL_DATA_TOKEN }}
           FOOTBALL_DATA_TOKEN:       ${{ secrets.FOOTBALL_DATA_TOKEN }}
           TELEGRAM_BOT_TOKEN:        ${{ secrets.TELEGRAM_BOT_TOKEN }}
           TELEGRAM_CHAT_ID:          ${{ secrets.TELEGRAM_CHAT_ID }}

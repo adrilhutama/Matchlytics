@@ -31,6 +31,7 @@ jobs:
 
       - name: Run standings sync
         env:
+          FOOTBALL_DATA_TOKENS:      ${{ secrets.FOOTBALL_DATA_TOKENS || secrets.FOOTBALL_DATA_TOKEN }}
           FOOTBALL_DATA_TOKEN:       ${{ secrets.FOOTBALL_DATA_TOKEN }}
           SUPABASE_URL:              ${{ secrets.SUPABASE_URL }}
           SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY || secrets.SUPABASE_SERVICE_KEY }}

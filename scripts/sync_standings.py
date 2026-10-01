@@ -13,13 +13,24 @@ import time
 from datetime import datetime, timezone
 import requests
 
-from config import (
-    BASE_URL,
-    HEADERS,
-    ACTIVE_LEAGUES,
-    REQUEST_DELAY,
-    supabase,
-)
+try:
+    from scripts.config import (
+        BASE_URL,
+        HEADERS,
+        ACTIVE_LEAGUES,
+        REQUEST_DELAY,
+        supabase,
+    )
+    from scripts.football_data_pool import football_pool
+except ModuleNotFoundError:
+    from config import (
+        BASE_URL,
+        HEADERS,
+        ACTIVE_LEAGUES,
+        REQUEST_DELAY,
+        supabase,
+    )
+    from football_data_pool import football_pool
 
 
 def normalize_form_string(raw_form: str | None) -> str:
@@ -31,11 +42,12 @@ def normalize_form_string(raw_form: str | None) -> str:
     return ''.join(clean[-5:])
 
 
-def fetch_league_standings(competition_code: str) -> list[dict]:
+def fetch_league_standings(competition_code: str, pool: Any = None) -> list[dict]:
     # Fetch standings tables for a competition from Football-Data.org v4
+    client = pool or football_pool
     url = f'{BASE_URL}/competitions/{competition_code}/standings'
     try:
-        resp = requests.get(url, headers=HEADERS, timeout=15)
+        resp = client.get(url, timeout=15)
         if resp.status_code != 200:
             print(f'    [WARN] Football-Data.org Standings {competition_code}: HTTP {resp.status_code}')
             return []

@@ -25,6 +25,7 @@ try:
         supabase,
     )
     from scripts.sync_daily import ensure_team_metadata
+    from scripts.football_data_pool import football_pool
 except ModuleNotFoundError:
     from config import (
         BASE_URL,
@@ -35,17 +36,19 @@ except ModuleNotFoundError:
         supabase,
     )
     from sync_daily import ensure_team_metadata
+    from football_data_pool import football_pool
 
 
-def fetch_fixtures_range(competition_code: str, from_date: str, to_date: str) -> list[dict]:
+def fetch_fixtures_range(competition_code: str, from_date: str, to_date: str, pool: Any = None) -> list[dict]:
     """Fetch scheduled fixtures from football-data.org for a competition within a date range."""
+    client = pool or football_pool
     url = f"{BASE_URL}/competitions/{competition_code}/matches"
     params = {
         "dateFrom": from_date,
         "dateTo":   to_date,
         "status":   "SCHEDULED",
     }
-    resp = requests.get(url, headers=HEADERS, params=params, timeout=15)
+    resp = client.get(url, params=params, timeout=15)
     if resp.status_code != 200:
         error_msg = resp.text
         try:

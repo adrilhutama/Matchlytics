@@ -48,6 +48,7 @@ try:
         send_daily_sitrep,
     )
     from scripts.odds_client import odds_pool
+    from scripts.football_data_pool import football_pool
 except ImportError:
     from config import (
         BASE_URL,
@@ -75,8 +76,40 @@ except ImportError:
         send_daily_sitrep,
     )
     from odds_client import odds_pool
+    from football_data_pool import football_pool
 
 LAST_QUOTA_REMAINING: int | None = None
+
+# ---- Football-Data.org Ingestion Helpers with Pool Rotation ---
+
+def fetch_league_standings(competition_code: str, pool: Any = None) -> list[dict]:
+    """Fetch standings tables for a competition from Football-Data.org via token pool."""
+    client = pool or football_pool
+    url = f"{BASE_URL}/competitions/{competition_code}/standings"
+    try:
+        resp = client.get(url, timeout=15)
+        if resp.status_code == 200:
+            return resp.json().get("standings", [])
+        print(f"    [WARN] Football-Data.org Standings {competition_code}: HTTP {resp.status_code}")
+        return []
+    except Exception as exc:
+        print(f"    [ERROR] Failed to fetch standings for {competition_code}: {exc}")
+        return []
+
+
+def fetch_head_to_head_history(match_id: int | str, pool: Any = None) -> dict:
+    """Fetch head-to-head match history for a fixture from Football-Data.org via token pool."""
+    client = pool or football_pool
+    url = f"{BASE_URL}/matches/{match_id}/head2head"
+    try:
+        resp = client.get(url, timeout=15)
+        if resp.status_code == 200:
+            return resp.json()
+        print(f"    [WARN] H2H fetch failed for match {match_id}: HTTP {resp.status_code}")
+        return {}
+    except Exception as exc:
+        print(f"    [ERROR] H2H fetch exception for match {match_id}: {exc}")
+        return {}
 
 # ---- Normalized Schema & Team Metadata Caching --------------
 
@@ -1077,8 +1110,8 @@ def main() -> None:
     print(f"Daily Odds & Analytics sync starting: {now_str} UTC")
 
     # 1. Settle recent completed matches and evaluate accuracy
-    print("Settling recent completed matches from Football-Data.org...")
-    fetch_and_settle_completed_matches(BASE_URL, HEADERS, supabase)
+    print("Settling recent completed matches from Football-Data.org via token pool...")
+    fetch_and_settle_completed_matches(BASE_URL, HEADERS, supabase, pool=football_pool)
 
     # 1b. Settle user portfolio positions with strict odds cap (250.00)
     print("Settling user portfolio positions with max odds cap (250.00)...")

@@ -40,8 +40,31 @@ def _require_env(primary: str, *fallbacks: str) -> str:
     )
 
 
-# ---- Football-Data.org API credentials -----------------------
-FOOTBALL_DATA_TOKEN = os.getenv("FOOTBALL_DATA_TOKEN")
+# ---- Football-Data.org API credentials & Token Pool ----------
+def parse_football_data_tokens(
+    env_tokens_val: str | None = None,
+    env_single_val: str | None = None,
+) -> list[str]:
+    """
+    Parse Football-Data.org token pool from environment variables.
+    Supports either:
+      - FOOTBALL_DATA_TOKENS: Comma-delimited list of tokens ("tok1,tok2,tok3")
+      - FOOTBALL_DATA_TOKEN: Single token fallback for backwards compatibility
+    Cleans surrounding quotes and whitespace, splitting strictly by comma.
+    """
+    if env_tokens_val is not None or env_single_val is not None:
+        raw = (env_tokens_val if env_tokens_val is not None and env_tokens_val != "" else env_single_val) or ""
+    else:
+        raw = os.getenv("FOOTBALL_DATA_TOKENS") or os.getenv("FOOTBALL_DATA_TOKEN") or ""
+
+    raw = raw.strip().strip("'\"")
+    tokens = [t.strip().strip("'\"") for t in raw.split(",") if t.strip().strip("'\"")]
+    print(f"[INFO] Initialized Football-Data Pool with {len(tokens)} token(s).")
+    return tokens
+
+
+FOOTBALL_DATA_TOKENS: list[str] = parse_football_data_tokens()
+FOOTBALL_DATA_TOKEN: str | None = FOOTBALL_DATA_TOKENS[0] if FOOTBALL_DATA_TOKENS else os.getenv("FOOTBALL_DATA_TOKEN")
 
 API_HOST = "api.football-data.org"
 BASE_URL = "https://api.football-data.org/v4"
