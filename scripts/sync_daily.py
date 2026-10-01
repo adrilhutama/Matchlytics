@@ -37,6 +37,7 @@ try:
     from scripts.engine import (
         calc_probabilities,
         calculate_lambdas,
+        score_matrix,
     )
     from scripts.evaluator import (
         fetch_and_settle_completed_matches,
@@ -63,6 +64,7 @@ except ImportError:
     from engine import (
         calc_probabilities,
         calculate_lambdas,
+        score_matrix,
     )
     from evaluator import (
         fetch_and_settle_completed_matches,
@@ -701,6 +703,29 @@ def load_upcoming_fixtures(days_ahead: int = 30) -> list[dict]:
     return []
 
 
+def safe_upsert_fixture(supabase_client: Any, row: dict) -> bool:
+    """Upsert fixture row with resilient schema adaptation on PGRST204."""
+    if not supabase_client or not row:
+        return False
+    curr = dict(row)
+    while True:
+        try:
+            supabase_client.table("fixtures").upsert(curr, on_conflict="id").execute()
+            return True
+        except Exception as exc:
+            err_msg = str(exc)
+            if "PGRST204" in err_msg or "Could not find the" in err_msg:
+                m = re.search(r"Could not find the '([^']+)' column", err_msg)
+                if m:
+                    missing_col = m.group(1)
+                    if missing_col in curr:
+                        print(f"    [Schema Adaptation] Dropping missing column '{missing_col}' from fixture {curr.get('id')} and retrying...")
+                        del curr[missing_col]
+                        continue
+            print(f"    [WARN] Failed to upsert fixture {curr.get('id')}: {exc}")
+            return False
+
+
 # ---- Single Competition Sync --------------------------------
 
 def sync_competition(
@@ -830,54 +855,70 @@ def sync_competition(
                 } if final_value_pick and final_ev_pct else None
             )
 
+            # Compute full normalized probabilities and score matrix
+            totals_dict = multi_analytics.get("totals_probabilities", {})
+            btts_dict = multi_analytics.get("btts_probabilities", {})
+            p_matrix = score_matrix(lambda_home, lambda_away).tolist()
+
+            prob_h = round(min(100.0, max(0.0, multi_analytics["prob_home"])), 2)
+            prob_d = round(min(100.0, max(0.0, multi_analytics["prob_draw"])), 2)
+            prob_a = round(min(100.0, max(0.0, multi_analytics["prob_away"])), 2)
+
+            fair_h = round(min(999.0, max(1.01, 100.0 / prob_h)), 2) if prob_h > 0 else None
+            fair_d = round(min(999.0, max(1.01, 100.0 / prob_d)), 2) if prob_d > 0 else None
+            fair_a = round(min(999.0, max(1.01, 100.0 / prob_a)), 2) if prob_a > 0 else None
+
+            p_o15 = totals_dict.get("1.5", {}).get("over")
+            p_u15 = totals_dict.get("1.5", {}).get("under")
+            p_o25 = totals_dict.get("2.5", {}).get("over") or prob_o25
+            p_u25 = totals_dict.get("2.5", {}).get("under") or prob_u25
+            p_o35 = totals_dict.get("3.5", {}).get("over")
+            p_u35 = totals_dict.get("3.5", {}).get("under")
+
+            p_btts_yes = btts_dict.get("yes") or prob_btts_val
+            p_btts_no = btts_dict.get("no") or (round(100.0 - p_btts_yes, 2) if p_btts_yes is not None else None)
+
+            kickoff_val = fixture.get("kickoff_time") or fixture.get("match_date")
+            status_val = fixture.get("status", "NS")
+
+            # Strictly normalized schema matching public.fixtures without lambda_away or legacy columns
             update_row = {
                 "id":                  fid,
                 "competition_code":    code,
                 "home_team_id":        home_id,
                 "away_team_id":        away_id,
-                "home_xg":             lambda_home,
-                "away_xg":             lambda_away,
-                "lambda_home":         lambda_home,
-                "lambda_away":         lambda_away,
-                "prob_home":           round(min(100.0, max(0.0, multi_analytics["prob_home"])), 2),
-                "prob_draw":           round(min(100.0, max(0.0, multi_analytics["prob_draw"])), 2),
-                "prob_away":           round(min(100.0, max(0.0, multi_analytics["prob_away"])), 2),
+                "kickoff_time":        kickoff_val,
+                "status":              status_val,
+                "home_xg":             round(lambda_home, 2) if lambda_home is not None else None,
+                "away_xg":             round(lambda_away, 2) if lambda_away is not None else None,
                 "predicted_score":     multi_analytics["predicted_score"],
-                "prob_over_25":        prob_o25,
-                "prob_under_25":       prob_u25,
-                "prob_btts_yes":       prob_btts_val,
-                "prob_btts":           prob_btts_val,
+                "prob_home":           prob_h,
+                "prob_draw":           prob_d,
+                "prob_away":           prob_a,
+                "fair_odds_home":      fair_h,
+                "fair_odds_draw":      fair_d,
+                "fair_odds_away":      fair_a,
                 "odds_home":           final_odds_home,
                 "odds_draw":           final_odds_draw,
                 "odds_away":           final_odds_away,
                 "value_pick":          final_value_pick,
-                "market_odds":         market_odds,
-                "ev_opportunities":    ev_opps,
+                "prob_over_15":        p_o15,
+                "prob_under_15":       p_u15,
+                "prob_over_25":        p_o25,
+                "prob_under_25":       p_u25,
+                "prob_over_35":        p_o35,
+                "prob_under_35":       p_u35,
+                "prob_btts_yes":       p_btts_yes,
+                "prob_btts_no":        p_btts_no,
+                "prob_btts":           p_btts_yes,
+                "score_matrix":        p_matrix,
+                "market_odds":         market_odds or {},
+                "ev_opportunities":    ev_opps or [],
                 "best_ev_opportunity": best_ev,
                 "updated_at":          datetime.now(timezone.utc).isoformat(),
             }
 
-            try:
-                supabase.table("fixtures").upsert(update_row, on_conflict="id").execute()
-            except Exception as upsert_err:
-                err_str = str(upsert_err)
-                base_keys = (
-                    "id", "competition_code", "home_team_id", "away_team_id",
-                    "home_xg", "away_xg", "lambda_home", "lambda_away",
-                    "prob_home", "prob_draw", "prob_away", "predicted_score",
-                    "prob_over_25", "prob_under_25", "prob_btts_yes", "prob_btts",
-                    "odds_home", "odds_draw", "odds_away", "value_pick",
-                    "market_odds", "ev_opportunities", "best_ev_opportunity", "updated_at"
-                )
-                fallback_row = {k: v for k, v in update_row.items() if k in base_keys}
-                try:
-                    supabase.table("fixtures").upsert(fallback_row, on_conflict="id").execute()
-                except Exception:
-                    minimal_row = {
-                        k: v for k, v in fallback_row.items()
-                        if k not in ("market_odds", "ev_opportunities")
-                    }
-                    supabase.table("fixtures").upsert(minimal_row, on_conflict="id").execute()
+            safe_upsert_fixture(supabase, update_row)
 
             odds_source = " [REAL ODDS: MULTI-MARKET]" if has_real_odds else " [FAIR ODDS]"
             opp_count_str = f" | +EV opps: {len(ev_opps)}" if ev_opps else ""

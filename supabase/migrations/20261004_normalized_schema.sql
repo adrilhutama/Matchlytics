@@ -32,6 +32,15 @@ ALTER TABLE public.fixtures ADD COLUMN IF NOT EXISTS competition_code TEXT;
 ALTER TABLE public.fixtures ADD COLUMN IF NOT EXISTS kickoff_time TIMESTAMPTZ;
 ALTER TABLE public.fixtures ADD COLUMN IF NOT EXISTS actual_home_score INT;
 ALTER TABLE public.fixtures ADD COLUMN IF NOT EXISTS actual_away_score INT;
+ALTER TABLE public.fixtures ADD COLUMN IF NOT EXISTS fair_odds_home NUMERIC(5, 2);
+ALTER TABLE public.fixtures ADD COLUMN IF NOT EXISTS fair_odds_draw NUMERIC(5, 2);
+ALTER TABLE public.fixtures ADD COLUMN IF NOT EXISTS fair_odds_away NUMERIC(5, 2);
+ALTER TABLE public.fixtures ADD COLUMN IF NOT EXISTS prob_over_15 NUMERIC(5, 2);
+ALTER TABLE public.fixtures ADD COLUMN IF NOT EXISTS prob_under_15 NUMERIC(5, 2);
+ALTER TABLE public.fixtures ADD COLUMN IF NOT EXISTS prob_over_35 NUMERIC(5, 2);
+ALTER TABLE public.fixtures ADD COLUMN IF NOT EXISTS prob_under_35 NUMERIC(5, 2);
+ALTER TABLE public.fixtures ADD COLUMN IF NOT EXISTS prob_btts_no NUMERIC(5, 2);
+ALTER TABLE public.fixtures ADD COLUMN IF NOT EXISTS score_matrix JSONB;
 
 -- Add foreign key constraints safely
 DO $$
