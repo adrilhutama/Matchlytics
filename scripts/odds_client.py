@@ -277,7 +277,7 @@ class OddsPoolManager:
         self,
         sport_key: str,
         regions: str = "eu",
-        markets: str = "h2h",
+        markets: str = "h2h,totals,spreads",
         odds_format: str = "decimal",
         session_get: Callable[..., Any] | None = None,
     ) -> list[dict]:

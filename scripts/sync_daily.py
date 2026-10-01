@@ -41,6 +41,7 @@ try:
     from scripts.evaluator import (
         fetch_and_settle_completed_matches,
         evaluate_recent_settlement,
+        compute_multi_market_analytics,
     )
     from scripts.telegram_notifier import (
         send_daily_sitrep,
@@ -66,6 +67,7 @@ except ImportError:
     from evaluator import (
         fetch_and_settle_completed_matches,
         evaluate_recent_settlement,
+        compute_multi_market_analytics,
     )
     from telegram_notifier import (
         send_daily_sitrep,
@@ -113,7 +115,7 @@ def teams_match(name1: str, name2: str) -> bool:
 # ---- The Odds API (v4) --------------------------------------
 
 def fetch_real_odds(league_code: str) -> list[dict]:
-    # Fetch live 1X2 market odds for a league via OddsPoolManager
+    # Fetch comprehensive multi-market odds (1X2, totals, spreads) for a league
     global LAST_QUOTA_REMAINING
     sport_key = ODDS_SPORT_KEYS.get(league_code)
     if not sport_key:
@@ -123,7 +125,12 @@ def fetch_real_odds(league_code: str) -> list[dict]:
         print(f"    [INFO] No Odds API keys configured in pool. Skipping real odds fetch for {league_code}.")
         return []
 
-    events = odds_pool.fetch_odds_events(sport_key)
+    events = odds_pool.fetch_odds_events(
+        sport_key,
+        regions="eu",
+        markets="h2h,totals,spreads",
+        odds_format="decimal"
+    )
     quota_sum = odds_pool.get_quota_summary()
     if quota_sum.get("total_remaining") is not None:
         LAST_QUOTA_REMAINING = quota_sum["total_remaining"]
@@ -172,19 +179,203 @@ def extract_event_odds(event: dict) -> tuple[float | None, float | None, float |
     return odds_home, odds_draw, odds_away
 
 
+def parse_multi_market_event_odds(event: dict) -> dict[str, Any]:
+    """
+    Parse comprehensive multi-market odds from an Odds API event.
+    Extracts:
+      - h2h: Primary and best decimal odds + no-vig consensus
+      - totals: Over/Under odds for lines (1.5, 2.5, 3.5)
+      - spreads: Asian Handicap odds for primary handicap lines
+    """
+    bookmakers = event.get("bookmakers", [])
+    if not bookmakers:
+        return {}
+
+    event_home = event.get("home_team", "")
+    event_away = event.get("away_team", "")
+
+    pinnacle_bm = None
+    bet365_bm = None
+    for bm in bookmakers:
+        if bm.get("key") == "pinnacle":
+            pinnacle_bm = bm
+        elif bm.get("key") == "bet365":
+            bet365_bm = bm
+
+    primary_bm = pinnacle_bm or bet365_bm or bookmakers[0]
+
+    # --- 1. Parse H2H (1X2) ---
+    best_home, best_draw, best_away = 0.0, 0.0, 0.0
+    primary_home, primary_draw, primary_away = None, None, None
+
+    for bm in bookmakers:
+        for market in bm.get("markets", []):
+            if market.get("key") == "h2h":
+                h_p, d_p, a_p = None, None, None
+                for out in market.get("outcomes", []):
+                    name = out.get("name", "")
+                    try:
+                        price = float(out.get("price", 0))
+                    except (ValueError, TypeError):
+                        continue
+                    if price <= 1.0:
+                        continue
+                    if name.lower() == "draw":
+                        d_p = price
+                        if price > best_draw:
+                            best_draw = price
+                    elif teams_match(name, event_home):
+                        h_p = price
+                        if price > best_home:
+                            best_home = price
+                    elif teams_match(name, event_away):
+                        a_p = price
+                        if price > best_away:
+                            best_away = price
+
+                if bm == primary_bm:
+                    primary_home, primary_draw, primary_away = h_p, d_p, a_p
+
+    h2h_home = primary_home or (best_home if best_home > 0 else None)
+    h2h_draw = primary_draw or (best_draw if best_draw > 0 else None)
+    h2h_away = primary_away or (best_away if best_away > 0 else None)
+
+    # Compute no-vig consensus
+    no_vig = None
+    if h2h_home and h2h_draw and h2h_away and h2h_home > 1.0 and h2h_draw > 1.0 and h2h_away > 1.0:
+        inv_h = 1.0 / h2h_home
+        inv_d = 1.0 / h2h_draw
+        inv_a = 1.0 / h2h_away
+        overround = inv_h + inv_d + inv_a
+        if overround > 0:
+            p_h = round((inv_h / overround) * 100.0, 2)
+            p_d = round((inv_d / overround) * 100.0, 2)
+            p_a = round((inv_a / overround) * 100.0, 2)
+            no_vig = {
+                "home_prob": p_h,
+                "draw_prob": p_d,
+                "away_prob": p_a,
+                "fair_odds_home": round(100.0 / p_h, 2) if p_h > 0 else None,
+                "fair_odds_draw": round(100.0 / p_d, 2) if p_d > 0 else None,
+                "fair_odds_away": round(100.0 / p_a, 2) if p_a > 0 else None,
+            }
+
+    h2h_data = {
+        "home": h2h_home,
+        "draw": h2h_draw,
+        "away": h2h_away,
+        "best_home": best_home if best_home > 0 else h2h_home,
+        "best_draw": best_draw if best_draw > 0 else h2h_draw,
+        "best_away": best_away if best_away > 0 else h2h_away,
+        "no_vig": no_vig,
+    }
+
+    # --- 2. Parse Totals (Over / Under) ---
+    totals_data: dict[str, dict[str, Any]] = {}
+    ordered_bms = [primary_bm] + [b for b in bookmakers if b != primary_bm]
+
+    for bm in ordered_bms:
+        for market in bm.get("markets", []):
+            if market.get("key") == "totals":
+                by_point: dict[float, dict[str, float]] = {}
+                for out in market.get("outcomes", []):
+                    pt = out.get("point")
+                    if pt is None:
+                        continue
+                    try:
+                        pt_val = float(pt)
+                        price = float(out.get("price", 0))
+                    except (ValueError, TypeError):
+                        continue
+                    if price <= 1.0:
+                        continue
+                    name = out.get("name", "").lower()
+                    if pt_val not in by_point:
+                        by_point[pt_val] = {}
+                    if name == "over":
+                        by_point[pt_val]["over"] = price
+                    elif name == "under":
+                        by_point[pt_val]["under"] = price
+
+                for pt_val, prices in by_point.items():
+                    k = str(pt_val)
+                    if k not in totals_data and "over" in prices and "under" in prices:
+                        totals_data[k] = {
+                            "point": pt_val,
+                            "over": prices["over"],
+                            "under": prices["under"],
+                        }
+
+    # --- 3. Parse Spreads (Asian Handicap) ---
+    spreads_data: dict[str, dict[str, Any]] = {}
+
+    for bm in ordered_bms:
+        for market in bm.get("markets", []):
+            if market.get("key") == "spreads":
+                by_point: dict[float, dict[str, float]] = {}
+                for out in market.get("outcomes", []):
+                    pt = out.get("point")
+                    if pt is None:
+                        continue
+                    try:
+                        pt_val = float(pt)
+                        price = float(out.get("price", 0))
+                    except (ValueError, TypeError):
+                        continue
+                    if price <= 1.0:
+                        continue
+                    name = out.get("name", "")
+                    if teams_match(name, event_home):
+                        if pt_val not in by_point:
+                            by_point[pt_val] = {}
+                        by_point[pt_val]["home"] = price
+                    elif teams_match(name, event_away):
+                        home_line = -pt_val
+                        if home_line not in by_point:
+                            by_point[home_line] = {}
+                        by_point[home_line]["away"] = price
+
+                for line_val, prices in by_point.items():
+                    k = f"+{line_val}" if line_val > 0 else f"{line_val}"
+                    if k not in spreads_data and "home" in prices and "away" in prices:
+                        spreads_data[k] = {
+                            "line": line_val,
+                            "home": prices["home"],
+                            "away": prices["away"],
+                        }
+
+    return {
+        "h2h": h2h_data,
+        "totals": totals_data,
+        "spreads": spreads_data,
+    }
+
+
+def find_matching_multi_market_odds(
+    home_name: str,
+    away_name: str,
+    odds_events: list[dict],
+) -> tuple[dict[str, Any] | None, bool]:
+    # Locate comprehensive multi-market odds for a specific fixture
+    for event in odds_events:
+        ev_home = event.get("home_team", "")
+        ev_away = event.get("away_team", "")
+        if teams_match(home_name, ev_home) and teams_match(away_name, ev_away):
+            parsed = parse_multi_market_event_odds(event)
+            if parsed and parsed.get("h2h", {}).get("home"):
+                return parsed, True
+    return None, False
+
 def find_matching_odds(
     home_name: str,
     away_name: str,
     odds_events: list[dict],
 ) -> tuple[float | None, float | None, float | None, bool]:
     # Locate odds for a specific fixture from fetched Odds API events
-    for event in odds_events:
-        ev_home = event.get("home_team", "")
-        ev_away = event.get("away_team", "")
-        if teams_match(home_name, ev_home) and teams_match(away_name, ev_away):
-            h, d, a = extract_event_odds(event)
-            if h and d and a:
-                return h, d, a, True
+    parsed, ok = find_matching_multi_market_odds(home_name, away_name, odds_events)
+    if ok and parsed:
+        h2h = parsed.get("h2h", {})
+        return h2h.get("home"), h2h.get("draw"), h2h.get("away"), True
     return None, None, None, False
 
 
@@ -306,27 +497,30 @@ def sync_competition(
             # Calculate Poisson lambdas with Home/Away split stats and Bayesian shrinkage
             lambda_home, lambda_away = calculate_lambdas(home_stats, away_stats, averages)
 
-            # Match real market odds from The Odds API
-            real_h, real_d, real_a, has_real_odds = find_matching_odds(
+            # Match comprehensive multi-market odds from The Odds API
+            market_odds, has_real_odds = find_matching_multi_market_odds(
                 home_name, away_name, odds_events
             )
 
-            # Run Poisson analytics
-            if has_real_odds:
-                analytics = calc_probabilities(
-                    lambda_home, lambda_away,
-                    real_h, real_d, real_a,
-                )
+            # Compute comprehensive multi-market analytics and EV
+            multi_analytics = compute_multi_market_analytics(
+                lambda_home, lambda_away, market_odds=market_odds
+            )
+
+            if has_real_odds and market_odds:
+                h2h = market_odds.get("h2h", {})
+                real_h = h2h.get("home")
+                real_d = h2h.get("draw")
+                real_a = h2h.get("away")
                 final_odds_home = round(min(999.0, max(1.01, float(real_h))), 2) if real_h else None
                 final_odds_draw = round(min(999.0, max(1.01, float(real_d))), 2) if real_d else None
                 final_odds_away = round(min(999.0, max(1.01, float(real_a))), 2) if real_a else None
-                final_value_pick = analytics.value_pick
-                final_ev_pct = analytics.ev_percentage
+                final_value_pick = multi_analytics.get("value_pick")
+                final_ev_pct = multi_analytics.get("ev_percentage")
             else:
-                analytics = calc_probabilities(lambda_home, lambda_away)
-                fair_h = round(min(999.0, max(1.01, 100.0 / analytics.prob_home)), 2) if analytics.prob_home > 0 else None
-                fair_d = round(min(999.0, max(1.01, 100.0 / analytics.prob_draw)), 2) if analytics.prob_draw > 0 else None
-                fair_a = round(min(999.0, max(1.01, 100.0 / analytics.prob_away)), 2) if analytics.prob_away > 0 else None
+                fair_h = round(min(999.0, max(1.01, 100.0 / multi_analytics["prob_home"])), 2) if multi_analytics["prob_home"] > 0 else None
+                fair_d = round(min(999.0, max(1.01, 100.0 / multi_analytics["prob_draw"])), 2) if multi_analytics["prob_draw"] > 0 else None
+                fair_a = round(min(999.0, max(1.01, 100.0 / multi_analytics["prob_away"])), 2) if multi_analytics["prob_away"] > 0 else None
 
                 final_odds_home = fixture.get("odds_home") or fair_h
                 final_odds_draw = fixture.get("odds_draw") or fair_d
@@ -334,32 +528,65 @@ def sync_competition(
                 final_value_pick = None
                 final_ev_pct = None
 
-            # Build update payload
+            ev_opps = multi_analytics.get("ev_opportunities", [])
+
+            # Build update payload with multi-market odds and EV opportunities
             update_row = {
                 "id":               fid,
                 "lambda_home":      lambda_home,
                 "lambda_away":      lambda_away,
-                "prob_home":        round(min(100.0, max(0.0, analytics.prob_home)), 2),
-                "prob_draw":        round(min(100.0, max(0.0, analytics.prob_draw)), 2),
-                "prob_away":        round(min(100.0, max(0.0, analytics.prob_away)), 2),
-                "predicted_score":  analytics.predicted_score,
-                "prob_over_25":     round(min(100.0, max(0.0, analytics.prob_over_25)), 2),
-                "prob_btts":        round(min(100.0, max(0.0, analytics.prob_btts)), 2),
+                "prob_home":        round(min(100.0, max(0.0, multi_analytics["prob_home"])), 2),
+                "prob_draw":        round(min(100.0, max(0.0, multi_analytics["prob_draw"])), 2),
+                "prob_away":        round(min(100.0, max(0.0, multi_analytics["prob_away"])), 2),
+                "predicted_score":  multi_analytics["predicted_score"],
+                "prob_over_25":     round(min(100.0, max(0.0, multi_analytics["prob_over_25"])), 2),
+                "prob_btts":        round(min(100.0, max(0.0, multi_analytics["prob_btts"])), 2),
                 "odds_home":        final_odds_home,
                 "odds_draw":        final_odds_draw,
                 "odds_away":        final_odds_away,
                 "value_pick":       final_value_pick,
                 "ev_percentage":    round(min(999.0, max(-100.0, final_ev_pct)), 2) if final_ev_pct is not None else None,
+                "market_odds":      market_odds,
+                "ev_opportunities": ev_opps,
                 "updated_at":       datetime.now(timezone.utc).isoformat(),
             }
 
-            supabase.table("fixtures").upsert(update_row, on_conflict="id").execute()
-            odds_source = " [REAL ODDS]" if has_real_odds else " [FAIR ODDS]"
+            try:
+                supabase.table("fixtures").upsert(update_row, on_conflict="id").execute()
+            except Exception as upsert_err:
+                err_str = str(upsert_err)
+                if "market_odds" in err_str or "ev_opportunities" in err_str:
+                    fallback_row = {
+                        k: v for k, v in update_row.items()
+                        if k not in ("market_odds", "ev_opportunities")
+                    }
+                    supabase.table("fixtures").upsert(fallback_row, on_conflict="id").execute()
+                else:
+                    raise upsert_err
+
+            odds_source = " [REAL ODDS: MULTI-MARKET]" if has_real_odds else " [FAIR ODDS]"
+            opp_count_str = f" | +EV opps: {len(ev_opps)}" if ev_opps else ""
             pick_label = f" | +EV: {final_value_pick} +{final_ev_pct}%" if final_value_pick else ""
-            print(f"    Fixture {fid} ({home_name} vs {away_name}): {lambda_home:.2f}/{lambda_away:.2f}{odds_source}{pick_label}")
+            print(f"    Fixture {fid} ({home_name} vs {away_name}): {lambda_home:.2f}/{lambda_away:.2f}{odds_source}{pick_label}{opp_count_str}")
             updated += 1
 
-            if final_value_pick and ev_collector is not None:
+            if ev_opps and ev_collector is not None:
+                for opp in ev_opps:
+                    ev_count += 1
+                    ev_collector.append({
+                        "fixture_id": fid,
+                        "home_team": home_name,
+                        "away_team": away_name,
+                        "league_code": code,
+                        "league_name": name,
+                        "market": opp.get("market"),
+                        "selection": opp.get("selection"),
+                        "value_pick": opp.get("selection"),
+                        "odds": opp.get("odds", 1.0),
+                        "model_prob": opp.get("model_prob", 0.0),
+                        "ev_percentage": opp.get("ev_percentage", 0.0),
+                    })
+            elif final_value_pick and ev_collector is not None:
                 ev_count += 1
                 pick_odds = (
                     final_odds_home if final_value_pick == "HOME"
@@ -367,9 +594,9 @@ def sync_competition(
                     else final_odds_away
                 )
                 pick_prob = (
-                    analytics.prob_home if final_value_pick == "HOME"
-                    else analytics.prob_draw if final_value_pick == "DRAW"
-                    else analytics.prob_away
+                    multi_analytics["prob_home"] if final_value_pick == "HOME"
+                    else multi_analytics["prob_draw"] if final_value_pick == "DRAW"
+                    else multi_analytics["prob_away"]
                 )
                 ev_collector.append({
                     "fixture_id": fid,
@@ -377,6 +604,8 @@ def sync_competition(
                     "away_team": away_name,
                     "league_code": code,
                     "league_name": name,
+                    "market": "h2h",
+                    "selection": final_value_pick,
                     "value_pick": final_value_pick,
                     "odds": pick_odds or 1.0,
                     "model_prob": pick_prob or 0.0,
