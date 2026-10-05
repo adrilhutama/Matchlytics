@@ -65,7 +65,7 @@ export default function ModelLedger({ settledFixtures = [] }) {
   const activeStats = useMemo(() => {
     const total = filteredBets.length
     if (total === 0) return null
-    const won = filteredBets.filter((b) => b.outcome === 'WON').length
+    const won = filteredBets.filter((b) => b.result === 'WIN').length
     const winRate = Math.round((won / total) * 1000) / 10
     const flatPnl = flatSeries.length > 0 ? flatSeries[flatSeries.length - 1].equity - START_BANKROLL : 0
     const kellyPnl = kellySeries.length > 0 ? kellySeries[kellySeries.length - 1].equity - START_BANKROLL : 0
@@ -352,7 +352,7 @@ export default function ModelLedger({ settledFixtures = [] }) {
                       {b.league}
                     </td>
                     <td className="py-2.5 px-3 text-center font-bold text-slate-100">
-                      {b.actualScore}
+                      {b.home_score != null && b.away_score != null ? `${b.home_score} - ${b.away_score}` : '-'}
                     </td>
                     <td className="py-2.5 px-3 text-center text-amber-300 font-semibold">
                       {b.pick}
@@ -362,11 +362,11 @@ export default function ModelLedger({ settledFixtures = [] }) {
                     </td>
                     <td className="py-2.5 px-3 text-center">
                       <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${
-                        b.outcome === 'WON'
+                        b.result === 'WIN'
                           ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'
                           : 'bg-rose-500/20 text-rose-400 border border-rose-500/30'
                       }`}>
-                        {b.outcome}
+                        {b.result}
                       </span>
                     </td>
                     <td className={`py-2.5 px-3 text-right font-bold tabular-nums ${

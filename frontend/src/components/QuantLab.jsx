@@ -7,7 +7,7 @@
 // - Zero em dash characters (R-02 compliance)
 
 import React, { Component, useState, useMemo, useEffect } from 'react'
-import { computePoissonMatrix, calculateZeroVigOdds, calculateEdgeAndEV, getKellyFraction } from '../utils/analytics'
+import { computePoissonMatrix, calculateZeroVigOdds, calculateEdgeAndEV, getKellyFraction, runMonteCarloSimulation } from '../utils/analytics'
 import FormGuide from './FormGuide'
 
 // Parse decimal odds supporting both dot and comma notation
@@ -37,113 +37,6 @@ function safeClampLambda(val, fallback = 1.35) {
   return Math.max(0.6, Math.min(3.2, Number(num.toFixed(2))))
 }
 
-// Fast client-side Poisson random number generator (Knuth algorithm with loop safeguard)
-function samplePoisson(lambda) {
-  const safeLambda = Math.max(0.1, Math.min(6.0, Number(lambda) || 1.2))
-  const L = Math.exp(-safeLambda)
-  let k = 0
-  let p = 1.0
-  do {
-    k += 1
-    p *= Math.random()
-  } while (p > L && k < 50)
-  return Math.max(0, k - 1)
-}
-
-// 10,000-iteration Monte Carlo simulation with safe defaults
-function runMonteCarloSimulation(lambdaHome, lambdaAway, iterations = 10000) {
-  const safeH = safeClampLambda(lambdaHome, 1.35)
-  const safeA = safeClampLambda(lambdaAway, 1.10)
-  const safeIters = Math.min(10000, Math.max(1000, Number(iterations) || 10000))
-
-  let homeCleanSheets = 0
-  let awayCleanSheets = 0
-  let bttsCount = 0
-
-  let over15 = 0
-  let over25 = 0
-  let over35 = 0
-
-  // Goal brackets: 0-1, 2-3, 4-5, 6+
-  let bracket01 = 0
-  let bracket23 = 0
-  let bracket45 = 0
-  let bracket6Plus = 0
-
-  // Margin distribution
-  let homeBy2Plus = 0
-  let homeBy1 = 0
-  let draws = 0
-  let awayBy1 = 0
-  let awayBy2Plus = 0
-
-  let homeWins = 0
-  let awayWins = 0
-
-  for (let i = 0; i < safeIters; i += 1) {
-    const h = samplePoisson(safeH)
-    const a = samplePoisson(safeA)
-    const total = h + a
-    const diff = h - a
-
-    if (a === 0) homeCleanSheets += 1
-    if (h === 0) awayCleanSheets += 1
-    if (h > 0 && a > 0) bttsCount += 1
-
-    if (total > 1) over15 += 1
-    if (total > 2) over25 += 1
-    if (total > 3) over35 += 1
-
-    if (total <= 1) bracket01 += 1
-    else if (total <= 3) bracket23 += 1
-    else if (total <= 5) bracket45 += 1
-    else bracket6Plus += 1
-
-    if (diff >= 2) {
-      homeBy2Plus += 1
-      homeWins += 1
-    } else if (diff === 1) {
-      homeBy1 += 1
-      homeWins += 1
-    } else if (diff === 0) {
-      draws += 1
-    } else if (diff === -1) {
-      awayBy1 += 1
-      awayWins += 1
-    } else {
-      awayBy2Plus += 1
-      awayWins += 1
-    }
-  }
-
-  const toPct = (val) => Number(((val / safeIters) * 100).toFixed(1))
-
-  return {
-    iterations: safeIters,
-    homeCleanSheetPct: toPct(homeCleanSheets),
-    awayCleanSheetPct: toPct(awayCleanSheets),
-    bttsPct: toPct(bttsCount),
-    over15Pct: toPct(over15),
-    over25Pct: toPct(over25),
-    over35Pct: toPct(over35),
-    brackets: {
-      bracket01Pct: toPct(bracket01),
-      bracket23Pct: toPct(bracket23),
-      bracket45Pct: toPct(bracket45),
-      bracket6PlusPct: toPct(bracket6Plus),
-    },
-    margins: {
-      homeBy2PlusPct: toPct(homeBy2Plus),
-      homeBy1Pct: toPct(homeBy1),
-      drawsPct: toPct(draws),
-      awayBy1Pct: toPct(awayBy1),
-      awayBy2PlusPct: toPct(awayBy2Plus),
-    },
-    simProbHome: toPct(homeWins),
-    simProbDraw: toPct(draws),
-    simProbAway: toPct(awayWins),
-  }
-}
 
 // Local React Error Boundary for Quant Lab workspace
 class QuantLabErrorBoundary extends Component {

@@ -4,7 +4,7 @@
 // - Zero-Vig True Fair Odds (Margin Stripping & Overround)
 // - Net Edge & Margin of Safety (Buffer Index)
 // - Kelly Criterion & Fractional Staking
-// - Client-side Monte Carlo Simulation (3,000 iterations)
+// - Client-side Monte Carlo Simulation (10,000 iterations)
 // - Multi-Match Parlay Engine & Persistence
 // - Localized date and relative time formatting
 // - Multi-criteria search, date-range filtering, and sorting
@@ -239,9 +239,10 @@ function samplePoisson(lambda) {
 }
 
 /**
- * Client-side Monte Carlo Match Simulation (3,000 runs)
+ * Client-side Monte Carlo Match Simulation
+ * Default 10,000 iterations to match QuantLab and Python evaluator.
  */
-export function runMonteCarloSimulation(lambdaHome, lambdaAway, iterations = 3000) {
+export function runMonteCarloSimulation(lambdaHome, lambdaAway, iterations = 10000) {
   const lh = Math.max(0.2, Math.min(4.5, Number(lambdaHome) || 1.35));
   const la = Math.max(0.2, Math.min(4.5, Number(lambdaAway) || 1.35));
 
@@ -645,6 +646,8 @@ export function simulateBankroll(settledFixtures, kellyPct = 2.5) {
       matchLabel: `${f.home_team_name ?? '?'} vs ${f.away_team_name ?? '?'}`,
       league: f.league_name,
       selection: pick,
+      home_score: f.home_score,
+      away_score: f.away_score,
       odds: marketOdds,
       outcome: actualOutcome,
       result: isWin ? 'WIN' : 'LOSS',

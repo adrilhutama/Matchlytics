@@ -109,6 +109,10 @@ ODDS_SPORT_KEYS: dict[str, str] = {
     "BL1": "soccer_germany_bundesliga",
     "FL1": "soccer_france_ligue_one",
     "CL":  "soccer_uefa_champs_league",
+    "ESA": "soccer_netherlands_eredivisie",
+    "PPL": "soccer_portugal_primeira_liga",
+    "SC1": "soccer_scotland_premiership",
+    "TSU": "soccer_turkey_super_league",
 }
 
 # ---- Telegram Bot & Notification Credentials ----------------
@@ -143,6 +147,10 @@ ACTIVE_LEAGUES: list[dict] = [
     {"code": "BL1", "name": "Bundesliga",             "id": 2002},
     {"code": "FL1", "name": "Ligue 1",                "id": 2015},
     {"code": "CL",  "name": "UEFA Champions League",  "id": 2001},
+    {"code": "ESA", "name": "Eredivisie",             "id": 2003},
+    {"code": "PPL", "name": "Liga Portugal",          "id": 2017},
+    {"code": "SC1", "name": "Scottish Premiership",   "id": 2020},
+    {"code": "TSU", "name": "Super Lig",              "id": 2016},
 ]
 
 # Backward-compatibility mapping: display_name -> league ID
