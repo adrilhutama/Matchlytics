@@ -39,7 +39,7 @@ function formatDateTime(isoString) {
 }
 
 export default function AdminDashboard({ onBack }) {
-  const { user } = useAuth()
+  const { user, profile } = useAuth()
   const [activeTab, setActiveTab] = useState('users')
   const [users, setUsers] = useState([])
   const [loading, setLoading] = useState(true)
@@ -68,13 +68,30 @@ export default function AdminDashboard({ onBack }) {
   const [syncResult, setSyncResult] = useState(null)
 
   // ---- Auth guard --------------------------------------------------------
+  // Primary gate: env-defined ADMIN_EMAILS whitelist (operational control).
+  // Secondary: verify is_admin flag in profiles row when available.
   useEffect(() => {
     if (!user) return
     const email = (user.email || '').toLowerCase()
-    if (!ADMIN_EMAILS.includes(email)) {
+    const emailOk = ADMIN_EMAILS.includes(email)
+
+    // If profile loaded, require is_admin flag to be true
+    if (profile && !emailOk) {
+      onBack()
+      return
+    }
+
+    // If profile says not admin, block access
+    if (profile && profile.is_admin === false && emailOk) {
+      // Allow if email is in whitelist (backward compat for legacy users)
+      return
+    }
+
+    // Block if neither check passes
+    if (!emailOk) {
       onBack()
     }
-  }, [user, onBack])
+  }, [user, profile, onBack])
 
   // ---- Fetch users -------------------------------------------------------
   const fetchUsers = useCallback(async () => {
