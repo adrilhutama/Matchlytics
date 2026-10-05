@@ -1,0 +1,25 @@
+=== VERIFICATION QUERIES (Copy-Paste Ready) ===
+
+-- QUERY 1: RLS Policies
+SELECT tablename, policyname, cmd, roles FROM pg_policies WHERE schemaname = 'public' ORDER BY tablename, policyname;
+
+-- QUERY 2: Grants on user_notifications
+SELECT table_name, grantee, privilege_type FROM information_schema.role_table_grants WHERE table_schema = 'public' AND table_name IN ('user_notifications', 'profiles', 'admin_audit_log') ORDER BY table_name, grantee;
+
+-- QUERY 3: fixture_id type fix
+SELECT table_name, column_name, data_type FROM information_schema.columns WHERE table_schema = 'public' AND table_name IN ('fixtures', 'user_notifications') AND column_name IN ('id', 'fixture_id') ORDER BY table_name;
+
+-- QUERY 4: is_admin column exists
+SELECT column_name, data_type, column_default FROM information_schema.columns WHERE table_schema = 'public' AND table_name = 'profiles' AND column_name = 'is_admin';
+
+-- QUERY 5: Admin users
+SELECT id, email, is_admin, subscription_tier FROM public.profiles ORDER BY is_admin DESC, created_at DESC LIMIT 10;
+
+-- QUERY 6: Redundant indexes removed?
+SELECT indexname FROM pg_indexes WHERE schemaname = 'public' AND indexname IN ('idx_fixtures_match_date', 'idx_fixtures_status');
+
+-- QUERY 7: New indexes exist?
+SELECT indexname, tablename FROM pg_indexes WHERE schemaname = 'public' AND indexname IN ('idx_portfolio_user_status_created', 'idx_profiles_created');
+
+-- QUERY 8: Foreign keys
+SELECT tc.constraint_name, tc.table_name, kcu.column_name, ccu.table_name AS foreign_table FROM information_schema.table_constraints tc JOIN information_schema.key_column_usage kcu ON tc.constraint_name = kcu.constraint_name JOIN information_schema.constraint_column_usage ccu ON ccu.constraint_name = tc.constraint_name WHERE tc.constraint_type = 'FOREIGN KEY' AND tc.table_schema = 'public' ORDER BY tc.table_name;
