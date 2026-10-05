@@ -108,6 +108,7 @@ CREATE POLICY "Only admins can read audit log"
 
 DROP POLICY IF EXISTS "Users can update own profile" ON public.profiles;
 
+-- Freeze entitlement columns: user can only update display fields
 CREATE POLICY "Users can update own profile, entitlement columns frozen"
     ON public.profiles
     FOR UPDATE
@@ -115,10 +116,18 @@ CREATE POLICY "Users can update own profile, entitlement columns frozen"
     USING (auth.uid() = id)
     WITH CHECK (
       auth.uid() = new.id
-      AND new.subscription_tier  = old.subscription_tier
-      AND new.subscription_status = old.subscription_status
-      AND new.current_period_end  = old.current_period_end
-      AND new.is_admin            = old.is_admin
+      AND new.subscription_tier = (
+        SELECT subscription_tier FROM public.profiles WHERE id = auth.uid()
+      )
+      AND new.subscription_status = (
+        SELECT subscription_status FROM public.profiles WHERE id = auth.uid()
+      )
+      AND new.current_period_end = (
+        SELECT current_period_end FROM public.profiles WHERE id = auth.uid()
+      )
+      AND new.is_admin = (
+        SELECT is_admin FROM public.profiles WHERE id = auth.uid()
+      )
     );
 
 
