@@ -1,5 +1,5 @@
 -- ============================================================
--- Matchlytics Database Audit Verification Script
+-- Matchlytics Database Audit Verification Script (FIXED)
 -- Run this AFTER applying migration 20261007
 -- ============================================================
 
@@ -13,7 +13,7 @@ SELECT
   policyname,
   cmd,
   roles,
-  CASE when using is not null then 'YES' else 'NO' end as has_using,
+  CASE when "using" is not null then 'YES' else 'NO' end as has_using,
   CASE when with_check is not null then 'YES' else 'NO' end as has_with_check
 FROM pg_policies
 WHERE schemaname = 'public'
@@ -110,7 +110,7 @@ WHERE schemaname = 'public'
 ORDER BY tablename;
 
 -- ------------------------------------------------------------
--- 8. Verify No Duplicate Indexes Remain
+-- 8. Check No Duplicate Indexes Remain
 -- ------------------------------------------------------------
 SELECT '=== REDUNDANT INDEX CHECK ===' as check_name;
 
