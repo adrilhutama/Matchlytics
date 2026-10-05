@@ -37,6 +37,7 @@ import CommandPalette from './components/CommandPalette'
 import QuantLab from './components/QuantLab'
 import PortfolioTracker from './components/PortfolioTracker'
 import ModelLedger from './components/ModelLedger'
+import AdminDashboard from './components/AdminDashboard'
 import { AuthProvider, useAuth } from './context/AuthContext'
 import {
   isDateInRange,
@@ -100,6 +101,7 @@ function AppInner() {
 
   // Multi-workspace terminal state: 'terminal' | 'quant_lab' | 'portfolio' | 'ledger'
   const [activeWorkspace,     setActiveWorkspace]     = useState('terminal')
+  const [isAdminView,         setIsAdminView]         = useState(false)
   const [isCommandPaletteOpen, setIsCommandPaletteOpen] = useState(false)
   const [selectedLabFixture,  setSelectedLabFixture]  = useState(null)
   const [visibleCount,        setVisibleCount]        = useState(24)
@@ -890,6 +892,15 @@ function AppInner() {
     )
   }
 
+  // Admin view (whitelisted emails only)
+  if (isAdminView) {
+    return (
+      <div className="w-full min-h-screen bg-pitch-950 text-slate-100">
+        <AdminDashboard onBack={() => setIsAdminView(false)} />
+      </div>
+    )
+  }
+
   return (
     <div className="w-full min-h-screen bg-pitch-900 text-slate-100 flex overflow-x-hidden">
       {/* Desktop Left Sidebar */}
@@ -910,6 +921,7 @@ function AppInner() {
         onSignOut={signOut}
         activeWorkspace={activeWorkspace}
         onSelectWorkspace={handleSelectWorkspace}
+        onOpenAdmin={() => setIsAdminView(true)}
       />
 
       {/* Main Content Area */}

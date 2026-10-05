@@ -30,12 +30,20 @@ export default function Sidebar({
   onSignOut,
   activeWorkspace = 'terminal',
   onSelectWorkspace,
+  onOpenAdmin,          // optional: called when admin link is clicked
 }) {
   const timeStr = lastUpdated
     ? lastUpdated.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' })
     : null
 
   const isTierLocked = !subscriptionTier || subscriptionTier === 'free' || subscriptionTier === 'inactive'
+
+  // Check if current user is an admin
+  const isAdmin = (() => {
+    const raw = import.meta.env.VITE_ADMIN_EMAILS || ''
+    const emails = raw.split(',').map((e) => e.trim().toLowerCase()).filter(Boolean)
+    return emails.includes((userEmail || '').toLowerCase())
+  })()
 
   const handleInstall = async () => {
     if (!deferredInstall) return
@@ -319,6 +327,15 @@ export default function Sidebar({
           </div>
         )}
         <div className="rounded-xl bg-pitch-900 border border-pitch-800 p-3 space-y-2">
+          {isAdmin && onOpenAdmin && (
+            <button
+              type="button"
+              onClick={onOpenAdmin}
+              className="w-full px-3 py-1.5 rounded-lg bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/30 text-amber-400 text-[11px] font-mono transition-colors text-left"
+            >
+              ⚙ Admin Dashboard
+            </button>
+          )}
           <div className="flex items-center gap-2 text-[11px] font-medium text-emerald-400">
             <span className="relative flex h-2.5 w-2.5" aria-hidden="true">
               <span className="absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75 animate-ping" />
