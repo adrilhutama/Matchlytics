@@ -31,6 +31,7 @@ import InstallPrompt from './components/InstallPrompt'
 import LandingPage from './components/LandingPage'
 import LoginPage from './components/LoginPage'
 import SubscriptionModal from './components/SubscriptionModal'
+import SubscriptionBanner from './components/SubscriptionBanner'
 import WorkspaceNav from './components/WorkspaceNav'
 import CommandPalette from './components/CommandPalette'
 import QuantLab from './components/QuantLab'
@@ -969,6 +970,9 @@ function AppInner() {
             </a>
           </div>
         </div>
+
+        {/* Subscription status banner */}
+        <SubscriptionBanner />
 
         {/* Multi-Workspace Top Sub-Nav Switcher */}
         <WorkspaceNav

@@ -1,49 +1,62 @@
 // ---- Header.jsx ----
-// Top-of-page header. Single <h1> per page (SEO). Shows product name
-// and last-data-update timestamp.
+// Top-of-page header. Single <h1> per page (SEO). Shows product name,
+// last-data-update timestamp, and notification bell.
+
+import NotificationBell from './NotificationBell'
+import NotificationPanel from './NotificationPanel'
+import { useState } from 'react'
 
 export default function Header({ lastUpdated }) {
   const timeStr = lastUpdated
     ? lastUpdated.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' })
     : null
+  const [notifOpen, setNotifOpen] = useState(false)
 
   return (
-    <header
-      className="border-b border-pitch-800 bg-pitch-900 sticky top-0 z-30 pt-safe"
-      style={{ paddingTop: 'max(0.5rem, env(safe-area-inset-top, 0px))' }}
-    >
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 py-3.5 flex items-center justify-between gap-4">
-        <div className="flex items-center gap-3">
-          {/* Logo: product name in type, no generated asset (R-23) */}
-          <div className="flex items-center gap-2">
-            <span
-              className="inline-block w-7 h-7 rounded-md bg-amber-500 flex-shrink-0"
-              aria-hidden="true"
-              style={{
-                clipPath: 'polygon(50% 0%, 100% 50%, 50% 100%, 0% 50%)',
-              }}
-            />
-            <h1 className="text-lg font-semibold text-slate-200 tracking-tight">
-              Matchlytics
-            </h1>
+    <>
+      <header
+        className="border-b border-pitch-800 bg-pitch-900 sticky top-0 z-30 pt-safe"
+        style={{ paddingTop: 'max(0.5rem, env(safe-area-inset-top, 0px))' }}
+      >
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 py-3.5 flex items-center justify-between gap-4">
+          <div className="flex items-center gap-3">
+            {/* Logo: product name in type, no generated asset (R-23) */}
+            <div className="flex items-center gap-2">
+              <span
+                className="inline-block w-7 h-7 rounded-md bg-amber-500 flex-shrink-0"
+                aria-hidden="true"
+                style={{
+                  clipPath: 'polygon(50% 0%, 100% 50%, 50% 100%, 0% 50%)',
+                }}
+              />
+              <h1 className="text-lg font-semibold text-slate-200 tracking-tight">
+                Matchlytics
+              </h1>
+            </div>
+            <span className="hidden sm:inline-block text-xs text-slate-500 border border-pitch-700 rounded px-2 py-0.5 font-medium">
+              Pre-Match Quantitative Analytics
+            </span>
           </div>
-          <span className="hidden sm:inline-block text-xs text-slate-500 border border-pitch-700 rounded px-2 py-0.5 font-medium">
-            Pre-Match Quantitative Analytics
-          </span>
-        </div>
 
-        <div className="text-right">
-          {timeStr && (
-            <p className="text-xs text-slate-500">
-              Data refreshed at{' '}
-              <span className="text-slate-400 tabular-nums font-mono">{timeStr}</span>
-            </p>
-          )}
-          <p className="text-xs text-slate-500 mt-0.5 font-mono">
-            Model: Bivariate Poisson : Consensus Sharp Odds
-          </p>
+          <div className="flex items-center gap-3">
+            <NotificationBell onOpenPanel={setNotifOpen} />
+
+            <div className="text-right">
+              {timeStr && (
+                <p className="text-xs text-slate-500">
+                  Data refreshed at{' '}
+                  <span className="text-slate-400 tabular-nums font-mono">{timeStr}</span>
+                </p>
+              )}
+              <p className="text-xs text-slate-500 mt-0.5 font-mono">
+                Model: Bivariate Poisson : Consensus Sharp Odds
+              </p>
+            </div>
+          </div>
         </div>
-      </div>
-    </header>
+      </header>
+
+      {notifOpen && <NotificationPanel onClose={() => setNotifOpen(false)} />}
+    </>
   )
 }

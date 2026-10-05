@@ -367,6 +367,26 @@ def settle_portfolio_positions(supabase_client: Any, max_odds: float = 250.00) -
                     "settled_at": now_iso,
                 }).eq("id", pos["id"]).execute()
                 settled_count += 1
+
+                # Insert notification for the position owner
+                owner_id = pos.get("user_id")
+                if owner_id:
+                    fixture_name = f"{f.get('home_team_name', '?')} vs {f.get('away_team_name', '?')}"
+                    pick_label = pos.get("selection", pos.get("pick", ""))
+                    supabase_client.table("user_notifications").insert({
+                        "user_id": owner_id,
+                        "type": "bet_settled",
+                        "position_id": pos["id"],
+                        "fixture_id": fid,
+                        "payload": {
+                            "result": status,
+                            "payout": payout,
+                            "stake": stake,
+                            "pick": pick_label,
+                            "fixture_name": fixture_name,
+                            "odds": capped_odds,
+                        },
+                    }).execute()
             except Exception as upd_err:
                 print(f"    [WARN] Failed to settle portfolio position {pos.get('id')}: {upd_err}")
 

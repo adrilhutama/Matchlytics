@@ -141,6 +141,21 @@ export function AuthProvider({ children }) {
 
   const hasActiveSubscription = profile?.subscription_status === 'active'
 
+  // ---- Subscription expiry check ----------------------------------------
+  // current_period_end is the hard deadline; once it passes the tier is
+  // treated as expired even if status is still 'active'. This lets us
+  // show a countdown without waiting for admin to flip the status column.
+  const periodEnd = profile?.current_period_end
+    ? new Date(profile.current_period_end)
+    : null
+  const isExpired = periodEnd && new Date() > periodEnd
+  const subscriptionRemaining = periodEnd
+    ? Math.max(0, Math.ceil((periodEnd.getTime() - Date.now()) / (1000 * 60 * 60 * 24)))
+    : null
+  const effectiveStatus = isExpired
+    ? 'expired'
+    : hasActiveSubscription ? 'active' : profile?.subscription_status || 'inactive'
+
   // ---- Tier model -----------------------------------------------
   // Three tiers: free (today window + basic 1X2 only), pro (monthly
   // pass, +7 day horizon, full feature set), annual (season pass,
@@ -171,13 +186,16 @@ export function AuthProvider({ children }) {
       canAccessWeekly,
       canAccessMonthly,
       canAccessQuantFeatures,
+      effectiveStatus,
+      subscriptionRemaining,
+      isExpired,
       signIn,
       signUp,
       requestMagicLink,
       signOut,
       refreshProfile,
     }),
-    [session, user, profile, loading, hasActiveSubscription, tier, isSubscribed, isFree, isPro, isAnnual, canAccessWeekly, canAccessMonthly, canAccessQuantFeatures, signIn, signUp, requestMagicLink, signOut, refreshProfile]
+    [session, user, profile, loading, hasActiveSubscription, tier, isSubscribed, isFree, isPro, isAnnual, canAccessWeekly, canAccessMonthly, canAccessQuantFeatures, effectiveStatus, subscriptionRemaining, isExpired, signIn, signUp, requestMagicLink, signOut, refreshProfile]
   )
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>
@@ -201,6 +219,9 @@ export function useAuth() {
     canAccessWeekly: false,
     canAccessMonthly: false,
     canAccessQuantFeatures: false,
+    effectiveStatus: 'inactive',
+    subscriptionRemaining: null,
+    isExpired: false,
     signIn: async () => ({ data: null, error: new Error('Auth provider missing.') }),
     signUp: async () => ({ data: null, error: new Error('Auth provider missing.') }),
     requestMagicLink: async () => ({ data: null, error: new Error('Auth provider missing.') }),

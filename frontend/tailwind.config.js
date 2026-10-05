@@ -47,6 +47,7 @@ export default {
         "shimmer":       "shimmer 1.6s ease-in-out infinite",
         "fade-in":       "fadeIn 0.35s ease-out both",
         "slide-up":      "slideUp 0.35s ease-out both",
+        "slide-left":    "slideLeft 0.3s ease-out both",
         "pulse-once":    "pulseOnce 0.6s ease-out",
       },
       keyframes: {
@@ -61,6 +62,10 @@ export default {
         slideUp: {
           from: { opacity: 0, transform: "translateY(12px)" },
           to:   { opacity: 1, transform: "translateY(0)" },
+        },
+        slideLeft: {
+          from: { transform: "translateX(100%)" },
+          to:   { transform: "translateX(0)" },
         },
         pulseOnce: {
           "0%, 100%": { transform: "scale(1)" },
