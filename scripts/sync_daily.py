@@ -307,16 +307,15 @@ def settle_portfolio_positions(supabase_client: Any, max_odds: float = 250.00) -
             try:
                 supabase_client.table("portfolio_positions").update({
                     "status": status,
-                    "payout": payout,
-                    "capped_odds": capped_odds,
                     "settled_at": now_iso,
+                    "realized_pnl": payout if status == "WON" else -stake if status == "LOST" else None,
                 }).eq("id", pos["id"]).execute()
                 settled_count += 1
 
                 # Insert notification for the position owner
                 owner_id = pos.get("user_id")
                 if owner_id:
-                    fixture_name = f"{f.get('home_team_name', '?')} vs {f.get('away_team_name', '?')}"
+                    fixture_name = f"{f.get('home_team_id') or '?'} vs {f.get('away_team_id') or '?'}"
                     pick_label = pos.get("selection", pos.get("pick", ""))
                     supabase_client.table("user_notifications").insert({
                         "user_id": owner_id,

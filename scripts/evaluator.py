@@ -147,15 +147,7 @@ def evaluate_full_history(supabase: Any) -> dict:
                 .execute()
             )
         except Exception:
-            res = (
-                supabase.table("fixtures")
-                .select("*")
-                .in_("status", ["FT", "FINISHED", "AET", "PEN"])
-                .not_.is_("home_score", "null")
-                .not_.is_("away_score", "null")
-                .order("match_date", ascending=True)
-                .execute()
-            )
+            return defaults
 
         rows = res.data or []
         if not rows:
@@ -203,13 +195,21 @@ def evaluate_full_history(supabase: Any) -> dict:
             # +EV track record
             val_pick = r.get("value_pick")
             if val_pick in ("HOME", "DRAW", "AWAY"):
-                ev_bets_count += 1
-                pick_odds = (
-                    r.get("odds_home") if val_pick == "HOME"
-                    else r.get("odds_draw") if val_pick == "DRAW"
-                    else r.get("odds_away")
-                )
-                odds_val = float(pick_odds) if pick_odds else 1.0
+                # Extract odds from best_ev_opportunity or fair_odds columns
+                best_ev = r.get("best_ev_opportunity") or {}
+                if val_pick == "HOME":
+                    odds_val = best_ev.get("odds") or r.get("fair_odds_home")
+                elif val_pick == "DRAW":
+                    odds_val = best_ev.get("odds") or r.get("fair_odds_draw")
+                else:
+                    odds_val = best_ev.get("odds") or r.get("fair_odds_away")
+                if odds_val is None:
+                    odds_val = 1.0
+                else:
+                    try:
+                        odds_val = float(odds_val)
+                    except (ValueError, TypeError):
+                        odds_val = 1.0
 
                 if val_pick == actual_outcome:
                     wins += 1
@@ -229,10 +229,14 @@ def evaluate_full_history(supabase: Any) -> dict:
             kelly_bankroll = round(kelly_bankroll + profit_k, 4)
 
             if val_pick in ("HOME", "DRAW", "AWAY"):
+                home_t = r.get("home_team") or r.get("home_team_id") or "?"
+                away_t = r.get("away_team") or r.get("away_team_id") or "?"
+                league = r.get("competition_code") or "?"
+                match_dt = r.get("kickoff_time") or ""
                 bets.append({
-                    "match_date": r.get("match_date"),
-                    "match_label": f"{r.get('home_team_name', '?')} vs {r.get('away_team_name', '?')}",
-                    "league": r.get("league_name"),
+                    "match_date": match_dt[:10] if match_dt else "",
+                    "match_label": f"{home_t} vs {away_t}",
+                    "league": league,
                     "selection": val_pick,
                     "odds": round(odds_val, 2),
                     "outcome": actual_outcome,
@@ -242,12 +246,12 @@ def evaluate_full_history(supabase: Any) -> dict:
                 })
                 equity_curve.append({
                     "index": len(equity_curve),
-                    "match_date": r.get("match_date"),
+                    "match_date": match_dt[:10] if match_dt else "",
                     "equity": flat_bankroll,
                 })
                 equity_curve_k.append({
                     "index": len(equity_curve_k),
-                    "match_date": r.get("match_date"),
+                    "match_date": match_dt[:10] if match_dt else "",
                     "equity": kelly_bankroll,
                 })
 
@@ -304,15 +308,7 @@ def evaluate_recent_settlement(supabase: Any) -> dict:
                 .execute()
             )
         except Exception:
-            res = (
-                supabase.table("fixtures")
-                .select("*")
-                .in_("status", ["FT", "FINISHED", "AET", "PEN"])
-                .not_.is_("home_score", "null")
-                .not_.is_("away_score", "null")
-                .gte("match_date", two_days_ago)
-                .execute()
-            )
+            return defaults
 
         rows = res.data or []
         if not rows:
@@ -355,11 +351,13 @@ def evaluate_recent_settlement(supabase: Any) -> dict:
             val_pick = r.get("value_pick")
             if val_pick in ("HOME", "DRAW", "AWAY"):
                 ev_bets_count += 1
-                pick_odds = (
-                    r.get("odds_home") if val_pick == "HOME"
-                    else r.get("odds_draw") if val_pick == "DRAW"
-                    else r.get("odds_away")
-                )
+                best_ev = r.get("best_ev_opportunity") or {}
+                if val_pick == "HOME":
+                    pick_odds = best_ev.get("odds") or r.get("fair_odds_home")
+                elif val_pick == "DRAW":
+                    pick_odds = best_ev.get("odds") or r.get("fair_odds_draw")
+                else:
+                    pick_odds = best_ev.get("odds") or r.get("fair_odds_away")
                 odds_val = float(pick_odds) if pick_odds else 1.0
 
                 if val_pick == actual_outcome:
