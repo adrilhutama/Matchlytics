@@ -340,3 +340,43 @@ def calculate_lambdas(
     lambda_away = _clamp_lambda(la)
 
     return lambda_home, lambda_away
+
+
+def calculate_lambdas_split(
+    home_stats: dict,
+    away_stats: dict,
+    league_averages: dict,
+    home_advantage: float = 1.10,
+) -> tuple[float, float]:
+    """
+    Calculate Poisson lambdas using pre-computed home/away attack-defense
+    strength splits directly (bypasses re-computation from raw goal data).
+    This is the variant called from sync_daily.py's inline path when the
+    standings_map already carries home_attack / home_defense / away_attack /
+    away_defense fields.
+
+    Formula:
+      lambda_home = home_attack * away_defense * league_home_avg * home_advantage
+      lambda_away = away_attack * home_defense * league_away_avg
+    Clamped to [LAMBDA_MIN, LAMBDA_MAX].
+    """
+    h_att = float(home_stats.get("home_attack") or 1.0)
+    h_def = float(home_stats.get("home_defense") or 1.0)
+    a_att = float(away_stats.get("away_attack") or 1.0)
+    a_def = float(away_stats.get("away_defense") or 1.0)
+
+    league_home_avg = max(0.5, float(
+        league_averages.get("home_avg_goals_for")
+        or league_averages.get("league_home_avg")
+        or 1.50
+    ))
+    league_away_avg = max(0.5, float(
+        league_averages.get("away_avg_goals_for")
+        or league_averages.get("league_away_avg")
+        or 1.20
+    ))
+
+    lh = h_att * a_def * league_home_avg * home_advantage
+    la = a_att * h_def * league_away_avg
+
+    return _clamp_lambda(lh), _clamp_lambda(la)

@@ -24,8 +24,8 @@ try:
         ACTIVE_LEAGUES,
         supabase,
     )
-    from scripts.sync_daily import ensure_team_metadata
     from scripts.football_data_pool import football_pool
+    from scripts._utils import extract_venue_and_referee, ensure_team_metadata
 except ModuleNotFoundError:
     from config import (
         BASE_URL,
@@ -35,8 +35,8 @@ except ModuleNotFoundError:
         ACTIVE_LEAGUES,
         supabase,
     )
-    from sync_daily import ensure_team_metadata
     from football_data_pool import football_pool
+    from _utils import extract_venue_and_referee, ensure_team_metadata
 
 
 def fetch_fixtures_range(competition_code: str, from_date: str, to_date: str, pool: Any = None) -> list[dict]:

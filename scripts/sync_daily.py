@@ -33,10 +33,12 @@ try:
         APP_BASE_URL,
         supabase,
         prune_stale_fixtures,
+        HOME_ADVANTAGE,
     )
     from scripts.engine import (
         calc_probabilities,
         calculate_lambdas,
+        calculate_lambdas_split,
         score_matrix,
     )
     from scripts.evaluator import (
@@ -49,6 +51,7 @@ try:
     )
     from scripts.odds_client import odds_pool
     from scripts.football_data_pool import football_pool, fetch_fixture_h2h
+    from scripts._utils import extract_venue_and_referee
 except ImportError:
     from config import (
         BASE_URL,
@@ -61,10 +64,12 @@ except ImportError:
         APP_BASE_URL,
         supabase,
         prune_stale_fixtures,
+        HOME_ADVANTAGE,
     )
     from engine import (
         calc_probabilities,
         calculate_lambdas,
+        calculate_lambdas_split,
         score_matrix,
     )
     from evaluator import (
@@ -75,53 +80,11 @@ except ImportError:
     from telegram_notifier import (
         send_daily_sitrep,
     )
+    from _utils import extract_venue_and_referee
     from odds_client import odds_pool
     from football_data_pool import football_pool, fetch_fixture_h2h
 
 LAST_QUOTA_REMAINING: int | None = None
-
-# ---- Football-Data.org Ingestion Helpers with Pool Rotation ---
-
-def extract_venue_and_referee(m: dict) -> tuple[str | None, dict]:
-    """Extract venue and primary referee metadata from Football-Data.org match payload."""
-    venue = m.get("venue")
-    refs = m.get("referees", []) or []
-    main_ref = next((r for r in refs if r.get("type") == "REFEREE"), refs[0] if refs else {})
-    referee_payload = {
-        "name": main_ref.get("name"),
-        "nationality": main_ref.get("nationality"),
-    } if main_ref and main_ref.get("name") else {}
-    return venue, referee_payload
-
-
-def fetch_league_standings(competition_code: str, pool: Any = None) -> list[dict]:
-    """Fetch standings tables for a competition from Football-Data.org via token pool."""
-    client = pool or football_pool
-    url = f"{BASE_URL}/competitions/{competition_code}/standings"
-    try:
-        resp = client.get(url, timeout=15)
-        if resp.status_code == 200:
-            return resp.json().get("standings", [])
-        print(f"    [WARN] Football-Data.org Standings {competition_code}: HTTP {resp.status_code}")
-        return []
-    except Exception as exc:
-        print(f"    [ERROR] Failed to fetch standings for {competition_code}: {exc}")
-        return []
-
-
-def fetch_head_to_head_history(match_id: int | str, pool: Any = None) -> dict:
-    """Fetch head-to-head match history for a fixture from Football-Data.org via token pool."""
-    client = pool or football_pool
-    url = f"{BASE_URL}/matches/{match_id}/head2head"
-    try:
-        resp = client.get(url, timeout=15)
-        if resp.status_code == 200:
-            return resp.json()
-        print(f"    [WARN] H2H fetch failed for match {match_id}: HTTP {resp.status_code}")
-        return {}
-    except Exception as exc:
-        print(f"    [ERROR] H2H fetch exception for match {match_id}: {exc}")
-        return {}
 
 
 def fetch_cross_league_matches(
@@ -132,35 +95,17 @@ def fetch_cross_league_matches(
     pool: Any = None,
 ) -> list[dict]:
     """
-    Fetch cross-league matchdays using multi-competition filtering supported in v4:
-    params={"competitions": "PL,PD,SA,BL1,FL1,CL", "dateFrom": start_date, "dateTo": end_date}
+    Fetch cross-league matchdays using the monthly fixtures module.
+    Wrapper kept here so tests importing from sync_daily still work.
     """
-    client = pool or football_pool
-    if isinstance(competition_codes, list):
-        comp_str = ",".join(competition_codes)
-    else:
-        comp_str = str(competition_codes)
+    from scripts.sync_monthly_fixtures import fetch_cross_league_fixtures
+    return fetch_cross_league_fixtures(
+        competition_codes=competition_codes,
+        from_date=date_from or date.today().strftime("%Y-%m-%d"),
+        to_date=date_to or (date.today() + timedelta(days=7)).strftime("%Y-%m-%d"),
+        pool=pool,
+    )
 
-    today = date.today()
-    start_date = date_from or today.strftime("%Y-%m-%d")
-    end_date = date_to or (today + timedelta(days=7)).strftime("%Y-%m-%d")
-
-    url = f"{BASE_URL}/matches"
-    params = {
-        "competitions": comp_str,
-        "dateFrom": start_date,
-        "dateTo": end_date,
-        "status": status,
-    }
-    try:
-        resp = client.get(url, params=params, timeout=15)
-        if resp.status_code == 200:
-            return resp.json().get("matches", [])
-        print(f"    [WARN] Multi-competition fetch ({comp_str}): HTTP {resp.status_code}")
-        return []
-    except Exception as exc:
-        print(f"    [ERROR] Multi-competition fetch error: {exc}")
-        return []
 
 # ---- Normalized Schema & Team Metadata Caching --------------
 
@@ -940,14 +885,11 @@ def sync_competition(
             h_def = home_stats.get("home_defense")
             a_att = away_stats.get("away_attack")
             a_def = away_stats.get("away_defense")
-            league_avg_home = averages.get("home_avg_goals_for", 1.50)
-            league_avg_away = averages.get("away_avg_goals_for", 1.20)
 
             if h_att is not None and a_def is not None and a_att is not None and h_def is not None:
-                lh = float(h_att) * float(a_def) * float(league_avg_home)
-                la = float(a_att) * float(h_def) * float(league_avg_away)
-                lambda_home = min(3.20, max(0.60, lh))
-                lambda_away = min(3.20, max(0.60, la))
+                lambda_home, lambda_away = calculate_lambdas_split(
+                    home_stats, away_stats, averages, home_advantage=HOME_ADVANTAGE
+                )
             else:
                 lambda_home, lambda_away = calculate_lambdas(home_stats, away_stats, averages)
 
@@ -1240,7 +1182,6 @@ def clean_stale_fixtures(days_threshold: int = 45) -> int:
 # ---- Main Pipeline Orchestrator ------------------------------
 
 def main() -> None:
-    LAST_QUOTA_REMAINING: Any = "N/A"
     now_str = date.today().isoformat()
     print(f"Daily Odds & Analytics sync starting: {now_str} UTC")
 
