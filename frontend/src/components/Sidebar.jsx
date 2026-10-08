@@ -251,29 +251,45 @@ export default function Sidebar({
       </div>
 
       {/* Footer */}
-      <div className="mt-auto px-2 pb-3 space-y-2">
-        {userEmail && (pinned || hovered) && (
+      <div className="mt-auto px-2 pb-3 space-y-2 border-t border-pitch-800 pt-2">
+        {/* User profile trigger - always visible */}
+        {userEmail && (
           <button
             type="button"
             onClick={onOpenProfile}
-            className="w-full rounded-xl bg-pitch-900 border border-pitch-800 p-2.5 text-left hover:border-pitch-700 transition-colors"
+            title="User Profile & Settings"
+            className={`w-full rounded-xl bg-pitch-900 border border-pitch-800 hover:border-amber-500/40 transition-all text-left ${
+              !pinned && !hovered ? 'flex items-center justify-center py-2' : 'p-2.5'
+            }`}
           >
-            <div className="flex items-center justify-between gap-1 min-w-0">
-              <div className="min-w-0 flex-1">
-                <p className="text-[10px] text-slate-300 font-medium truncate">{userEmail}</p>
-                <span className={`inline-block mt-0.5 px-1.5 py-0.5 rounded-md text-[9px] font-mono font-bold tracking-wider ${
-                  subscriptionTier === 'free'
-                    ? 'bg-pitch-800 text-slate-500 border border-pitch-700'
-                    : 'bg-amber-500/15 text-amber-300 border border-amber-500/30'
-                }`}>
-                  {(subscriptionTier || 'free').toUpperCase()}
-                </span>
+            {(!pinned && !hovered) ? (
+              <div className="flex flex-col items-center gap-1">
+                <div className="w-7 h-7 rounded-full bg-gradient-to-tr from-amber-500 to-amber-300 flex items-center justify-center text-pitch-950 font-bold text-xs">
+                  {userEmail.charAt(0).toUpperCase()}
+                </div>
+                <span className="text-[9px] text-slate-500 font-mono">Profile</span>
               </div>
-              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" className="text-slate-500 flex-shrink-0">
-                <circle cx="12" cy="12" r="3" />
-                <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z" />
-              </svg>
-            </div>
+            ) : (
+              <div className="flex items-center gap-2 min-w-0">
+                <div className="w-7 h-7 rounded-full bg-gradient-to-tr from-amber-500 to-amber-300 flex-shrink-0 flex items-center justify-center text-pitch-950 font-bold text-xs">
+                  {userEmail.charAt(0).toUpperCase()}
+                </div>
+                <div className="min-w-0 flex-1">
+                  <p className="text-[10px] text-slate-300 font-medium truncate">{userEmail}</p>
+                  <span className={`inline-block mt-0.5 px-1.5 py-0.5 rounded-md text-[9px] font-mono font-bold tracking-wider ${
+                    subscriptionTier === 'free'
+                      ? 'bg-pitch-800 text-slate-500 border border-pitch-700'
+                      : 'bg-amber-500/15 text-amber-300 border border-amber-500/30'
+                  }`}>
+                    {(subscriptionTier || 'free').toUpperCase()}
+                  </span>
+                </div>
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" className="text-slate-500 flex-shrink-0">
+                  <circle cx="12" cy="12" r="3" />
+                  <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z" />
+                </svg>
+              </div>
+            )}
           </button>
         )}
 

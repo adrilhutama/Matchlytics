@@ -1020,6 +1020,17 @@ function AppInner() {
                 </span>
                 <button
                   type="button"
+                  onClick={() => { setActiveWorkspace('profile'); window.scrollTo({ top: 0, behavior: 'smooth' }) }}
+                  title="User Profile & Settings"
+                  className="min-h-[32px] min-w-[32px] rounded-lg flex items-center justify-center bg-pitch-800 hover:bg-amber-500/20 hover:border-amber-500/50 border border-pitch-700 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500"
+                >
+                  <span className="text-xs font-bold text-slate-300 hover:text-amber-400 w-5 h-5 rounded-full bg-gradient-to-tr from-amber-500/30 to-amber-300/10 flex items-center justify-center">
+                    {user.email ? user.email.charAt(0).toUpperCase() : 'U'}
+                  </span>
+                  <span className="sr-only">Open account settings</span>
+                </button>
+                <button
+                  type="button"
                   onClick={signOut}
                   title="Sign out of this device"
                   className="min-h-[32px] min-w-[32px] rounded-lg text-slate-500 hover:text-rose-400 hover:bg-pitch-900 transition-colors flex items-center justify-center focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500"
