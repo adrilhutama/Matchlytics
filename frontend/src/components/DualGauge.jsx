@@ -1,12 +1,21 @@
 // ---- DualGauge.jsx ----
 // Dual-color progress bars for Over/Under 2.5 and BTTS (Yes/No)
 // High contrast, clear labels, accessible progress bars.
+// If probBtts is missing, derives BTTS probability from home/away xG lambdas via Poisson.
 
-export default function DualGauge({ probOver25, probBtts }) {
+export default function DualGauge({ probOver25, probBtts, lambdaHome, lambdaAway }) {
   const over = probOver25 != null ? Math.max(0, Math.min(100, Number(probOver25))) : null
   const under = over != null ? Math.round((100 - over) * 10) / 10 : null
 
-  const bttsYes = probBtts != null ? Math.max(0, Math.min(100, Number(probBtts))) : null
+  // Derive BTTS probability from Poisson lambdas if pre-computed value is missing
+  let bttsYes = probBtts != null ? Math.max(0, Math.min(100, Number(probBtts))) : null
+  if (bttsYes == null && lambdaHome != null && lambdaAway != null) {
+    const lH = Math.max(0.6, Math.min(3.2, Number(lambdaHome)))
+    const lA = Math.max(0.6, Math.min(3.2, Number(lambdaAway)))
+    const pHomeScores = 1 - Math.exp(-lH)
+    const pAwayScores = 1 - Math.exp(-lA)
+    bttsYes = Math.round(pHomeScores * pAwayScores * 1000) / 10
+  }
   const bttsNo = bttsYes != null ? Math.round((100 - bttsYes) * 10) / 10 : null
 
   return (

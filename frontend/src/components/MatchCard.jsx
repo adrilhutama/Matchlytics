@@ -82,7 +82,7 @@ export default function MatchCard({
     league_name,    league_logo,
     prob_home, prob_draw, prob_away,
     predicted_score,
-    prob_over_25,  prob_btts,
+    prob_over_25,  prob_btts_yes,
     value_pick, ev_percentage,
   } = fixture
 
@@ -526,9 +526,9 @@ export default function MatchCard({
         {isExpanded && (
           <div className="pt-2 border-t border-pitch-800/80 space-y-3 animate-fade-in">
             {/* Dual Gauge O/U 2.5 and BTTS */}
-            {(prob_over_25 != null || prob_btts != null) && (
+            {(prob_over_25 != null || prob_btts_yes != null || lambda_home != null) && (
               <div>
-                <DualGauge probOver25={prob_over_25} probBtts={prob_btts} />
+                <DualGauge probOver25={prob_over_25} probBtts={prob_btts_yes} lambdaHome={lambda_home} lambdaAway={lambda_away} />
               </div>
             )}
 
