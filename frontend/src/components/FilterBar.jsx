@@ -268,8 +268,8 @@ export default function FilterBar({
         </button>
       </div>
 
-      {/* ---- Row 4: League Selector & Watchlist Tab (Desktop lg+ only) ---- */}
-      <div className="hidden lg:flex overflow-x-auto no-scrollbar items-center gap-1.5 py-1 touch-pan-x" role="navigation" aria-label="Filter by league or watchlist">
+      {/* ---- Row 4: League Selector & Watchlist Tab ---- */}
+      <div className="flex overflow-x-auto no-scrollbar items-center gap-1.5 py-1 touch-pan-x" role="navigation" aria-label="Filter by league or watchlist">
         {/* Watchlist Tab */}
         <button
           type="button"

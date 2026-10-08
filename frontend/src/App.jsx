@@ -64,14 +64,23 @@ const getInitialView = () => {
 }
 
 // ---- League metadata ------------------------------------------
+// All 12 Free Tier competitions from football-data.org.
+// `id` is the football-data.org integer ID (used for display); `code` is the
+// 2-4 letter competition code stored in fixtures.competition_code.
 export const LEAGUES = [
-  { id: 'all', label: 'All Leagues' },
-  { id: 2021,  label: 'Premier League' },
-  { id: 2014,  label: 'La Liga' },
-  { id: 2019,  label: 'Serie A' },
-  { id: 2002,  label: 'Bundesliga' },
-  { id: 2015,  label: 'Ligue 1' },
-  { id: 2001,  label: 'Champions League' },
+  { id: 'all',      label: 'All Leagues', code: 'all' },
+  { id: 2021,       label: 'Premier League', code: 'PL' },
+  { id: 2014,       label: 'La Liga',        code: 'PD' },
+  { id: 2019,       label: 'Serie A',        code: 'SA' },
+  { id: 2002,       label: 'Bundesliga',     code: 'BL1' },
+  { id: 2015,       label: 'Ligue 1',        code: 'FL1' },
+  { id: 2001,       label: 'Champions League', code: 'CL' },
+  { id: 2003,       label: 'Eredivisie',     code: 'DED' },
+  { id: 2017,       label: 'Liga Portugal',  code: 'PPL' },
+  { id: 2016,       label: 'Championship',   code: 'ELC' },
+  { id: 2013,       label: 'Brasileirao',    code: 'BSA' },
+  { id: 2000,       label: 'World Cup',      code: 'WC' },
+  { id: 2018,       label: 'Euro',           code: 'EC' },
 ]
 
 // Single window: now - 2h to now + 30 days
@@ -640,7 +649,8 @@ function AppInner() {
     if (showWatchlistOnly) {
       result = result.filter((f) => f?.id && watchlist.includes(f.id))
     } else if (activeLeague !== 'all') {
-      result = result.filter((f) => f?.league_id === activeLeague)
+      const code = LEAGUES.find((l) => l.id === activeLeague)?.code
+      result = result.filter((f) => f?.competition_code === code)
     }
 
     // Market category and +EV edge filtering
@@ -701,6 +711,12 @@ function AppInner() {
     setRangeTouched(true)
     setSearchQuery('')
     setSortOption('kickoff_asc')
+  }, [setDateRange, canAccessMonthly, canAccessWeekly])
+
+  const handleViewAllFixtures = useCallback(() => {
+    setDateRange(canAccessMonthly ? 'all' : canAccessWeekly ? 'week' : 'today')
+    setRangeTouched(true)
+    setActiveLeague('all')
   }, [setDateRange, canAccessMonthly, canAccessWeekly])
 
   const currentLeagueLabel = LEAGUES.find((l) => l.id === activeLeague)?.label
@@ -991,7 +1007,7 @@ function AppInner() {
           activeWorkspace={activeWorkspace}
           onWorkspaceChange={handleSelectWorkspace}
           onSelectWorkspace={handleSelectWorkspace}
-          activeFixtureCount={displayedFixtures.length}
+          activeFixtureCount={fixtures.length}
           valueCount={valueCount}
           valueBetCount={valueCount}
           portfolioCount={portfolioPositions.length}
@@ -1077,6 +1093,7 @@ function AppInner() {
                   searchQuery={searchQuery}
                   isWatchlist={showWatchlistOnly}
                   onClearFilters={handleClearFilters}
+                  onViewAllFixtures={handleViewAllFixtures}
                 />
               ) : (
                 <TerminalScanner

@@ -1,17 +1,9 @@
 // ---- Sidebar.jsx ----
 // Desktop navigation rail (lg+): branding, feed filters, league list,
 // and system status footer. Hidden on mobile where MobileNav takes over.
+// Zero em dash characters used (R-02 compliance).
 
 import { useEffect } from 'react'
-
-const LEAGUES = [
-  { id: 2021, label: 'Premier League' },
-  { id: 2014, label: 'La Liga' },
-  { id: 2019, label: 'Serie A' },
-  { id: 2002, label: 'Bundesliga' },
-  { id: 2015, label: 'Ligue 1' },
-  { id: 2001, label: 'Champions League' },
-]
 
 export default function Sidebar({
   activeFeed,            // 'all' | 'value' | 'watchlist'

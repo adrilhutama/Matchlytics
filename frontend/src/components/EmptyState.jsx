@@ -9,6 +9,7 @@ export default function EmptyState({
   searchQuery,
   isWatchlist,
   onClearFilters,
+  onViewAllFixtures,
 }) {
   let title = 'No fixtures found'
   let hint = 'Try adjusting your search criteria, league filter, or time window.'
@@ -55,14 +56,25 @@ export default function EmptyState({
       <h2 className="text-slate-200 font-semibold text-base sm:text-lg mb-2">{title}</h2>
       <p className="text-slate-400 text-sm max-w-md text-balance leading-relaxed mb-6">{hint}</p>
 
-      <button
-        type="button"
-        id="clear-filters-btn"
-        onClick={onClearFilters}
-        className="px-4 py-2.5 min-h-[44px] text-xs font-semibold rounded-xl bg-pitch-800 hover:bg-amber-500 hover:text-pitch-950 text-slate-200 border border-pitch-700 transition-all duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500"
-      >
-        Reset all filters
-      </button>
+      <div className="flex flex-wrap items-center justify-center gap-3">
+        <button
+          type="button"
+          id="clear-filters-btn"
+          onClick={onClearFilters}
+          className="px-4 py-2.5 min-h-[44px] text-xs font-semibold rounded-xl bg-pitch-800 hover:bg-amber-500 hover:text-pitch-950 text-slate-200 border border-pitch-700 transition-all duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500"
+        >
+          Reset all filters
+        </button>
+        {onViewAllFixtures && (
+          <button
+            type="button"
+            onClick={onViewAllFixtures}
+            className="px-4 py-2.5 min-h-[44px] text-xs font-semibold rounded-xl bg-emerald-500/15 hover:bg-emerald-500/25 text-emerald-300 border border-emerald-500/40 transition-all duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500"
+          >
+            View All {leagueLabel ? `${leagueLabel} Fixtures (30 Days)` : 'Fixtures'}
+          </button>
+        )}
+      </div>
     </div>
   )
 }
