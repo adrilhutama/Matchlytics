@@ -18,7 +18,7 @@ export default function FormGuide({ form, size = 'md' }) {
 
   const sizeClasses = size === 'sm'
     ? 'w-4 h-4 text-[9px]'
-    : 'w-4.5 h-4.5 text-[10px]'
+    : 'w-4 h-4 text-[10px]'
 
   return (
     <div

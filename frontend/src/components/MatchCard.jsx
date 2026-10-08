@@ -311,7 +311,7 @@ export default function MatchCard({
               type="button"
               onClick={() => onToggleWatchlist(fixture.id)}
               aria-label={isPinned ? `Unpin ${home_team_name} vs ${away_team_name} from watchlist` : `Pin ${home_team_name} vs ${away_team_name} to watchlist`}
-              className={`w-9 h-9 flex items-center justify-center rounded-xl transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500 active:scale-95 touch-manipulation ${
+              className={`min-w-[44px] min-h-[44px] w-11 h-11 flex items-center justify-center rounded-xl transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500 active:scale-95 touch-manipulation ${
                 isPinned
                   ? 'bg-amber-500/20 text-amber-400 border border-amber-500/40'
                   : 'bg-pitch-900/80 text-slate-500 hover:text-amber-400 border border-pitch-700 hover:border-amber-500/30'

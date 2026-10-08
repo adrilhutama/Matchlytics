@@ -143,7 +143,7 @@ export default function NotificationPanel({ onClose }) {
             <button
               type="button"
               onClick={onClose}
-              className="w-8 h-8 rounded-lg bg-pitch-950 hover:bg-pitch-800 border border-pitch-700 text-slate-400 hover:text-slate-200 flex items-center justify-center transition-colors"
+              className="w-11 h-11 rounded-lg bg-pitch-950 hover:bg-pitch-800 border border-pitch-700 text-slate-400 hover:text-slate-200 flex items-center justify-center transition-colors"
               aria-label="Close notifications"
             >
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
@@ -209,7 +209,7 @@ export default function NotificationPanel({ onClose }) {
           <button
             type="button"
             onClick={() => { fetchNotifications(); onClose() }}
-            className="w-full text-center text-[11px] text-slate-500 hover:text-slate-300 font-mono transition-colors py-1"
+            className="w-full text-center text-[11px] text-slate-500 hover:text-slate-300 font-mono transition-colors min-h-[44px] flex items-center justify-center"
           >
             Refresh
           </button>

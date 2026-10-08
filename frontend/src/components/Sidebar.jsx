@@ -103,12 +103,12 @@ export default function Sidebar({
               aria-current={activeWorkspace === 'quant_lab' ? 'page' : undefined}
               className={`w-full min-h-[38px] px-3 rounded-xl text-xs font-semibold transition-all flex items-center justify-between gap-2 ${
                 activeWorkspace === 'quant_lab'
-                  ? 'bg-indigo-500/15 text-indigo-400 border border-indigo-500/30'
+                  ? 'bg-sky-500/15 text-sky-400 border border-sky-500/30'
                   : 'text-slate-300 hover:bg-pitch-900 hover:text-slate-100'
               }`}
             >
               <span className="flex items-center gap-2">
-                <span className="text-sm font-mono text-indigo-400">⚅</span>
+                <span className="text-sm font-mono text-sky-400">⚅</span>
                 Quant Lab
               </span>
               {isTierLocked && (
@@ -125,12 +125,12 @@ export default function Sidebar({
               aria-current={activeWorkspace === 'portfolio' ? 'page' : undefined}
               className={`w-full min-h-[38px] px-3 rounded-xl text-xs font-semibold transition-all flex items-center justify-between gap-2 ${
                 activeWorkspace === 'portfolio'
-                  ? 'bg-emerald-500/15 text-emerald-400 border border-emerald-500/30'
+                  ? 'bg-amber-500/15 text-amber-400 border border-amber-500/30'
                   : 'text-slate-300 hover:bg-pitch-900 hover:text-slate-100'
               }`}
             >
               <span className="flex items-center gap-2">
-                <span className="text-sm font-mono text-emerald-400">⊞</span>
+                <span className="text-sm font-mono text-amber-400">⊞</span>
                 Bankroll Tracker
               </span>
             </button>
@@ -142,12 +142,12 @@ export default function Sidebar({
               aria-current={activeWorkspace === 'ledger' ? 'page' : undefined}
               className={`w-full min-h-[38px] px-3 rounded-xl text-xs font-semibold transition-all flex items-center justify-between gap-2 ${
                 activeWorkspace === 'ledger'
-                  ? 'bg-sky-500/15 text-sky-400 border border-sky-500/30'
+                  ? 'bg-emerald-500/15 text-emerald-400 border border-emerald-500/30'
                   : 'text-slate-300 hover:bg-pitch-900 hover:text-slate-100'
               }`}
             >
               <span className="flex items-center gap-2">
-                <span className="text-sm font-mono text-sky-400">📈</span>
+                <span className="text-sm font-mono text-emerald-400">📈</span>
                 Model Ledger
               </span>
             </button>

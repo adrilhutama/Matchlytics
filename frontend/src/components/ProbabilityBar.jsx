@@ -3,9 +3,9 @@
 // with accessible percentage labels.
 
 const COLORS = {
-  home: { bar: 'bg-sky-500',     text: 'text-sky-400'     },
-  draw: { bar: 'bg-slate-400',   text: 'text-slate-400'   },
-  away: { bar: 'bg-rose-500',    text: 'text-rose-400'    },
+  home: { bar: 'bg-gradient-to-r from-sky-500 to-sky-400', text: 'text-sky-400' },
+  draw: { bar: 'bg-gradient-to-r from-slate-500 to-slate-400', text: 'text-slate-400' },
+  away: { bar: 'bg-gradient-to-r from-rose-500 to-rose-400', text: 'text-rose-400' },
 }
 
 function Bar({ label, prob, color, side }) {

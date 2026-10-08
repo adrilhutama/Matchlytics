@@ -106,7 +106,7 @@ export function TotalsMarketView({
                         leagueName,
                         matchDate,
                       })}
-                      className={`mt-2 py-1 px-2 min-h-[38px] rounded-lg text-xs font-bold transition-all active:scale-95 touch-manipulation ${
+                      className={`mt-2 py-1 px-2 min-h-[44px] rounded-lg text-xs font-bold transition-all active:scale-95 touch-manipulation ${
                         isOverInSlip
                           ? 'bg-amber-500 text-pitch-950 font-extrabold shadow'
                           : 'bg-pitch-800 hover:bg-pitch-700 text-slate-200 hover:text-amber-400'
@@ -159,7 +159,7 @@ export function TotalsMarketView({
                         leagueName,
                         matchDate,
                       })}
-                      className={`mt-2 py-1 px-2 min-h-[38px] rounded-lg text-xs font-bold transition-all active:scale-95 touch-manipulation ${
+                      className={`mt-2 py-1 px-2 min-h-[44px] rounded-lg text-xs font-bold transition-all active:scale-95 touch-manipulation ${
                         isUnderInSlip
                           ? 'bg-amber-500 text-pitch-950 font-extrabold shadow'
                           : 'bg-pitch-800 hover:bg-pitch-700 text-slate-200 hover:text-amber-400'
@@ -286,7 +286,7 @@ export function SpreadsMarketView({
                         leagueName,
                         matchDate,
                       })}
-                      className={`mt-2 py-1 px-2 min-h-[38px] rounded-lg text-xs font-bold transition-all active:scale-95 touch-manipulation ${
+                      className={`mt-2 py-1 px-2 min-h-[44px] rounded-lg text-xs font-bold transition-all active:scale-95 touch-manipulation ${
                         isHomeInSlip
                           ? 'bg-amber-500 text-pitch-950 font-extrabold shadow'
                           : 'bg-pitch-800 hover:bg-pitch-700 text-slate-200 hover:text-amber-400'
@@ -341,7 +341,7 @@ export function SpreadsMarketView({
                         leagueName,
                         matchDate,
                       })}
-                      className={`mt-2 py-1 px-2 min-h-[38px] rounded-lg text-xs font-bold transition-all active:scale-95 touch-manipulation ${
+                      className={`mt-2 py-1 px-2 min-h-[44px] rounded-lg text-xs font-bold transition-all active:scale-95 touch-manipulation ${
                         isAwayInSlip
                           ? 'bg-amber-500 text-pitch-950 font-extrabold shadow'
                           : 'bg-pitch-800 hover:bg-pitch-700 text-slate-200 hover:text-amber-400'

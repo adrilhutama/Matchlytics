@@ -639,37 +639,6 @@ function ParlayPanel({ evPicks }) {
 // Track Record Panel
 // ------------------------------------------------------------------
 
-function EquitySpark({ equity }) {
-  if (!equity || equity.length < 2) return null
-  const min = Math.min(...equity)
-  const max = Math.max(...equity)
-  const range = max - min || 1
-  const width = 100
-  const height = 28
-
-  const points = equity
-    .map((val, idx) => {
-      const x = (idx / (equity.length - 1)) * width
-      const y = height - ((val - min) / range) * (height - 4) - 2
-      return `${x.toFixed(1)},${y.toFixed(1)}`
-    })
-    .join(' ')
-
-  return (
-    <svg viewBox="0 0 100 28" className="w-full h-7 max-w-[90px] overflow-visible" preserveAspectRatio="none" aria-hidden="true">
-      <polyline
-        fill="none"
-        stroke="#10b981"
-        strokeWidth="2.5"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-        vectorEffect="non-scaling-stroke"
-        points={points}
-      />
-    </svg>
-  )
-}
-
 function TrackRecordPanel({ settledFixtures, onOpenBacktest }) {
   const settled = settledFixtures || []
   const settledCount = settled.length
