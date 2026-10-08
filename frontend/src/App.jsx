@@ -951,13 +951,10 @@ function AppInner() {
 
   return (
     <div className="w-full min-h-screen bg-pitch-900 text-slate-100 flex overflow-x-hidden">
-      {/* Desktop Left Sidebar */}
+      {/* Desktop Left Sidebar (collapsible mini-rail) */}
       <Sidebar
         activeFeed={activeFeed}
         onFeedSelect={handleFeedSelect}
-        leagues={LEAGUES.filter((l) => l.id !== 'all')}
-        activeLeague={activeLeague}
-        onLeagueChange={handleLeagueChangeFromSidebar}
         valueCount={valueCount}
         watchlistCount={watchlist.length}
         lastUpdated={lastUpdated}
@@ -973,7 +970,7 @@ function AppInner() {
       />
 
       {/* Main Content Area */}
-      <div className="flex-1 lg:pl-64 flex flex-col min-w-0 pb-20 lg:pb-8">
+      <div className="flex-1 lg:pl-16 flex flex-col min-w-0 pb-20 lg:pb-8">
         {/* Mobile top brand bar */}
         <div className="lg:hidden sticky top-0 z-20 bg-pitch-950/90 backdrop-blur-md border-b border-pitch-800 px-4 py-3 flex items-center gap-2.5 pt-safe" style={{ paddingTop: 'max(0.75rem, env(safe-area-inset-top, 0px))' }}>
           <span

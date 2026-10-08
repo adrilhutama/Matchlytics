@@ -1,14 +1,65 @@
 // ---- Sidebar.jsx ----
-// Desktop navigation rail (lg+): branding, feed filters, league list,
-// and system status footer. Hidden on mobile where MobileNav takes over.
-// Zero em dash characters used (R-02 compliance).
+// Collapsible mini-rail sidebar (lg+): icons-only by default, expands on hover.
+// Workspaces and feeds only; leagues moved to top filter bar.
+// Zero em dash characters (R-02 compliance).
 
-import { useEffect } from 'react'
+import { useState } from 'react'
+
+const WORKSPACES = [
+  { id: 'terminal', label: 'Scanner', icon: (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <rect x="3" y="3" width="7" height="7" rx="1" />
+      <rect x="14" y="3" width="7" height="7" rx="1" />
+      <rect x="14" y="14" width="7" height="7" rx="1" />
+      <rect x="3" y="14" width="7" height="7" rx="1" />
+    </svg>
+  )},
+  { id: 'quant_lab', label: 'Quant Lab', icon: (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <circle cx="12" cy="12" r="10" />
+      <path d="M12 2a14.5 14.5 0 0 0 0 20 14.5 14.5 0 0 0 0-20" />
+      <path d="M2 12h20" />
+    </svg>
+  )},
+  { id: 'portfolio', label: 'Portfolio', icon: (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <rect x="2" y="7" width="20" height="14" rx="2" ry="2" />
+      <path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16" />
+    </svg>
+  )},
+  { id: 'ledger', label: 'Ledger', icon: (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <polyline points="22 12 18 12 15 21 9 3 6 12 2 12" />
+    </svg>
+  )},
+]
+
+const FEEDS = [
+  { id: 'all', label: 'All', icon: (
+    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <rect x="3" y="3" width="7" height="7" rx="1" />
+      <rect x="14" y="3" width="7" height="7" rx="1" />
+      <rect x="14" y="14" width="7" height="7" rx="1" />
+      <rect x="3" y="14" width="7" height="7" rx="1" />
+    </svg>
+  )},
+  { id: 'value', label: '+EV', icon: (
+    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <circle cx="12" cy="12" r="10" />
+      <circle cx="12" cy="12" r="6" />
+      <circle cx="12" cy="12" r="2" />
+    </svg>
+  )},
+  { id: 'watchlist', label: 'Stars', icon: (
+    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2" />
+    </svg>
+  )},
+]
 
 export default function Sidebar({
-  activeFeed,            // 'all' | 'value' | 'watchlist'
+  activeFeed,
   onFeedSelect,
-  leagues,
   activeLeague,
   onLeagueChange,
   valueCount,
@@ -16,21 +67,23 @@ export default function Sidebar({
   lastUpdated,
   deferredInstall,
   onOpenBacktest,
-  onEcosystemVisit,      // opens the imortifex.me landing surface
-  userEmail,             // signed-in account (app view only)
-  subscriptionTier,     // 'free' | 'pro' | 'annual' | 'institutional'
+  onEcosystemVisit,
+  userEmail,
+  subscriptionTier,
   onSignOut,
   activeWorkspace = 'terminal',
   onSelectWorkspace,
-  onOpenAdmin,          // optional: called when admin link is clicked
+  onOpenAdmin,
 }) {
+  const [pinned, setPinned] = useState(false)
+  const [hovered, setHovered] = useState(false)
+
   const timeStr = lastUpdated
     ? lastUpdated.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' })
     : null
 
   const isTierLocked = !subscriptionTier || subscriptionTier === 'free' || subscriptionTier === 'inactive'
 
-  // Check if current user is an admin
   const isAdmin = (() => {
     const raw = import.meta.env.VITE_ADMIN_EMAILS || ''
     const emails = raw.split(',').map((e) => e.trim().toLowerCase()).filter(Boolean)
@@ -40,340 +93,224 @@ export default function Sidebar({
   const handleInstall = async () => {
     if (!deferredInstall) return
     deferredInstall.prompt()
-    const { outcome } = await deferredInstall.userChoice
-    console.log(`Install prompt outcome: ${outcome}`)
+    await deferredInstall.userChoice
   }
+
+  const widthClass = pinned || hovered ? 'w-56' : 'w-16'
 
   return (
     <aside
-      className="hidden lg:flex lg:flex-col w-64 fixed inset-y-0 left-0 bg-pitch-950 border-r border-pitch-800 z-30 p-4 select-none"
+      className={`hidden lg:flex flex-col bg-pitch-950 border-r border-pitch-800 z-30 transition-all duration-200 select-none ${widthClass}`}
+      onMouseEnter={() => !pinned && setHovered(true)}
+      onMouseLeave={() => !pinned && setHovered(false)}
       aria-label="Main navigation"
     >
-      {/* ---- Branding Header ---- */}
-      <div className="flex items-center gap-2.5 pb-4 mb-4 border-b border-pitch-800">
+      {/* Brand */}
+      <div className="flex items-center gap-2.5 px-3 py-4 border-b border-pitch-800">
         <span
-          className="inline-block w-8 h-8 rounded-md bg-amber-500 flex-shrink-0"
+          className="inline-block w-7 h-7 rounded-md bg-amber-500 flex-shrink-0"
           aria-hidden="true"
           style={{ clipPath: 'polygon(50% 0%, 100% 50%, 50% 100%, 0% 50%)' }}
         />
-        <div className="min-w-0">
-          <h1 className="text-base font-bold text-slate-100 tracking-tight leading-none">
-            Matchlytics
-            <span className="ml-1.5 text-[10px] font-mono font-normal text-slate-500">by imortifex</span>
-          </h1>
-          <p className="text-[11px] text-slate-500 mt-1">Pre-Match Quant Analytics</p>
-        </div>
+        {(pinned || hovered) && (
+          <div className="min-w-0 animate-fade-in">
+            <h1 className="text-sm font-bold text-slate-100 tracking-tight leading-none">
+              Matchlytics
+              <span className="ml-1 text-[9px] font-mono font-normal text-slate-500">by imortifex</span>
+            </h1>
+            <p className="text-[10px] text-slate-500 mt-0.5">Pre-Match Quant</p>
+          </div>
+        )}
       </div>
 
-      {/* ---- Workspaces Navigation ---- */}
-      <nav aria-label="Workspaces" className="mb-4">
-        <p className="text-[11px] uppercase tracking-wider text-slate-500 font-semibold px-2 mb-1.5">
-          Workspaces
-        </p>
-        <ul className="space-y-1">
-          <li>
+      {/* Workspace Nav */}
+      <nav aria-label="Workspaces" className="px-2 py-3 space-y-1">
+        {!pinned && !hovered && (
+          <p className="text-[9px] uppercase tracking-wider text-slate-600 font-semibold text-center mb-2">Work</p>
+        )}
+        {WORKSPACES.map((ws) => {
+          const active = activeWorkspace === ws.id
+          return (
             <button
+              key={ws.id}
               type="button"
-              onClick={() => onSelectWorkspace && onSelectWorkspace('terminal')}
-              aria-current={activeWorkspace === 'terminal' ? 'page' : undefined}
-              className={`w-full min-h-[38px] px-3 rounded-xl text-xs font-semibold transition-all flex items-center justify-between gap-2 ${
-                activeWorkspace === 'terminal'
-                  ? 'bg-amber-500/15 text-amber-400 border border-amber-500/30'
-                  : 'text-slate-300 hover:bg-pitch-900 hover:text-slate-100'
-              }`}
+              onClick={() => onSelectWorkspace && onSelectWorkspace(ws.id)}
+              aria-current={active ? 'page' : undefined}
+              title={!pinned && !hovered ? ws.label : undefined}
+              className={`w-full min-h-[36px] rounded-xl transition-all flex items-center gap-3 ${
+                active
+                  ? 'bg-amber-500/15 text-amber-400'
+                  : 'text-slate-400 hover:bg-pitch-900 hover:text-slate-200'
+              } ${!pinned && !hovered ? 'justify-center px-0' : 'px-3'}`}
             >
-              <span className="flex items-center gap-2">
-                <span className="text-sm font-mono text-amber-400">◈</span>
-                Terminal Scanner
-              </span>
-            </button>
-          </li>
-          <li>
-            <button
-              type="button"
-              onClick={() => onSelectWorkspace && onSelectWorkspace('quant_lab')}
-              aria-current={activeWorkspace === 'quant_lab' ? 'page' : undefined}
-              className={`w-full min-h-[38px] px-3 rounded-xl text-xs font-semibold transition-all flex items-center justify-between gap-2 ${
-                activeWorkspace === 'quant_lab'
-                  ? 'bg-sky-500/15 text-sky-400 border border-sky-500/30'
-                  : 'text-slate-300 hover:bg-pitch-900 hover:text-slate-100'
-              }`}
-            >
-              <span className="flex items-center gap-2">
-                <span className="text-sm font-mono text-sky-400">⚅</span>
-                Quant Lab
-              </span>
-              {isTierLocked && (
-                <span className="text-[9px] font-mono uppercase px-1.5 py-0.5 rounded bg-pitch-900 text-indigo-300 border border-indigo-500/20">
-                  PRO
-                </span>
+              <span className="flex-shrink-0">{ws.icon}</span>
+              {(pinned || hovered) && (
+                <span className="text-xs font-semibold truncate animate-fade-in">{ws.label}</span>
               )}
             </button>
-          </li>
-          <li>
-            <button
-              type="button"
-              onClick={() => onSelectWorkspace && onSelectWorkspace('portfolio')}
-              aria-current={activeWorkspace === 'portfolio' ? 'page' : undefined}
-              className={`w-full min-h-[38px] px-3 rounded-xl text-xs font-semibold transition-all flex items-center justify-between gap-2 ${
-                activeWorkspace === 'portfolio'
-                  ? 'bg-amber-500/15 text-amber-400 border border-amber-500/30'
-                  : 'text-slate-300 hover:bg-pitch-900 hover:text-slate-100'
-              }`}
-            >
-              <span className="flex items-center gap-2">
-                <span className="text-sm font-mono text-amber-400">⊞</span>
-                Bankroll Tracker
-              </span>
-            </button>
-          </li>
-          <li>
-            <button
-              type="button"
-              onClick={() => onSelectWorkspace && onSelectWorkspace('ledger')}
-              aria-current={activeWorkspace === 'ledger' ? 'page' : undefined}
-              className={`w-full min-h-[38px] px-3 rounded-xl text-xs font-semibold transition-all flex items-center justify-between gap-2 ${
-                activeWorkspace === 'ledger'
-                  ? 'bg-emerald-500/15 text-emerald-400 border border-emerald-500/30'
-                  : 'text-slate-300 hover:bg-pitch-900 hover:text-slate-100'
-              }`}
-            >
-              <span className="flex items-center gap-2">
-                <span className="text-sm font-mono text-emerald-400">📈</span>
-                Model Ledger
-              </span>
-            </button>
-          </li>
-        </ul>
+          )
+        })}
       </nav>
 
-      {/* ---- Feeds Section ---- */}
-      <nav aria-label="Feeds">
-        <p className="text-[11px] uppercase tracking-wider text-slate-500 font-semibold px-2 mb-1.5">
-          Feeds
-        </p>
-        <ul className="space-y-1 mb-4">
-          <li>
+      {/* Feed Nav */}
+      <nav aria-label="Feeds" className="px-2 py-2 space-y-1">
+        {!pinned && !hovered && (
+          <p className="text-[9px] uppercase tracking-wider text-slate-600 font-semibold text-center mb-1">Feed</p>
+        )}
+        {FEEDS.map((feed) => {
+          const active = activeFeed === feed.id
+          return (
             <button
+              key={feed.id}
               type="button"
-              onClick={() => onFeedSelect('all')}
-              aria-current={activeFeed === 'all' ? 'page' : undefined}
-              className={`w-full min-h-[44px] px-3 rounded-xl text-sm font-medium transition-all flex items-center justify-between gap-2 ${
-                activeFeed === 'all'
+              onClick={() => onFeedSelect && onFeedSelect(feed.id)}
+              aria-current={active ? 'page' : undefined}
+              title={!pinned && !hovered ? feed.label : undefined}
+              className={`w-full min-h-[36px] rounded-xl transition-all flex items-center gap-3 ${
+                active
                   ? 'bg-pitch-800 text-amber-400'
-                  : 'text-slate-300 hover:bg-pitch-900 hover:text-slate-100'
-              }`}
+                  : 'text-slate-400 hover:bg-pitch-900 hover:text-slate-200'
+              } ${!pinned && !hovered ? 'justify-center px-0' : 'px-3'}`}
             >
-              <span className="flex items-center gap-2.5">
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                  <rect x="3" y="3" width="7" height="7" rx="1" />
-                  <rect x="14" y="3" width="7" height="7" rx="1" />
-                  <rect x="14" y="14" width="7" height="7" rx="1" />
-                  <rect x="3" y="14" width="7" height="7" rx="1" />
-                </svg>
-                All Matches
-              </span>
-            </button>
-          </li>
-          <li>
-            <button
-              type="button"
-              onClick={() => onFeedSelect('value')}
-              aria-current={activeFeed === 'value' ? 'page' : undefined}
-              className={`w-full min-h-[44px] px-3 rounded-xl text-sm font-medium transition-all flex items-center justify-between gap-2 ${
-                activeFeed === 'value'
-                  ? 'bg-pitch-800 text-amber-400'
-                  : 'text-slate-300 hover:bg-pitch-900 hover:text-slate-100'
-              }`}
-            >
-              <span className="flex items-center gap-2.5">
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                  <circle cx="12" cy="12" r="10" />
-                  <circle cx="12" cy="12" r="6" />
-                  <circle cx="12" cy="12" r="2" />
-                </svg>
-                +EV Opportunities
-              </span>
-              {valueCount > 0 && (
-                <span className="px-1.5 py-0.5 rounded-full text-[10px] font-bold bg-amber-500/20 text-amber-300 border border-amber-500/30 tabular-nums">
+              <span className="flex-shrink-0">{feed.icon}</span>
+              {(pinned || hovered) && (
+                <span className="text-xs font-medium truncate flex-1 text-left">{feed.label}</span>
+              )}
+              {feed.id === 'value' && valueCount > 0 && (
+                <span className={`px-1.5 py-0.5 rounded-full text-[10px] font-bold bg-amber-500/20 text-amber-300 border border-amber-500/30 tabular-nums ${!pinned && !hovered ? 'ml-0' : 'ml-auto'}`}>
                   {valueCount}
                 </span>
               )}
-            </button>
-          </li>
-          <li>
-            <button
-              type="button"
-              onClick={() => onFeedSelect('watchlist')}
-              aria-current={activeFeed === 'watchlist' ? 'page' : undefined}
-              className={`w-full min-h-[44px] px-3 rounded-xl text-sm font-medium transition-all flex items-center justify-between gap-2 ${
-                activeFeed === 'watchlist'
-                  ? 'bg-pitch-800 text-amber-400'
-                  : 'text-slate-300 hover:bg-pitch-900 hover:text-slate-100'
-              }`}
-            >
-              <span className="flex items-center gap-2.5">
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                  <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2" />
-                </svg>
-                Watchlist
-              </span>
-              {watchlistCount > 0 && (
-                <span className="px-1.5 py-0.5 rounded-full text-[10px] font-bold bg-amber-500/20 text-amber-300 border border-amber-500/30 tabular-nums">
+              {feed.id === 'watchlist' && watchlistCount > 0 && (
+                <span className={`px-1.5 py-0.5 rounded-full text-[10px] font-bold bg-amber-500/20 text-amber-300 border border-amber-500/30 tabular-nums ${!pinned && !hovered ? 'ml-0' : 'ml-auto'}`}>
                   {watchlistCount}
                 </span>
               )}
             </button>
-          </li>
-        </ul>
+          )
+        })}
       </nav>
 
-      {/* ---- Track Record / Backtest ---- */}
-      <button
-        type="button"
-        onClick={onOpenBacktest}
-        className="w-full min-h-[44px] px-3 rounded-xl text-sm font-medium transition-all flex items-center gap-2.5 mb-4 text-slate-300 hover:bg-pitch-900 hover:text-slate-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500"
-      >
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-          <polyline points="22 12 18 12 15 21 9 3 6 12 2 12" />
-        </svg>
-        Track Record &amp; Backtest
-      </button>
+      {/* Backtest button */}
+      <div className="px-2 py-2">
+        <button
+          type="button"
+          onClick={onOpenBacktest}
+          title={!pinned && !hovered ? 'Track Record' : undefined}
+          className="w-full min-h-[36px] rounded-xl text-slate-400 hover:bg-pitch-900 hover:text-slate-200 transition-all flex items-center gap-3 px-3"
+        >
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+            <polyline points="22 12 18 12 15 21 9 3 6 12 2 12" />
+          </svg>
+          {(pinned || hovered) && <span className="text-xs font-medium truncate">Track Record</span>}
+        </button>
+      </div>
 
-      {/* ---- Competitions Section ---- */}
-      <nav aria-label="Competitions">
-        <p className="text-[11px] uppercase tracking-wider text-slate-500 font-semibold px-2 mb-1.5">
-          Competitions
-        </p>
-        <ul className="space-y-0.5">
-          <li>
-            <button
-              type="button"
-              onClick={() => onLeagueChange('all')}
-              aria-current={activeLeague === 'all' ? 'true' : undefined}
-              className={`w-full min-h-[40px] px-3 rounded-lg text-xs font-medium transition-all ${
-                activeLeague === 'all'
-                  ? 'bg-pitch-800 text-slate-100'
-                  : 'text-slate-400 hover:bg-pitch-900 hover:text-slate-200'
-              }`}
-            >
-              All Leagues
-            </button>
-          </li>
-          {leagues.map((league) => {
-            const isActive = activeLeague === league.id
-            return (
-              <li key={league.id}>
-                <button
-                  type="button"
-                  onClick={() => onLeagueChange(league.id)}
-                  aria-current={isActive ? 'true' : undefined}
-                  className={`w-full min-h-[40px] px-3 rounded-lg text-xs font-medium transition-all flex items-center justify-between gap-2 ${
-                    isActive
-                      ? 'bg-pitch-800 text-amber-400'
-                      : 'text-slate-400 hover:bg-pitch-900 hover:text-slate-200'
-                  }`}
-                >
-                  <span className="truncate">{league.label}</span>
-                  {isActive && (
-                    <span className="w-1.5 h-1.5 rounded-full bg-amber-400 flex-shrink-0" aria-hidden="true" />
-                  )}
-                </button>
-              </li>
-            )
-          })}
-        </ul>
-      </nav>
+      {/* Pin toggle */}
+      <div className="px-2 py-1">
+        <button
+          type="button"
+          onClick={() => setPinned(!pinned)}
+          title={pinned ? 'Unpin sidebar' : 'Pin sidebar open'}
+          className={`w-full min-h-[32px] rounded-lg text-[10px] font-mono transition-all flex items-center justify-center gap-1.5 ${
+            pinned ? 'bg-amber-500/15 text-amber-400 border border-amber-500/30' : 'text-slate-500 hover:text-slate-300 hover:bg-pitch-900'
+          }`}
+        >
+          <span>{pinned ? '📌' : '📍'}</span>
+          {(pinned || hovered) && <span>{pinned ? 'Unpin' : 'Pin'}</span>}
+        </button>
+      </div>
 
-      {/* ---- Account + System Status Footer ---- */}
-      <div className="mt-auto pt-4 space-y-3">
-        {userEmail && (
-          <div className="rounded-xl bg-pitch-900 border border-pitch-800 p-3">
-            <div className="flex items-center justify-between gap-2 min-w-0">
+      {/* Footer */}
+      <div className="mt-auto px-2 pb-3 space-y-2">
+        {userEmail && (pinned || hovered) && (
+          <div className="rounded-xl bg-pitch-900 border border-pitch-800 p-2.5">
+            <div className="flex items-center justify-between gap-1 min-w-0">
               <div className="min-w-0">
-                <p className="text-[11px] text-slate-300 font-medium truncate">{userEmail}</p>
-                <span
-                  className={`inline-block mt-1 px-1.5 py-0.5 rounded-md text-[9px] font-mono font-bold tracking-wider ${
-                    subscriptionTier === 'free'
-                      ? 'bg-pitch-800 text-slate-500 border border-pitch-700'
-                      : 'bg-amber-500/15 text-amber-300 border border-amber-500/30'
-                  }`}
-                >
+                <p className="text-[10px] text-slate-300 font-medium truncate">{userEmail}</p>
+                <span className={`inline-block mt-0.5 px-1.5 py-0.5 rounded-md text-[9px] font-mono font-bold tracking-wider ${
+                  subscriptionTier === 'free'
+                    ? 'bg-pitch-800 text-slate-500 border border-pitch-700'
+                    : 'bg-amber-500/15 text-amber-300 border border-amber-500/30'
+                }`}>
                   {(subscriptionTier || 'free').toUpperCase()}
                 </span>
               </div>
               <button
                 type="button"
                 onClick={onSignOut}
-                title="Sign out of this device"
-                className="min-h-[32px] min-w-[32px] shrink-0 px-2 rounded-lg text-slate-500 hover:text-rose-400 hover:bg-pitch-800 transition-colors flex items-center justify-center focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500"
+                title="Sign out"
+                className="min-h-[28px] min-w-[28px] shrink-0 px-1.5 rounded-lg text-slate-500 hover:text-rose-400 hover:bg-pitch-800 transition-colors flex items-center justify-center"
               >
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
                   <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
                   <polyline points="16 17 21 12 16 7" />
                   <line x1="21" y1="12" x2="9" y2="12" />
                 </svg>
-                <span className="sr-only">Sign out</span>
               </button>
             </div>
           </div>
         )}
-        <div className="rounded-xl bg-pitch-900 border border-pitch-800 p-3 space-y-2">
-          {isAdmin && onOpenAdmin && (
-            <button
-              type="button"
-              onClick={onOpenAdmin}
-              className="w-full px-3 py-1.5 rounded-lg bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/30 text-amber-400 text-[11px] font-mono transition-colors text-left"
-            >
-              ⚙ Admin Dashboard
-            </button>
-          )}
-          <div className="flex items-center gap-2 text-[11px] font-medium text-emerald-400">
-            <span className="relative flex h-2.5 w-2.5" aria-hidden="true">
-              <span className="absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75 animate-ping" />
-              <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-emerald-500" />
-            </span>
-            Realtime Active
-          </div>
-          {timeStr && (
-            <p className="text-[11px] text-slate-500 tabular-nums">
-              Last sync: {timeStr}
-            </p>
-          )}
-          <a
-            href="https://imortifex.me/"
-            onClick={(e) => {
-              if (typeof window !== 'undefined' && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')) {
-                e.preventDefault()
-                if (onEcosystemVisit) onEcosystemVisit()
-              }
-            }}
-            className="w-full min-h-[36px] flex items-center gap-1.5 px-2 rounded-lg text-[11px] font-mono text-slate-400 hover:text-amber-300 hover:bg-pitch-800 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500 cursor-pointer"
-            title="Open the Matchlytics public landing showcase at imortifex.me"
-          >
-            <span aria-hidden="true">🌐</span>
-            <span className="truncate">imortifex.me · Landing</span>
-          </a>
+
+        {isAdmin && onOpenAdmin && (pinned || hovered) && (
           <button
             type="button"
-            id="sidebar-install-btn"
-            onClick={handleInstall}
-            className={`w-full mt-2 min-h-[44px] px-3 py-2 rounded-xl text-xs font-medium border transition-all flex items-center justify-center gap-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500 ${
-              deferredInstall
-                ? 'bg-pitch-800 hover:bg-pitch-700 text-slate-300 hover:text-slate-100 border-pitch-700 hover:border-pitch-600'
-                : 'bg-transparent border-transparent text-transparent pointer-events-none'
-            }`}
-            style={{ visibility: deferredInstall ? 'visible' : 'hidden' }}
-            aria-label="Install application"
+            onClick={onOpenAdmin}
+            className="w-full px-3 py-1.5 rounded-lg bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/30 text-amber-400 text-[11px] font-mono transition-colors text-left"
           >
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-              <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
-              <polyline points="17 8 12 3 7 8" />
-              <line x1="12" y1="3" x2="12" y2="15" />
-            </svg>
-            Install App
+            ⚙ Admin Dashboard
           </button>
-        </div>
+        )}
+
+        {(pinned || hovered) && (
+          <>
+            <div className="flex items-center gap-2 text-[10px] font-medium text-emerald-400">
+              <span className="relative flex h-2 w-2" aria-hidden="true">
+                <span className="absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75 animate-ping" />
+                <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500" />
+              </span>
+              Live
+            </div>
+            {timeStr && (
+              <p className="text-[10px] text-slate-500 tabular-nums">Sync: {timeStr}</p>
+            )}
+          </>
+        )}
+
+        <a
+          href="https://imortifex.me/"
+          onClick={(e) => {
+            if (typeof window !== 'undefined' && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')) {
+              e.preventDefault()
+              if (onEcosystemVisit) onEcosystemVisit()
+            }
+          }}
+          title="imortifex.me"
+          className={`flex items-center gap-2 px-2 py-1.5 rounded-lg text-[10px] font-mono text-slate-500 hover:text-amber-300 hover:bg-pitch-900 transition-colors ${!pinned && !hovered ? 'justify-center' : ''}`}
+        >
+          <span aria-hidden="true">🌐</span>
+          {(pinned || hovered) && <span>imortifex.me</span>}
+        </a>
+
+        <button
+          type="button"
+          onClick={handleInstall}
+          disabled={!deferredInstall}
+          title={!pinned && !hovered ? 'Install' : undefined}
+          className={`w-full min-h-[36px] px-3 py-2 rounded-xl text-xs font-medium border transition-all flex items-center justify-center gap-2 ${
+            deferredInstall
+              ? 'bg-pitch-900 hover:bg-pitch-800 text-slate-300 border-pitch-700'
+              : 'bg-transparent border-transparent text-transparent pointer-events-none'
+          } ${!pinned && !hovered ? 'px-0' : ''}`}
+          style={{ visibility: deferredInstall ? 'visible' : 'hidden' }}
+        >
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+            <polyline points="17 8 12 3 7 8" />
+            <line x1="12" y1="3" x2="12" y2="15" />
+          </svg>
+          {(pinned || hovered) && <span>Install App</span>}
+        </button>
       </div>
     </aside>
   )
