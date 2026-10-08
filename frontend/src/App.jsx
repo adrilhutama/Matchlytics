@@ -40,6 +40,7 @@ import ModelLedger from './components/ModelLedger'
 import AdminDashboard from './components/AdminDashboard'
 import AdminPanel from './components/AdminPanel'
 import UserProfile from './components/UserProfile'
+import DailyPicksModal from './components/DailyPicksModal'
 import { AuthProvider, useAuth } from './context/AuthContext'
 import {
   isDateInRange,
@@ -217,6 +218,19 @@ function AppInner() {
   const [settledFixtures,       setSettledFixtures]       = useState([])
 
   const [deferredInstall,       setDeferredInstall]       = useState(null)
+
+  // Daily Picks modal state
+  const [isDailyPicksOpen, setIsDailyPicksOpen] = useState(false)
+  const handleOpenDailyPicks = useCallback(() => setIsDailyPicksOpen(true), [])
+  const handleCloseDailyPicks = useCallback(() => setIsDailyPicksOpen(false), [])
+  useEffect(() => {
+    if (!user || authLoading || !fixtures || fixtures.length === 0) return
+    const todayKey = new Date().toISOString().split('T')[0]
+    try {
+      const dismissed = localStorage.getItem(`matchlytics_daily_picks_dismissed_${todayKey}`)
+      if (!dismissed) setIsDailyPicksOpen(true)
+    } catch {}
+  }, [user, authLoading, fixtures])
 
   // Dedicated match deep route check: /match/:id or #/match/:id or ?match=:id
   useEffect(() => {
@@ -915,6 +929,12 @@ function AppInner() {
 
       <InstallPrompt />
 
+      <DailyPicksModal
+        isOpen={isDailyPicksOpen}
+        onClose={handleCloseDailyPicks}
+        fixtures={(fixtures || []).filter(Boolean)}
+      />
+
       {showUpgradeModal && (
         <SubscriptionModal onClose={() => setShowUpgradeModal(false)} />
       )}
@@ -1006,6 +1026,21 @@ function AppInner() {
             <p className="text-[9px] font-mono text-slate-500 mt-0.5">by imortifex</p>
           </div>
           <div className="ml-auto flex items-center gap-2 min-w-0">
+            {/* Daily Alpha Slips trigger */}
+            {!isAdminView && (
+              <button
+                type="button"
+                onClick={handleOpenDailyPicks}
+                className="flex-shrink-0 px-2.5 py-1.5 rounded-lg bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/30 text-amber-400 text-[10px] font-mono font-bold transition-colors min-h-[32px] flex items-center gap-1.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500"
+                title="Open Daily Quant Intelligence"
+              >
+                <span className="relative flex h-2 w-2" aria-hidden="true">
+                  <span className="absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75 animate-ping" />
+                  <span className="relative inline-flex rounded-full h-2 w-2 bg-amber-500" />
+                </span>
+                <span className="hidden sm:inline">Daily Alpha</span>
+              </button>
+            )}
             {user && (
               <div className="flex items-center gap-1.5 min-w-0 flex-shrink-0">
                 <p className="hidden sm:block text-[10px] font-mono text-slate-500 truncate max-w-[90px]">{user.email}</p>
