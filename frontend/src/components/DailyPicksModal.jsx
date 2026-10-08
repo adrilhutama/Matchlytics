@@ -139,7 +139,7 @@ function ParlayCard({ parlay, tierAccess, onAddToSlip, lockedReason }) {
             {tierAccess && (
               <button
                 type="button"
-                onClick={() => onAddToSlip(leg)}
+                onClick={() => handleAddParlayToSlip(parlay)}
                 className="flex-shrink-0 px-2 py-0.5 rounded bg-amber-500/15 hover:bg-amber-500/25 text-amber-400 text-[10px] font-mono font-bold border border-amber-500/30 transition-colors min-h-[24px]"
               >
                 + Add
@@ -152,7 +152,7 @@ function ParlayCard({ parlay, tierAccess, onAddToSlip, lockedReason }) {
       {tierAccess && (
         <button
           type="button"
-          onClick={() => parlay.legs.forEach(leg => onAddToSlip(leg))}
+          onClick={() => handleAddParlayToSlip(parlay)}
           className="w-full py-1.5 rounded-lg text-[11px] font-mono font-bold bg-amber-500 hover:bg-amber-400 text-pitch-950 transition-colors min-h-[32px]"
         >
           Add All Legs to Slip
