@@ -20,18 +20,35 @@ DEFAULT_LEAGUE_SHIELDS: dict[str, str] = {
 }
 
 FREE_TIER_COMPETITIONS: dict[str, dict] = {
-    "PL":  {"id": 2021, "name": "Premier League",          "country": "England"},
-    "PD":  {"id": 2014, "name": "La Liga",                 "country": "Spain"},
-    "SA":  {"id": 2019, "name": "Serie A",                 "country": "Italy"},
-    "BL1": {"id": 2002, "name": "Bundesliga",              "country": "Germany"},
-    "FL1": {"id": 2015, "name": "Ligue 1",                 "country": "France"},
-    "CL":  {"id": 2001, "name": "UEFA Champions League",   "country": "Europe"},
-    "DED": {"id": 2003, "name": "Eredivisie",              "country": "Netherlands"},
-    "PPL": {"id": 2017, "name": "Liga Portugal",           "country": "Portugal"},
-    "ELC": {"id": 2016, "name": "Championship",            "country": "England"},
-    "BSA": {"id": 2013, "name": "Campeonato Brasileiro A", "country": "Brazil"},
-    "WC":  {"id": 2000, "name": "FIFA World Cup",          "country": "World"},
-    "EC":  {"id": 2018, "name": "European Championship",   "country": "Europe"},
+    "PL":  {"id": 2021, "name": "Premier League",            "country": "England"},
+    "PD":  {"id": 2014, "name": "La Liga",                   "country": "Spain"},
+    "SA":  {"id": 2019, "name": "Serie A",                   "country": "Italy"},
+    "BL1": {"id": 2002, "name": "Bundesliga",                "country": "Germany"},
+    "FL1": {"id": 2015, "name": "Ligue 1",                   "country": "France"},
+    "CL":  {"id": 2001, "name": "UEFA Champions League",     "country": "Europe"},
+    "DED": {"id": 2003, "name": "Eredivisie",                "country": "Netherlands"},
+    "PPL": {"id": 2017, "name": "Liga Portugal",             "country": "Portugal"},
+    "ELC": {"id": 2016, "name": "Championship",              "country": "England"},
+    "BSA": {"id": 2013, "name": "Campeonato Brasileiro A",   "country": "Brazil"},
+    "WC":  {"id": 2000, "name": "FIFA World Cup",            "country": "World"},
+    "EC":  {"id": 2018, "name": "European Championship",     "country": "Europe"},
+}
+
+# Inline sport key mapping avoids circular import from config.py.
+# Kept in sync with ODDS_SPORT_KEYS in scripts/config.py.
+_DEFAULT_ODDS_SPORT_KEYS: dict[str, str] = {
+    "PL":  "soccer_epl",
+    "PD":  "soccer_spain_la_liga",
+    "SA":  "soccer_italy_serie_a",
+    "BL1": "soccer_germany_bundesliga",
+    "FL1": "soccer_france_ligue_one",
+    "CL":  "soccer_uefa_champs_league",
+    "DED": "soccer_netherlands_eredivisie",
+    "PPL": "soccer_portugal_primeira_liga",
+    "ELC": "soccer_efl_champ",
+    "BSA": "soccer_brazil_campeonato",
+    "WC":  "soccer_fifa_world_cup",
+    "EC":  "soccer_uefa_european_championship",
 }
 
 
@@ -41,20 +58,24 @@ def ensure_competition_metadata(
 ) -> None:
     """
     Ensure a competition exists in public.competitions table.
-    Upserts: id, code, name, country from the FREE_TIER_COMPETITIONS registry.
-    This prevents 23503 FK violations when fixtures reference unknown competitions.
+    Upserts: id, code, name, country, odds_api_sport_key.
+    This prevents 23503 FK and 23502 NOT NULL violations on ingestion.
     """
     comp_info = FREE_TIER_COMPETITIONS.get(code)
     if not comp_info:
         return
+    sport_key = _DEFAULT_ODDS_SPORT_KEYS.get(code, f"soccer_{code.lower()}")
     try:
         if supabase_client:
-            supabase_client.table("competitions").upsert({
-                "id": comp_info["id"],
+            payload: dict[str, Any] = {
                 "code": code,
-                "name": comp_info["name"],
+                "name": comp_info.get("name", code),
                 "country": comp_info.get("country", ""),
-            }, on_conflict="code").execute()
+                "odds_api_sport_key": sport_key,
+            }
+            if "id" in comp_info:
+                payload["id"] = comp_info["id"]
+            supabase_client.table("competitions").upsert(payload, on_conflict="code").execute()
     except Exception as exc:
         print(f"    [WARN] Failed to upsert competition {code}: {exc}")
 
