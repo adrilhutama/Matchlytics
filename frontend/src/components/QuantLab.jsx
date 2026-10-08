@@ -193,37 +193,53 @@ function QuantLabWorkspace({
   // Head-to-Head intelligence data
   const h2hData = fixture?.h2h_data || {}
   const recentMatches = Array.isArray(h2hData?.recentMatches) ? h2hData.recentMatches : []
-  const totalH2hMatches = (h2hData?.homeWins ?? 0) + (h2hData?.draws ?? 0) + (h2hData?.awayWins ?? 0) || h2hData?.numberOfMatches || recentMatches.length
+  // totalH2hMatches = number of recentMatches we can derive stats from (never uses h2hData summary counts directly)
+  const totalH2hMatches = recentMatches.length
 
-  // Derive H2H counters defensively from recentMatches as fallback
+  // Derive H2H counters defensively from recentMatches; mirror the same winner logic as the encounter cards
   const h2hHomeId = String(fixture?.home_team?.id || fixture?.home_team_id || '')
   const h2hAwayId = String(fixture?.away_team?.id || fixture?.away_team_id || '')
-  const h2hHomeName = fixture?.home_team?.name || fixture?.home_team_name || ''
-  const h2hAwayName = fixture?.away_team?.name || fixture?.away_team_name || ''
+  const h2hHomeName = (fixture?.home_team?.name || fixture?.home_team_name || '').toLowerCase().trim()
+  const h2hAwayName = (fixture?.away_team?.name || fixture?.away_team_name || '').toLowerCase().trim()
   const h2hStats = useMemo(() => {
-    if (totalH2hMatches > 0 || h2hData?.homeWins != null) {
-      return { homeWins: h2hData?.homeWins ?? 0, draws: h2hData?.draws ?? 0, awayWins: h2hData?.awayWins ?? 0, totalGoals: h2hData?.totalGoals ?? 0 }
+    const matches = recentMatches
+    if (!matches.length) {
+      return { homeWins: 0, draws: 0, awayWins: 0, totalGoals: 0, homePct: 0, drawPct: 0, awayPct: 0, avgGoals: '0.0' }
     }
     let hw = 0, dw = 0, aw = 0, tg = 0
-    for (const m of recentMatches) {
-      const hs = Number(m.homeScore ?? m.actual_home_score ?? 0)
-      const as_ = Number(m.awayScore ?? m.actual_away_score ?? 0)
+    for (const m of matches) {
+      const hs = Number(m.homeScore ?? m.actual_home_score ?? m.score?.fullTime?.home ?? 0)
+      const as_ = Number(m.awayScore ?? m.actual_away_score ?? m.score?.fullTime?.away ?? 0)
       tg += hs + as_
-      const mHomeName = m.homeTeam || ''
-      const mAwayName = m.awayTeam || ''
-      const isCurrentHomeHome = mHomeName === h2hHomeName || String(m.home_team_id) === h2hHomeId
-      if (hs > as_) {
-        if (isCurrentHomeHome) hw++
-        else aw++
-      } else if (hs < as_) {
-        if (isCurrentHomeHome) aw++
-        else hw++
-      } else {
+      // Match historical match team names against current fixture teams (fuzzy, case-insensitive)
+      const mHomeName = ((m.homeTeam || m.home_team_name || m.home_team || '')).toLowerCase().trim()
+      const mHomeId = String(m.home_team_id || m.home_team?.id || '')
+      const isCurHomeTeamAtHome =
+        (h2hHomeId && mHomeId && mHomeId === h2hHomeId) ||
+        (h2hHomeName && mHomeName && (mHomeName.includes(h2hHomeName) || h2hHomeName.includes(mHomeName)))
+      const homeWon = hs > as_
+      if (hs === as_) {
         dw++
+      } else if (isCurHomeTeamAtHome) {
+        if (homeWon) hw++
+        else aw++
+      } else {
+        if (homeWon) aw++
+        else hw++
       }
     }
-    return { homeWins: hw, draws: dw, awayWins: aw, totalGoals: tg }
-  }, [totalH2hMatches, h2hData?.homeWins, h2hData?.draws, h2hData?.awayWins, h2hData?.totalGoals, recentMatches, h2hHomeId, h2hAwayId, h2hHomeName, h2hAwayName])
+    const n = matches.length
+    return {
+      homeWins: hw,
+      draws: dw,
+      awayWins: aw,
+      totalGoals: tg,
+      homePct: Math.round((hw / n) * 100),
+      drawPct: Math.round((dw / n) * 100),
+      awayPct: Math.round((aw / n) * 100),
+      avgGoals: (tg / n).toFixed(1),
+    }
+  }, [recentMatches, h2hHomeId, h2hAwayId, h2hHomeName, h2hAwayName])
 
   // Reset to original model xG
   const handleResetModelXg = () => {
@@ -721,7 +737,7 @@ function QuantLabWorkspace({
                 {h2hStats.homeWins}
               </span>
               <span className="text-xs text-slate-500 font-mono">
-                {totalH2hMatches > 0 ? `${Math.round(((h2hStats.homeWins ?? 0) / totalH2hMatches) * 100)}%` : '0%'}
+                {h2hStats.homePct}%
               </span>
             </div>
           </div>
@@ -735,7 +751,7 @@ function QuantLabWorkspace({
                 {h2hStats.draws}
               </span>
               <span className="text-xs text-slate-500 font-mono">
-                {totalH2hMatches > 0 ? `${Math.round(((h2hStats.draws ?? 0) / totalH2hMatches) * 100)}%` : '0%'}
+                {h2hStats.drawPct}%
               </span>
             </div>
           </div>
@@ -749,7 +765,7 @@ function QuantLabWorkspace({
                 {h2hStats.awayWins}
               </span>
               <span className="text-xs text-slate-500 font-mono">
-                {totalH2hMatches > 0 ? `${Math.round(((h2hStats.awayWins ?? 0) / totalH2hMatches) * 100)}%` : '0%'}
+                {h2hStats.awayPct}%
               </span>
             </div>
           </div>
