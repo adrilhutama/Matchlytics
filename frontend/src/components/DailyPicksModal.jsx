@@ -54,13 +54,17 @@ function SingleCard({ card, onAddToSlip, isInSlip }) {
     <div className={`rounded-xl border p-4 transition-all hover:border-amber-500/40 ${
       isInSlip ? 'border-amber-500/50 bg-amber-500/5' : 'border-pitch-700 bg-pitch-950'
     }`}>
-      <div className="flex items-start justify-between gap-3 mb-3">
-        <div className="min-w-0">
-          <p className="text-sm font-bold text-slate-100 truncate">{card.matchLabel}</p>
-          <div className="flex items-center gap-2 mt-0.5">
-            <span className="text-[10px] font-mono text-slate-500">{card.league}</span>
-            <span className="text-[10px] text-slate-600">\u{2022}</span>
-            <span className="text-[10px] font-mono text-slate-500">{card.timeStr}</span>
+      <div className="flex items-center justify-between mb-3 border-b border-slate-800/80 pb-2">
+        <div>
+          <p className="text-sm font-bold text-slate-100 flex items-center gap-1.5">
+            <span>{card.matchLabel.split(' vs ')[0]}</span>
+            <span className="text-slate-500 font-normal">vs</span>
+            <span>{card.matchLabel.split(' vs ')[1]}</span>
+          </p>
+          <div className="flex items-center gap-2 mt-0.5 text-[11px] font-mono text-slate-400">
+            <span className="font-semibold text-amber-400/90">{card.league}</span>
+            <span className="text-slate-600">•</span>
+            <span>{card.timeStr}</span>
           </div>
         </div>
         <MarketBadge market={card.market} />

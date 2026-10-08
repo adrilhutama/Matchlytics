@@ -83,11 +83,20 @@ export function buildDailyPicks(fixtures) {
 // Card builders
 // ---------------------------------------------------------------------------
 
+function resolveTeamName(raw) {
+  // Prefer short_name (e.g. "MCI", "RMA") when available; otherwise full name
+  const parts = String(raw || '').split(' ')
+  // If the raw value is already a short code (<= 3 chars, all alpha), use it
+  if (raw && raw.length <= 3 && /^[A-Z]+$/.test(raw)) return raw
+  // Otherwise return the full name (avoid truncating to last token)
+  return raw || 'TBD'
+}
+
 function buildSingleCard(item, date) {
   const opp = item.opportunity
   const fixture = item
-  const home = fixture.homeTeam.split(' ').pop()
-  const away = fixture.awayTeam.split(' ').pop()
+  const home = resolveTeamName(fixture.homeTeam)
+  const away = resolveTeamName(fixture.awayTeam)
   const matchLabel = `${home} vs ${away}`
   const league = fixture.competitionCode || 'Unknown'
   const kickoff = new Date(fixture.kickoffTime)
@@ -114,8 +123,8 @@ function buildParlayCard(items, date) {
   if (items.length === 0) return null
   const legs = items.map((item) => {
     const opp = item.opportunity
-    const home = item.homeTeam.split(' ').pop()
-    const away = item.awayTeam.split(' ').pop()
+    const home = resolveTeamName(item.homeTeam)
+    const away = resolveTeamName(item.awayTeam)
     const kickoff = new Date(item.kickoffTime)
     const timeStr = kickoff.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' })
     return {
