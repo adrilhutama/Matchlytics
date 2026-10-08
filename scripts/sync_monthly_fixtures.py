@@ -25,7 +25,7 @@ try:
         supabase,
     )
     from scripts.football_data_pool import football_pool
-    from scripts._utils import extract_venue_and_referee, ensure_team_metadata
+    from scripts._utils import extract_venue_and_referee, ensure_team_metadata, ensure_competition_metadata
 except ModuleNotFoundError:
     from config import (
         BASE_URL,
@@ -36,7 +36,7 @@ except ModuleNotFoundError:
         supabase,
     )
     from football_data_pool import football_pool
-    from _utils import extract_venue_and_referee, ensure_team_metadata
+    from _utils import extract_venue_and_referee, ensure_team_metadata, ensure_competition_metadata
 
 
 def fetch_fixtures_range(competition_code: str, from_date: str, to_date: str, pool: Any = None) -> list[dict]:
@@ -178,8 +178,10 @@ def main() -> None:
             away_team = m.get("awayTeam", {})
 
             if home_team:
+                ensure_competition_metadata(supabase, comp_code)
                 ensure_team_metadata(supabase, team_dict=home_team, competition_code=comp_code)
             if away_team:
+                ensure_competition_metadata(supabase, comp_code)
                 ensure_team_metadata(supabase, team_dict=away_team, competition_code=comp_code)
 
             row = parse_fixture_row(m, comp_code=comp_code)
@@ -205,8 +207,10 @@ def main() -> None:
                 away_team = m.get("awayTeam", {})
 
                 if home_team:
+                    ensure_competition_metadata(supabase, code)
                     ensure_team_metadata(supabase, team_dict=home_team, competition_code=code)
                 if away_team:
+                    ensure_competition_metadata(supabase, code)
                     ensure_team_metadata(supabase, team_dict=away_team, competition_code=code)
 
                 row = parse_fixture_row(m, league, code)

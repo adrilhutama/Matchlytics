@@ -51,7 +51,7 @@ try:
     )
     from scripts.odds_client import odds_pool
     from scripts.football_data_pool import football_pool, fetch_fixture_h2h
-    from scripts._utils import extract_venue_and_referee
+    from scripts._utils import extract_venue_and_referee, ensure_competition_metadata
 except ImportError:
     from config import (
         BASE_URL,
@@ -80,7 +80,7 @@ except ImportError:
     from telegram_notifier import (
         send_daily_sitrep,
     )
-    from _utils import extract_venue_and_referee
+    from _utils import extract_venue_and_referee, ensure_competition_metadata
     from odds_client import odds_pool
     from football_data_pool import football_pool, fetch_fixture_h2h
 
@@ -823,6 +823,9 @@ def sync_competition(
     code = league["code"]
     name = league["name"]
     lid  = league["id"]
+
+    # Self-heal: ensure competition row exists before any fixture/team writes
+    ensure_competition_metadata(supabase, code)
 
     # Match by competition_code (normalized) or league_id (legacy)
     league_fixtures = [

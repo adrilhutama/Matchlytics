@@ -19,6 +19,45 @@ DEFAULT_LEAGUE_SHIELDS: dict[str, str] = {
     "CL": "https://crests.football-data.org/CL.png",
 }
 
+FREE_TIER_COMPETITIONS: dict[str, dict] = {
+    "PL":  {"id": 2021, "name": "Premier League",          "country": "England"},
+    "PD":  {"id": 2014, "name": "La Liga",                 "country": "Spain"},
+    "SA":  {"id": 2019, "name": "Serie A",                 "country": "Italy"},
+    "BL1": {"id": 2002, "name": "Bundesliga",              "country": "Germany"},
+    "FL1": {"id": 2015, "name": "Ligue 1",                 "country": "France"},
+    "CL":  {"id": 2001, "name": "UEFA Champions League",   "country": "Europe"},
+    "DED": {"id": 2003, "name": "Eredivisie",              "country": "Netherlands"},
+    "PPL": {"id": 2017, "name": "Liga Portugal",           "country": "Portugal"},
+    "ELC": {"id": 2016, "name": "Championship",            "country": "England"},
+    "BSA": {"id": 2013, "name": "Campeonato Brasileiro A", "country": "Brazil"},
+    "WC":  {"id": 2000, "name": "FIFA World Cup",          "country": "World"},
+    "EC":  {"id": 2018, "name": "European Championship",   "country": "Europe"},
+}
+
+
+def ensure_competition_metadata(
+    supabase_client: Any,
+    code: str,
+) -> None:
+    """
+    Ensure a competition exists in public.competitions table.
+    Upserts: id, code, name, country from the FREE_TIER_COMPETITIONS registry.
+    This prevents 23503 FK violations when fixtures reference unknown competitions.
+    """
+    comp_info = FREE_TIER_COMPETITIONS.get(code)
+    if not comp_info:
+        return
+    try:
+        if supabase_client:
+            supabase_client.table("competitions").upsert({
+                "id": comp_info["id"],
+                "code": code,
+                "name": comp_info["name"],
+                "country": comp_info.get("country", ""),
+            }, on_conflict="code").execute()
+    except Exception as exc:
+        print(f"    [WARN] Failed to upsert competition {code}: {exc}")
+
 
 def extract_venue_and_referee(m: dict) -> tuple[str | None, dict]:
     """Extract venue and primary referee metadata from Football-Data.org match payload."""

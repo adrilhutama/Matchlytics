@@ -111,6 +111,10 @@ ODDS_SPORT_KEYS: dict[str, str] = {
     "CL":  "soccer_uefa_champs_league",
     "DED": "soccer_netherlands_eredivisie",
     "PPL": "soccer_portugal_primeira_liga",
+    "ELC": "soccer_efl_champ",
+    "BSA": "soccer_brazil_campeonato",
+    "WC":  "soccer_fifa_world_cup",
+    "EC":  "soccer_uefa_european_championship",
 }
 
 # ---- Telegram Bot & Notification Credentials ----------------
@@ -139,14 +143,18 @@ else:
 
 # ---- Active competitions / leagues --------------------------
 ACTIVE_LEAGUES: list[dict] = [
-    {"code": "PL",  "name": "Premier League",         "id": 2021},
-    {"code": "PD",  "name": "La Liga",                "id": 2014},
-    {"code": "SA",  "name": "Serie A",                "id": 2019},
-    {"code": "BL1", "name": "Bundesliga",             "id": 2002},
-    {"code": "FL1", "name": "Ligue 1",                "id": 2015},
-    {"code": "CL",  "name": "UEFA Champions League",  "id": 2001},
-    {"code": "DED", "name": "Eredivisie",             "id": 2003},
-    {"code": "PPL", "name": "Liga Portugal",          "id": 2017},
+    {"code": "PL",  "name": "Premier League",          "id": 2021, "country": "England"},
+    {"code": "PD",  "name": "La Liga",                 "id": 2014, "country": "Spain"},
+    {"code": "SA",  "name": "Serie A",                 "id": 2019, "country": "Italy"},
+    {"code": "BL1", "name": "Bundesliga",              "id": 2002, "country": "Germany"},
+    {"code": "FL1", "name": "Ligue 1",                 "id": 2015, "country": "France"},
+    {"code": "CL",  "name": "UEFA Champions League",   "id": 2001, "country": "Europe"},
+    {"code": "DED", "name": "Eredivisie",              "id": 2003, "country": "Netherlands"},
+    {"code": "PPL", "name": "Liga Portugal",           "id": 2017, "country": "Portugal"},
+    {"code": "ELC", "name": "Championship",            "id": 2016, "country": "England"},
+    {"code": "BSA", "name": "Campeonato Brasileiro A", "id": 2013, "country": "Brazil"},
+    {"code": "WC",  "name": "FIFA World Cup",          "id": 2000, "country": "World"},
+    {"code": "EC",  "name": "European Championship",   "id": 2018, "country": "Europe"},
 ]
 
 # Backward-compatibility mapping: display_name -> league ID
