@@ -24,7 +24,34 @@ Institutional Sports Market Intelligence Driven by Mathematical Rigor.
 
 ---
 
-## Overview
+## Quick Start — /init
+
+To bootstrap a new local development environment in one shot, run the provided setup script:
+
+```bash
+init.bat
+```
+
+This performs the following steps automatically:
+
+1. Creates and activates a Python virtual environment, then installs all pipeline dependencies from `scripts/requirements.txt`.
+2. Installs frontend dependencies via `npm install` (skips if `node_modules` already exists).
+3. Copies `.env.example` to `.env` and `frontend/.env.example` to `frontend/.env` (skips if they already exist).
+4. Prints the manual migration step reminder — migrations must be applied through the Supabase SQL Editor; there is no auto-apply pipeline.
+
+After the script completes, fill in your credentials in both `.env` files, then:
+
+```bash
+# Frontend dev server
+cd frontend
+npm run dev        # http://localhost:5173 (public terminal view)
+
+# Pipeline (once migrations are applied and tokens are set)
+cd scripts
+python sync_daily.py    # full quant loop: odds, engine, EV, settlement, Telegram
+```
+
+See **Section 4** below for the full environment variable reference and test commands.
 
 Matchlytics is a decoupled, institutional sports market intelligence platform. It automates the
 full path from Tier-1 European Fixture Telemetry and Direct Consensus Market Feeds through a
