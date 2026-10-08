@@ -9,7 +9,7 @@
 // Desktop Left Sidebar (lg+) & Mobile Top Brand Bar & Sticky Workspace Nav
 // Zero em dash characters used (R-02 compliance)
 
-import { useState, useEffect, useCallback, useMemo, useRef } from 'react'
+import { useState, useEffect, useCallback, useMemo, useRef, Component } from 'react'
 import { supabase } from './lib/supabase'
 import Header from './components/Header'
 import FilterBar, { DATE_RANGES } from './components/FilterBar'
@@ -89,6 +89,38 @@ const buildDateRange = () => {
   const from = new Date(now.getTime() - 2 * 60 * 60 * 1000).toISOString()
   const to = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000).toISOString()
   return { from, to }
+}
+
+// Global Error Boundary to prevent blank-screen crashes from render errors
+class AppErrorBoundary extends Component {
+  constructor(props) {
+    super(props)
+    this.state = { hasError: false, error: null }
+  }
+  static getDerivedStateFromError(error) {
+    return { hasError: true, error }
+  }
+  componentDidCatch(error, info) {
+    console.error('[AppErrorBoundary] Render error:', error, info)
+  }
+  handleReset = () => this.setState({ hasError: false, error: null })
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div className="min-h-screen bg-pitch-950 flex items-center justify-center p-4">
+          <div className="text-center space-y-4 max-w-md">
+            <div className="w-12 h-12 rounded-full bg-rose-500/10 text-rose-400 border border-rose-500/20 flex items-center justify-center mx-auto text-xl font-bold">!</div>
+            <h2 className="text-base font-bold text-slate-100">Something went wrong loading the app.</h2>
+            <p className="text-xs text-slate-400 font-mono">{String(this.state.error?.message || 'Unknown error')}</p>
+            <button type="button" onClick={this.handleReset} className="px-4 py-2.5 min-h-[44px] rounded-xl bg-amber-500 hover:bg-amber-400 text-pitch-950 font-bold text-xs transition-colors">
+              Reload App
+            </button>
+          </div>
+        </div>
+      )
+    }
+    return this.props.children
+  }
 }
 
 const UPCOMING_STATUSES = ['NS', 'SCHEDULED', 'TIMED', 'IN_PLAY', 'PAUSED']
@@ -1210,7 +1242,9 @@ function AppInner() {
 export default function App() {
   return (
     <AuthProvider>
-      <AppInner />
+      <AppErrorBoundary>
+        <AppInner />
+      </AppErrorBoundary>
     </AuthProvider>
   )
 }

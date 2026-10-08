@@ -26,6 +26,47 @@ import { TotalsMarketView, SpreadsMarketView } from './MultiMarketViews'
 import ValueBadge from './ValueBadge'
 import FormGuide from './FormGuide'
 
+// League badge colors for core leagues
+const LEAGUE_ACCENT_COLOR = {
+  PL:  '#38003c',
+  PD:  '#ee8707',
+  SA:  '#008fd7',
+  BL1: '#dc052d',
+  FL1: '#008491',
+  CL:  '#061d3e',
+  DED: '#ff8200',
+  PPL: '#0066b3',
+  ELC: '#000d4a',
+  BSA: '#009739',
+  WC:  '#ff6600',
+  EC:  '#003399',
+}
+
+function LeagueBadge({ name, code, logoUrl }) {
+  const color = code ? (LEAGUE_ACCENT_COLOR[code] || '#334155') : '#334155'
+  return (
+    <div className="flex items-center gap-1.5 min-w-[110px] max-w-[160px]" title={name || code || ''}>
+      {logoUrl && (
+        <img
+          src={logoUrl}
+          alt=""
+          width={14}
+          height={14}
+          className="w-3.5 h-3.5 object-contain flex-shrink-0"
+          loading="lazy"
+          onError={(e) => { e.currentTarget.style.display = 'none' }}
+        />
+      )}
+      <span
+        className="inline-flex items-center px-2 py-0.5 rounded text-xs font-mono font-semibold border truncate"
+        style={{ backgroundColor: `${color}22`, color, borderColor: `${color}66` }}
+      >
+        {code || name || 'N/A'}
+      </span>
+    </div>
+  )
+}
+
 export function TableRow({
   fixture,
   isExpanded,
@@ -823,47 +864,6 @@ export default function TableView({
       }
       return next
     })
-  }
-
-  // League accent border color map for core leagues (matches football-data.org crest palettes)
-  const LEAGUE_ACCENT_COLOR = {
-    PL:  '#38003c',
-    PD:  '#ee8707',
-    SA:  '#008fd7',
-    BL1: '#dc052d',
-    FL1: '#008491',
-    CL:  '#061d3e',
-    DED: '#ff8200',
-    PPL: '#0066b3',
-    ELC: '#000d4a',
-    BSA: '#009739',
-    WC:  '#ff6600',
-    EC:  '#003399',
-  }
-
-  const LeagueBadge = ({ name, code, logoUrl }) => {
-    const color = code ? (LEAGUE_ACCENT_COLOR[code] || '#334155') : '#334155'
-    return (
-      <div className="flex items-center gap-1.5 min-w-[110px] max-w-[160px]" title={name || code || ''}>
-        {logoUrl && (
-          <img
-            src={logoUrl}
-            alt=""
-            width={14}
-            height={14}
-            className="w-3.5 h-3.5 object-contain flex-shrink-0"
-            loading="lazy"
-            onError={(e) => { e.currentTarget.style.display = 'none' }}
-          />
-        )}
-        <span
-          className="inline-flex items-center px-2 py-0.5 rounded text-xs font-mono font-semibold border truncate"
-          style={{ backgroundColor: `${color}22`, color: color, borderColor: `${color}66` }}
-        >
-          {code || name || 'N/A'}
-        </span>
-      </div>
-    )
   }
 
   return (
