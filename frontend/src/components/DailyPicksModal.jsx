@@ -2,12 +2,16 @@
 // Institutional-grade daily curated betting slip popup.
 // Tier-gated: Free sees singles only; Pro unlocks 2-leg parlay; Institutional
 // unlocks 3-leg and 4-leg multipliers.
+// Admin users bypass all paywalls.
 // Dismiss tracking via localStorage per date key.
 // Zero em dash characters (R-02 compliance).
 
 import { useState, useEffect, useCallback } from 'react'
 import { buildDailyPicks } from '../utils/dailyPicksEngine'
 import { useAuth } from '../context/AuthContext'
+
+const ADMIN_EMAILS_RAW = import.meta.env.VITE_ADMIN_EMAILS || ''
+const ADMIN_EMAILS = ADMIN_EMAILS_RAW.split(',').map((e) => e.trim().toLowerCase()).filter(Boolean)
 
 const DISABLED_MARKET_ICONS = {
   h2h: '\u{1F494}',
@@ -34,7 +38,7 @@ function MarketBadge({ market }) {
   )
 }
 
-function LockOverlay({ children }) {
+function LockOverlay({ lockText, children }) {
   return (
     <div className="relative rounded-xl overflow-hidden">
       {children}
@@ -43,7 +47,7 @@ function LockOverlay({ children }) {
           <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
           <path d="M7 11V7a5 5 0 0 1 10 0v4" />
         </svg>
-        <p className="text-xs font-mono text-slate-400 text-center">{children.props.lockText}</p>
+        <p className="text-xs font-mono text-slate-400 text-center">{lockText}</p>
       </div>
     </div>
   )
@@ -105,63 +109,88 @@ function SingleCard({ card, onAddToSlip, isInSlip }) {
   )
 }
 
-function ParlayCard({ parlay, tierAccess, onAddToSlip }) {
+function ParlayCard({ parlay, tierAccess, onAddToSlip, lockedReason }) {
   if (!parlay) return null
 
   const totalOdds = parseFloat(parlay.totalOdds)
-  const isFreeUser = !tierAccess
   const locked = !tierAccess
 
-  return (
-    <LockOverlay lockText={isFreeUser ? 'Upgrade to Pro to unlock daily 2-team parlays' : 'Upgrade to Institutional for high-multiplier multi-leg slips'}>
-      <div className="rounded-xl border border-pitch-700 bg-pitch-950 p-4">
-        <div className="flex items-center justify-between mb-3">
-          <div>
-            <p className="text-xs font-bold text-slate-100">{parlay.legCount}-Team Parlay</p>
-            <p className="text-[10px] font-mono text-slate-500 mt-0.5">Combined odds: <span className="text-amber-400">{parlay.totalOdds}</span>x</p>
-          </div>
-          <div className="text-right">
-            <p className="text-[10px] text-slate-500 font-mono">Model Prob</p>
-            <p className="text-xs font-mono text-emerald-400">{parlay.combinedProb}%</p>
-          </div>
+  const legContent = (
+    <div className="rounded-xl border border-pitch-700 bg-pitch-950 p-4">
+      <div className="flex items-center justify-between mb-3">
+        <div>
+          <p className="text-xs font-bold text-slate-100">{parlay.legCount}-Team Parlay</p>
+          <p className="text-[10px] font-mono text-slate-500 mt-0.5">Combined odds: <span className="text-amber-400">{parlay.totalOdds}</span>x</p>
         </div>
-
-        <div className="space-y-2 mb-3">
-          {parlay.legs.map((leg, i) => (
-            <div key={i} className="flex items-center gap-2 text-xs">
-              <span className="w-5 h-5 rounded-full bg-pitch-800 flex items-center justify-center text-[10px] font-mono text-slate-400 flex-shrink-0">{i + 1}</span>
-              <span className="text-slate-200 flex-1 truncate">{leg.matchLabel}</span>
-              <MarketBadge market={leg.market} />
-              <span className="text-slate-400 font-mono text-[10px]">{leg.selection}</span>
-              <span className="text-slate-300 font-mono text-[10px]">{leg.odds}</span>
-            </div>
-          ))}
+        <div className="text-right">
+          <p className="text-[10px] text-slate-500 font-mono">Model Prob</p>
+          <p className="text-xs font-mono text-emerald-400">{parlay.combinedProb}%</p>
         </div>
+      </div>
 
+      <div className="space-y-2 mb-3">
+        {parlay.legs.map((leg, i) => (
+          <div key={i} className="flex items-center gap-2 text-xs">
+            <span className="w-5 h-5 rounded-full bg-pitch-800 flex items-center justify-center text-[10px] font-mono text-slate-400 flex-shrink-0">{i + 1}</span>
+            <span className="text-slate-200 flex-1 truncate">{leg.matchLabel}</span>
+            <MarketBadge market={leg.market} />
+            <span className="text-slate-400 font-mono text-[10px]">{leg.selection}</span>
+            <span className="text-slate-300 font-mono text-[10px]">{leg.odds}</span>
+            {tierAccess && (
+              <button
+                type="button"
+                onClick={() => onAddToSlip(leg)}
+                className="flex-shrink-0 px-2 py-0.5 rounded bg-amber-500/15 hover:bg-amber-500/25 text-amber-400 text-[10px] font-mono font-bold border border-amber-500/30 transition-colors min-h-[24px]"
+              >
+                + Add
+              </button>
+            )}
+          </div>
+        ))}
+      </div>
+
+      {tierAccess && (
         <button
           type="button"
           onClick={() => parlay.legs.forEach(leg => onAddToSlip(leg))}
-          disabled={locked}
-          className="w-full py-1.5 rounded-lg text-[11px] font-mono font-bold bg-amber-500 hover:bg-amber-400 disabled:bg-pitch-700 text-pitch-950 transition-colors min-h-[32px]"
+          className="w-full py-1.5 rounded-lg text-[11px] font-mono font-bold bg-amber-500 hover:bg-amber-400 text-pitch-950 transition-colors min-h-[32px]"
         >
           Add All Legs to Slip
         </button>
-      </div>
-    </LockOverlay>
+      )}
+    </div>
   )
+
+  if (locked) {
+    return (
+      <LockOverlay lockText={lockedReason}>
+        {legContent}
+      </LockOverlay>
+    )
+  }
+
+  return legContent
 }
 
 export default function DailyPicksModal({ isOpen, onClose, fixtures, onAddToSlip, onOpenSlip }) {
-  const { profile } = useAuth()
+  const { user, profile } = useAuth()
   const [picks, setPicks] = useState(null)
   const [isLoading, setIsLoading] = useState(true)
   const todayKey = new Date().toISOString().split('T')[0]
 
-  // Tier checks
+  // Admin bypass: admin users see all sections regardless of tier
+  const isAdmin = user && ADMIN_EMAILS.includes((user.email || '').toLowerCase())
   const tier = profile?.subscription_tier || 'free'
-  const canSeeParlay2 = ['pro', 'annual', 'institutional'].includes(tier)
-  const canSeeParlay3 = tier === 'institutional'
-  const canSeeParlay4 = tier === 'institutional'
+
+  // Tier checks with admin override
+  const canSeeParlay2 = isAdmin || ['pro', 'annual', 'institutional'].includes(tier)
+  const canSeeParlay3 = isAdmin || tier === 'institutional'
+  const canSeeParlay4 = isAdmin || tier === 'institutional'
+
+  // Session label
+  const nowWIB = new Date(new Date().toLocaleString('en-US', { timeZone: 'Asia/Jakarta' }))
+  const wibHour = nowWIB.getHours()
+  const sessionLabel = (wibHour >= 15 || wibHour < 6) ? 'Evening & Night Session' : 'Day & Afternoon Session'
 
   // Load picks when modal opens
   useEffect(() => {
@@ -181,7 +210,7 @@ export default function DailyPicksModal({ isOpen, onClose, fixtures, onAddToSlip
     const leg = {
       fixtureId: card.fixtureId,
       pick: card.selection,
-      pickLabel: `${card.matchLabel} – ${card.selection}`,
+      pickLabel: `${card.matchLabel} - ${card.selection}`,
       homeTeam: card.matchLabel.split(' vs ')[0] || '',
       awayTeam: card.matchLabel.split(' vs ')[1] || '',
       odds: parseFloat(card.odds) || 1,
@@ -198,7 +227,7 @@ export default function DailyPicksModal({ isOpen, onClose, fixtures, onAddToSlip
       onAddToSlip({
         fixtureId: leg.fixtureId,
         pick: leg.selection,
-        pickLabel: `${leg.matchLabel} – ${leg.selection}`,
+        pickLabel: `${leg.matchLabel} - ${leg.selection}`,
         homeTeam: leg.matchLabel.split(' vs ')[0] || '',
         awayTeam: leg.matchLabel.split(' vs ')[1] || '',
         odds: parseFloat(leg.odds) || 1,
@@ -227,11 +256,19 @@ export default function DailyPicksModal({ isOpen, onClose, fixtures, onAddToSlip
         {/* Header */}
         <div className="px-5 py-4 border-b border-pitch-800 flex items-start gap-3">
           <div className="flex-1 min-w-0">
-            <div className="flex items-center gap-2 mb-1">
+            <div className="flex items-center gap-2 mb-1 flex-wrap">
               <span className="px-2 py-0.5 rounded-full bg-amber-500/15 text-amber-400 text-[9px] font-mono font-bold border border-amber-500/30">
                 DAILY QUANT INTELLIGENCE
               </span>
+              <span className="px-2 py-0.5 rounded-full bg-emerald-500/15 text-emerald-400 text-[9px] font-mono font-bold border border-emerald-500/30">
+                {sessionLabel} • NEXT 24H
+              </span>
               <span className="text-[10px] font-mono text-slate-500">{todayKey}</span>
+              {isAdmin && (
+                <span className="px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-300 text-[9px] font-mono font-bold border border-amber-500/40">
+                  ADMIN
+                </span>
+              )}
             </div>
             <p className="text-xs font-mono text-slate-400">
               Algorithmic value picks generated from proprietary Bivariate Poisson models.
@@ -256,7 +293,7 @@ export default function DailyPicksModal({ isOpen, onClose, fixtures, onAddToSlip
             </div>
           ) : picks?.singles?.length === 0 ? (
             <div className="text-center py-12 space-y-3">
-              <p className="text-sm text-slate-300">No value picks found in the 24-36 hour window.</p>
+              <p className="text-sm text-slate-300">No value picks found in the next 24 hours.</p>
               <p className="text-xs font-mono text-slate-500">Check back after the next sync cycle.</p>
             </div>
           ) : (
@@ -289,12 +326,13 @@ export default function DailyPicksModal({ isOpen, onClose, fixtures, onAddToSlip
                 <div className="flex items-center justify-between mb-3">
                   <h3 className="text-xs font-mono font-bold text-slate-300">2-Team Value Parlay</h3>
                   <span className="text-[10px] font-mono text-slate-500">
-                    {canSeeParlay2 ? 'Pro+' : '\u{1F512} Locked'}
+                    {canSeeParlay2 ? (isAdmin ? 'Admin Unlocked' : 'Pro+') : '\u{1F512} Locked'}
                   </span>
                 </div>
                 <ParlayCard
                   parlay={picks?.parlay2}
                   tierAccess={canSeeParlay2}
+                  lockedReason={isAdmin ? undefined : 'Upgrade to Pro to unlock daily 2-team parlays'}
                   onAddToSlip={handleAddParlayToSlip}
                 />
               </section>
@@ -304,12 +342,13 @@ export default function DailyPicksModal({ isOpen, onClose, fixtures, onAddToSlip
                 <div className="flex items-center justify-between mb-3">
                   <h3 className="text-xs font-mono font-bold text-slate-300">3-Team Quant Multiplier</h3>
                   <span className="text-[10px] font-mono text-slate-500">
-                    {canSeeParlay3 ? 'Institutional' : '\u{1F512} Locked'}
+                    {canSeeParlay3 ? (isAdmin ? 'Admin Unlocked' : 'Institutional') : '\u{1F512} Locked'}
                   </span>
                 </div>
                 <ParlayCard
                   parlay={picks?.parlay3}
                   tierAccess={canSeeParlay3}
+                  lockedReason={isAdmin ? undefined : 'Upgrade to Institutional for high-multiplier 3-leg slips'}
                   onAddToSlip={handleAddParlayToSlip}
                 />
               </section>
@@ -319,12 +358,13 @@ export default function DailyPicksModal({ isOpen, onClose, fixtures, onAddToSlip
                 <div className="flex items-center justify-between mb-3">
                   <h3 className="text-xs font-mono font-bold text-slate-300">4-Team Mega Parlay</h3>
                   <span className="text-[10px] font-mono text-slate-500">
-                    {canSeeParlay4 ? 'Institutional' : '\u{1F512} Locked'}
+                    {canSeeParlay4 ? (isAdmin ? 'Admin Unlocked' : 'Institutional') : '\u{1F512} Locked'}
                   </span>
                 </div>
                 <ParlayCard
                   parlay={picks?.parlay4}
                   tierAccess={canSeeParlay4}
+                  lockedReason={isAdmin ? undefined : 'Upgrade to Institutional for 4-team mega parlays'}
                   onAddToSlip={handleAddParlayToSlip}
                 />
               </section>
