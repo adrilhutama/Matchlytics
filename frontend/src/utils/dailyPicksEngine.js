@@ -6,6 +6,54 @@
 const UPCOMING_STATUSES = ['NS', 'SCHEDULED', 'TIMED']
 const HORIZON_HOURS_MIN = 24
 const HORIZON_HOURS_MAX = 36
+const IMMEDIATE_HOURS_MAX = 18
+const IMMEDIATE_FALLBACK_HOURS_MAX = 24
+const MIN_IMMEDIATE_FIXTURES = 3
+
+/**
+ * Build a time-filtered pool of immediately upcoming fixtures.
+ * Applies a hard 18h cutoff; falls back to 24h only if fewer than
+ * MIN_IMMEDIATE_FIXTURES qualify — never exceeds 24h, never includes
+ * multi-day matches.
+ */
+export function buildImmediatePool(fixtures) {
+  const now = new Date()
+  const currentTimeMs = now.getTime()
+
+  function computePool(maxHours) {
+    const maxMs = currentTimeMs + maxHours * 60 * 60 * 1000
+    const pool = []
+    for (const f of fixtures || []) {
+      if (!UPCOMING_STATUSES.includes(f.status)) continue
+      const kickoff = new Date(f.kickoff_time).getTime()
+      if (kickoff <= currentTimeMs || kickoff > maxMs) continue
+      if (!f.best_ev_opportunity) continue
+      const opp = f.best_ev_opportunity
+      const score = (opp.ev_percentage * 0.6) + (opp.model_prob * 0.4)
+      pool.push({
+        fixtureId: f.id,
+        competitionCode: f.competition_code,
+        homeTeam: f.home_team?.name || `Team ${f.home_team_id}`,
+        awayTeam: f.away_team?.name || `Team ${f.away_team_id}`,
+        kickoffTime: f.kickoff_time,
+        opportunity: opp,
+        score,
+      })
+    }
+    pool.sort((a, b) => b.score - a.score)
+    return pool
+  }
+
+  // First pass: strict 18h window
+  let pool = computePool(IMMEDIATE_HOURS_MAX)
+
+  // Fallback: expand to 24h only when the strict window is too sparse
+  if (pool.length < MIN_IMMEDIATE_FIXTURES) {
+    pool = computePool(IMMEDIATE_FALLBACK_HOURS_MAX)
+  }
+
+  return pool
+}
 
 /**
  * Flatten all ev_opportunities across eligible fixtures into a single ranked pool.
@@ -25,7 +73,6 @@ export function buildPicksPool(fixtures) {
     if (!f.best_ev_opportunity) continue
 
     const opp = f.best_ev_opportunity
-    // score = 0.6 * ev_pct + 0.4 * model_prob (both are already percentages)
     const score = (opp.ev_percentage * 0.6) + (opp.model_prob * 0.4)
     pool.push({
       fixtureId: f.id,
@@ -46,8 +93,10 @@ export function buildPicksPool(fixtures) {
  * Build the full daily picks output from a fixtures array.
  */
 export function buildDailyPicks(fixtures) {
-  const pool = buildPicksPool(fixtures)
   const today = new Date().toISOString().split('T')[0]
+
+  // Use the immediate-pool path: hard 18h cutoff (fallback 24h if sparse)
+  const pool = buildImmediatePool(fixtures)
 
   // -- Top 3 Singles --
   const singles = pool.slice(0, 3).map((item) => buildSingleCard(item, today))
