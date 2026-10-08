@@ -933,6 +933,16 @@ function AppInner() {
         isOpen={isDailyPicksOpen}
         onClose={handleCloseDailyPicks}
         fixtures={(fixtures || []).filter(Boolean)}
+        onAddToSlip={(leg) => {
+          setParlaySlip(prev => {
+            const exists = prev.some(l => l.fixtureId === leg.fixtureId && l.pick === leg.pick)
+            if (exists) return prev.filter(l => !(l.fixtureId === leg.fixtureId && l.pick === leg.pick))
+            const next = [...prev, leg]
+            saveParlaySlip(next)
+            return next
+          })
+        }}
+        onOpenSlip={() => setIsSlipDrawerOpen(true)}
       />
 
       {showUpgradeModal && (
@@ -1112,6 +1122,7 @@ function AppInner() {
             portfolioCount={portfolioPositions.length}
             selectedLabFixture={selectedLabFixture}
             onOpenCommandPalette={() => setIsCommandPaletteOpen(true)}
+            onOpenDailyPicks={handleOpenDailyPicks}
             tier={tier}
           />
         )}

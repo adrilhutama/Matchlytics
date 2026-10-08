@@ -151,11 +151,10 @@ function ParlayCard({ parlay, tierAccess, onAddToSlip }) {
   )
 }
 
-export default function DailyPicksModal({ isOpen, onClose, fixtures }) {
+export default function DailyPicksModal({ isOpen, onClose, fixtures, onAddToSlip, onOpenSlip }) {
   const { profile } = useAuth()
   const [picks, setPicks] = useState(null)
   const [isLoading, setIsLoading] = useState(true)
-  const [slipLegs, setSlipLegs] = useState([])
   const todayKey = new Date().toISOString().split('T')[0]
 
   // Tier checks
@@ -177,52 +176,38 @@ export default function DailyPicksModal({ isOpen, onClose, fixtures }) {
     setIsLoading(false)
   }, [isOpen, fixtures])
 
-  // Load slip state from localStorage
-  useEffect(() => {
-    try {
-      const saved = localStorage.getItem('matchlytics_parlay_slip')
-      if (saved) setSlipLegs(JSON.parse(saved))
-    } catch {}
-  }, [])
-
-  // Check which legs are already in the slip
-  const isInSlip = useCallback((fixtureId, selection, market) => {
-    return slipLegs.some(l => l.fixtureId === fixtureId && l.pick === selection && l.market === market)
-  }, [slipLegs])
-
   const handleAddToSlip = useCallback((card) => {
+    if (!onAddToSlip) return
     const leg = {
       fixtureId: card.fixtureId,
       pick: card.selection,
-      market: card.market,
+      pickLabel: `${card.matchLabel} – ${card.selection}`,
+      homeTeam: card.matchLabel.split(' vs ')[0] || '',
+      awayTeam: card.matchLabel.split(' vs ')[1] || '',
       odds: parseFloat(card.odds) || 1,
-      label: `${card.matchLabel} - ${card.selection}`,
+      modelProb: parseFloat(card.modelProb) || 0,
+      ev: parseFloat(card.evPercent) || 0,
     }
-    setSlipLegs(prev => {
-      const exists = prev.some(l => l.fixtureId === leg.fixtureId && l.pick === leg.pick && l.market === leg.market)
-      if (exists) return prev.filter(l => !(l.fixtureId === leg.fixtureId && l.pick === leg.pick && l.market === leg.market))
-      const next = [...prev, leg]
-      try { localStorage.setItem('matchlytics_parlay_slip', JSON.stringify(next)) } catch {}
-      return next
-    })
-  }, [])
+    onAddToSlip(leg)
+    onOpenSlip?.()
+  }, [onAddToSlip, onOpenSlip])
 
   const handleAddParlayToSlip = useCallback((parlay) => {
-    if (!parlay) return
-    const newLegs = parlay.legs.map(leg => ({
-      fixtureId: leg.fixtureId,
-      pick: leg.selection,
-      market: leg.market,
-      odds: parseFloat(leg.odds) || 1,
-      label: `${leg.matchLabel} - ${leg.selection}`,
-    }))
-    setSlipLegs(prev => {
-      const filtered = prev.filter(p => !newLegs.some(nl => nl.fixtureId === p.fixtureId && nl.pick === p.pick))
-      const merged = [...filtered, ...newLegs]
-      try { localStorage.setItem('matchlytics_parlay_slip', JSON.stringify(merged)) } catch {}
-      return merged
+    if (!parlay || !onAddToSlip) return
+    parlay.legs.forEach(leg => {
+      onAddToSlip({
+        fixtureId: leg.fixtureId,
+        pick: leg.selection,
+        pickLabel: `${leg.matchLabel} – ${leg.selection}`,
+        homeTeam: leg.matchLabel.split(' vs ')[0] || '',
+        awayTeam: leg.matchLabel.split(' vs ')[1] || '',
+        odds: parseFloat(leg.odds) || 1,
+        modelProb: parseFloat(leg.modelProb) || 0,
+        ev: parseFloat(leg.evPercent) || 0,
+      })
     })
-  }, [])
+    onOpenSlip?.()
+  }, [onAddToSlip, onOpenSlip])
 
   const handleDismiss = useCallback(() => {
     try {
@@ -288,7 +273,7 @@ export default function DailyPicksModal({ isOpen, onClose, fixtures }) {
                       key={card.id}
                       card={card}
                       onAddToSlip={handleAddToSlip}
-                      isInSlip={isInSlip(card.fixtureId, card.selection, card.market)}
+                      isInSlip={false}
                     />
                   ))}
                   {!picks?.singles?.length && (

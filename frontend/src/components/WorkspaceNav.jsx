@@ -9,6 +9,7 @@ export default function WorkspaceNav({
   onWorkspaceChange,
   onSelectWorkspace,
   onOpenCommandPalette,
+  onOpenDailyPicks,
   activeFixtureCount = 0,
   valueBetCount = 0,
   valueCount = 0,
@@ -130,8 +131,22 @@ export default function WorkspaceNav({
           })}
         </nav>
 
-        {/* Command Palette Trigger */}
+        {/* Daily Alpha Trigger + Command Palette */}
         <div className="flex items-center gap-2 flex-shrink-0 pl-2">
+          {onOpenDailyPicks && (
+            <button
+              type="button"
+              onClick={onOpenDailyPicks}
+              className="min-h-[44px] px-3 rounded-xl border border-amber-500/30 bg-amber-500/10 text-amber-400 hover:bg-amber-500/20 hover:border-amber-500/50 transition-all flex items-center gap-1.5 text-xs font-mono font-bold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500"
+              title="Open Daily Alpha Picks &amp; Parlay Slips"
+            >
+              <span className="relative flex h-2 w-2">
+                <span className="absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75 animate-ping" />
+                <span className="relative inline-flex rounded-full h-2 w-2 bg-amber-500" />
+              </span>
+              <span className="hidden sm:inline">Daily Alpha</span>
+            </button>
+          )}
           <button
             type="button"
             onClick={onOpenCommandPalette}
