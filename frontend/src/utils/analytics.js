@@ -254,9 +254,10 @@ export function runMonteCarloSimulation(lambdaHome, lambdaAway, iterations = 100
   let homeCleanSheets = 0;
   let awayCleanSheets = 0;
 
-  let margin1 = 0;
-  let margin2 = 0;
-  let margin3Plus = 0;
+  let homeBy1 = 0;
+  let homeBy2Plus = 0;
+  let awayBy1 = 0;
+  let awayBy2Plus = 0;
 
   let bracketLow = 0;     // 0-1 goals
   let bracketNormal = 0;  // 2-3 goals
@@ -266,7 +267,6 @@ export function runMonteCarloSimulation(lambdaHome, lambdaAway, iterations = 100
     const goalsH = samplePoisson(lh);
     const goalsA = samplePoisson(la);
     const totalGoals = goalsH + goalsA;
-    const diff = Math.abs(goalsH - goalsA);
 
     if (goalsH > goalsA) homeWins++;
     else if (goalsH === goalsA) draws++;
@@ -275,9 +275,11 @@ export function runMonteCarloSimulation(lambdaHome, lambdaAway, iterations = 100
     if (goalsA === 0) homeCleanSheets++;
     if (goalsH === 0) awayCleanSheets++;
 
-    if (diff === 1) margin1++;
-    else if (diff === 2) margin2++;
-    else if (diff >= 3) margin3Plus++;
+    const diff = goalsH - goalsA;
+    if (diff === 1) homeBy1++;
+    else if (diff >= 2) homeBy2Plus++;
+    else if (diff === -1) awayBy1++;
+    else if (diff <= -2) awayBy2Plus++;
 
     if (totalGoals <= 1) bracketLow++;
     else if (totalGoals <= 3) bracketNormal++;
@@ -293,12 +295,27 @@ export function runMonteCarloSimulation(lambdaHome, lambdaAway, iterations = 100
     awayWinPct: toPct(awayWins),
     homeCleanSheetPct: toPct(homeCleanSheets),
     awayCleanSheetPct: toPct(awayCleanSheets),
-    margin1Pct: toPct(margin1),
-    margin2Pct: toPct(margin2),
-    margin3PlusPct: toPct(margin3Plus),
+    // Flat keys for backward compatibility
+    margin1Pct: toPct(homeBy1),
+    margin2Pct: toPct(homeBy2Plus),
+    margin3PlusPct: 0,
     bracketLowPct: toPct(bracketLow),
     bracketNormalPct: toPct(bracketNormal),
     bracketHighPct: toPct(bracketHigh),
+    // Nested structure for QuantLab
+    brackets: {
+      bracket01Pct: toPct(bracketLow),
+      bracket23Pct: toPct(bracketNormal),
+      bracket45Pct: toPct(bracketHigh),
+      bracket6PlusPct: 0,
+    },
+    margins: {
+      homeBy2PlusPct: toPct(homeBy2Plus),
+      homeBy1Pct: toPct(homeBy1),
+      drawsPct: toPct(draws),
+      awayBy1Pct: toPct(awayBy1),
+      awayBy2PlusPct: toPct(awayBy2Plus),
+    },
   };
 }
 

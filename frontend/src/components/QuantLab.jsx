@@ -195,6 +195,36 @@ function QuantLabWorkspace({
   const recentMatches = Array.isArray(h2hData?.recentMatches) ? h2hData.recentMatches : []
   const totalH2hMatches = (h2hData?.homeWins ?? 0) + (h2hData?.draws ?? 0) + (h2hData?.awayWins ?? 0) || h2hData?.numberOfMatches || recentMatches.length
 
+  // Derive H2H counters defensively from recentMatches as fallback
+  const h2hHomeId = String(fixture?.home_team?.id || fixture?.home_team_id || '')
+  const h2hAwayId = String(fixture?.away_team?.id || fixture?.away_team_id || '')
+  const h2hHomeName = fixture?.home_team?.name || fixture?.home_team_name || ''
+  const h2hAwayName = fixture?.away_team?.name || fixture?.away_team_name || ''
+  const h2hStats = useMemo(() => {
+    if (totalH2hMatches > 0 || h2hData?.homeWins != null) {
+      return { homeWins: h2hData?.homeWins ?? 0, draws: h2hData?.draws ?? 0, awayWins: h2hData?.awayWins ?? 0, totalGoals: h2hData?.totalGoals ?? 0 }
+    }
+    let hw = 0, dw = 0, aw = 0, tg = 0
+    for (const m of recentMatches) {
+      const hs = Number(m.homeScore ?? m.actual_home_score ?? 0)
+      const as_ = Number(m.awayScore ?? m.actual_away_score ?? 0)
+      tg += hs + as_
+      const mHomeName = m.homeTeam || ''
+      const mAwayName = m.awayTeam || ''
+      const isCurrentHomeHome = mHomeName === h2hHomeName || String(m.home_team_id) === h2hHomeId
+      if (hs > as_) {
+        if (isCurrentHomeHome) hw++
+        else aw++
+      } else if (hs < as_) {
+        if (isCurrentHomeHome) aw++
+        else hw++
+      } else {
+        dw++
+      }
+    }
+    return { homeWins: hw, draws: dw, awayWins: aw, totalGoals: tg }
+  }, [totalH2hMatches, h2hData?.homeWins, h2hData?.draws, h2hData?.awayWins, h2hData?.totalGoals, recentMatches, h2hHomeId, h2hAwayId, h2hHomeName, h2hAwayName])
+
   // Reset to original model xG
   const handleResetModelXg = () => {
     if (fixture) {
@@ -270,11 +300,14 @@ function QuantLabWorkspace({
               className="bg-pitch-950 border border-pitch-700 hover:border-amber-500/50 rounded-xl px-3 py-2 text-xs sm:text-sm text-slate-200 focus:outline-none focus:ring-2 focus:ring-amber-500 font-sans w-full lg:max-w-[340px] min-h-[44px] truncate cursor-pointer transition-colors touch-manipulation"
             >
               {matchPool.map((f) => {
+                const homeName = f.home_team?.short_name || f.home_team?.name || f.home_team_name || "Home"
+                const awayName = f.away_team?.short_name || f.away_team?.name || f.away_team_name || "Away"
+                const compCode = f.competition_code || f.competition?.code || f.league || ""
                 const isVal = Boolean(f.value_pick)
                 const evTag = isVal ? ` ★ [+EV ${(f.ev_percentage || 0).toFixed(1)}%]` : ''
                 return (
                   <option key={f.id} value={f.id}>
-                    {f.home_team_name} vs {f.away_team_name}{evTag} ({f.league_name || 'League'})
+                    {homeName} vs {awayName}{evTag}{compCode ? ` (${compCode})` : ''}
                   </option>
                 )
               })}
@@ -685,10 +718,10 @@ function QuantLabWorkspace({
             </span>
             <div className="flex items-baseline gap-2">
               <span className="text-xl font-bold font-mono text-sky-400">
-                {h2hData?.homeWins ?? 0}
+                {h2hStats.homeWins}
               </span>
               <span className="text-xs text-slate-500 font-mono">
-                {totalH2hMatches > 0 ? `${Math.round(((h2hData?.homeWins ?? 0) / totalH2hMatches) * 100)}%` : '0%'}
+                {totalH2hMatches > 0 ? `${Math.round(((h2hStats.homeWins ?? 0) / totalH2hMatches) * 100)}%` : '0%'}
               </span>
             </div>
           </div>
@@ -699,10 +732,10 @@ function QuantLabWorkspace({
             </span>
             <div className="flex items-baseline gap-2">
               <span className="text-xl font-bold font-mono text-amber-400">
-                {h2hData?.draws ?? 0}
+                {h2hStats.draws}
               </span>
               <span className="text-xs text-slate-500 font-mono">
-                {totalH2hMatches > 0 ? `${Math.round(((h2hData?.draws ?? 0) / totalH2hMatches) * 100)}%` : '0%'}
+                {totalH2hMatches > 0 ? `${Math.round(((h2hStats.draws ?? 0) / totalH2hMatches) * 100)}%` : '0%'}
               </span>
             </div>
           </div>
@@ -713,10 +746,10 @@ function QuantLabWorkspace({
             </span>
             <div className="flex items-baseline gap-2">
               <span className="text-xl font-bold font-mono text-rose-400">
-                {h2hData?.awayWins ?? 0}
+                {h2hStats.awayWins}
               </span>
               <span className="text-xs text-slate-500 font-mono">
-                {totalH2hMatches > 0 ? `${Math.round(((h2hData?.awayWins ?? 0) / totalH2hMatches) * 100)}%` : '0%'}
+                {totalH2hMatches > 0 ? `${Math.round(((h2hStats.awayWins ?? 0) / totalH2hMatches) * 100)}%` : '0%'}
               </span>
             </div>
           </div>
@@ -727,10 +760,10 @@ function QuantLabWorkspace({
             </span>
             <div className="flex items-baseline gap-2">
               <span className="text-xl font-bold font-mono text-emerald-400">
-                {h2hData?.totalGoals ?? 0}
+                {h2hStats.totalGoals}
               </span>
               <span className="text-xs text-slate-500 font-mono">
-                {totalH2hMatches > 0 ? `${((h2hData?.totalGoals ?? 0) / totalH2hMatches).toFixed(1)} / game` : '-'}
+                {totalH2hMatches > 0 ? `${(h2hStats.totalGoals / totalH2hMatches).toFixed(1)} / game` : '-'}
               </span>
             </div>
           </div>
