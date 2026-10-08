@@ -454,8 +454,8 @@ function AppInner() {
         .from('fixtures')
         .select(`
           *,
-          home_team:teams!home_team_id(id, name, short_name, crest_url),
-          away_team:teams!away_team_id(id, name, short_name, crest_url)
+          home_team:teams!home_team_id(id, name, short_name, crest_url, home_attack, home_defense, away_attack, away_defense),
+          away_team:teams!away_team_id(id, name, short_name, crest_url, home_attack, home_defense, away_attack, away_defense)
         `)
         .in('status', UPCOMING_STATUSES)
         .order('kickoff_time', { ascending: true })
@@ -509,8 +509,8 @@ function AppInner() {
         .from('fixtures')
         .select(`
           *,
-          home_team:teams!home_team_id(id, name, short_name, crest_url),
-          away_team:teams!away_team_id(id, name, short_name, crest_url)
+          home_team:teams!home_team_id(id, name, short_name, crest_url, home_attack, home_defense, away_attack, away_defense),
+          away_team:teams!away_team_id(id, name, short_name, crest_url, home_attack, home_defense, away_attack, away_defense)
         `)
         .in('status', ['FT', 'FINISHED', 'AET', 'PEN'])
         .order('kickoff_time', { ascending: false })
