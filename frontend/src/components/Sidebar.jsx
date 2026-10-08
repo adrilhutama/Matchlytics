@@ -57,6 +57,16 @@ const FEEDS = [
   )},
 ]
 
+const ADMIN_WORKSPACE = {
+  id: 'admin',
+  label: 'Admin Center',
+  icon: (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
+    </svg>
+  ),
+}
+
 export default function Sidebar({
   activeFeed,
   onFeedSelect,
@@ -74,6 +84,7 @@ export default function Sidebar({
   activeWorkspace = 'terminal',
   onSelectWorkspace,
   onOpenAdmin,
+  onOpenProfile,
 }) {
   const [pinned, setPinned] = useState(false)
   const [hovered, setHovered] = useState(false)
@@ -150,6 +161,24 @@ export default function Sidebar({
             </button>
           )
         })}
+        {isAdmin && onOpenAdmin && (
+          <button
+            type="button"
+            onClick={() => onOpenAdmin()}
+            aria-current={activeWorkspace === 'admin' ? 'page' : undefined}
+            title={!pinned && !hovered ? ADMIN_WORKSPACE.label : undefined}
+            className={`w-full min-h-[36px] rounded-xl transition-all flex items-center gap-3 ${
+              activeWorkspace === 'admin'
+                ? 'bg-amber-500/15 text-amber-400'
+                : 'text-slate-400 hover:bg-pitch-900 hover:text-slate-200'
+            } ${!pinned && !hovered ? 'justify-center px-0' : 'px-3'}`}
+          >
+            <span className="flex-shrink-0 text-amber-500">{ADMIN_WORKSPACE.icon}</span>
+            {(pinned || hovered) && (
+              <span className="text-xs font-semibold truncate animate-fade-in text-amber-400">{ADMIN_WORKSPACE.label}</span>
+            )}
+          </button>
+        )}
       </nav>
 
       {/* Feed Nav */}
@@ -224,9 +253,13 @@ export default function Sidebar({
       {/* Footer */}
       <div className="mt-auto px-2 pb-3 space-y-2">
         {userEmail && (pinned || hovered) && (
-          <div className="rounded-xl bg-pitch-900 border border-pitch-800 p-2.5">
+          <button
+            type="button"
+            onClick={onOpenProfile}
+            className="w-full rounded-xl bg-pitch-900 border border-pitch-800 p-2.5 text-left hover:border-pitch-700 transition-colors"
+          >
             <div className="flex items-center justify-between gap-1 min-w-0">
-              <div className="min-w-0">
+              <div className="min-w-0 flex-1">
                 <p className="text-[10px] text-slate-300 font-medium truncate">{userEmail}</p>
                 <span className={`inline-block mt-0.5 px-1.5 py-0.5 rounded-md text-[9px] font-mono font-bold tracking-wider ${
                   subscriptionTier === 'free'
@@ -236,20 +269,12 @@ export default function Sidebar({
                   {(subscriptionTier || 'free').toUpperCase()}
                 </span>
               </div>
-              <button
-                type="button"
-                onClick={onSignOut}
-                title="Sign out"
-                className="min-h-[28px] min-w-[28px] shrink-0 px-1.5 rounded-lg text-slate-500 hover:text-rose-400 hover:bg-pitch-800 transition-colors flex items-center justify-center"
-              >
-                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                  <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
-                  <polyline points="16 17 21 12 16 7" />
-                  <line x1="21" y1="12" x2="9" y2="12" />
-                </svg>
-              </button>
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" className="text-slate-500 flex-shrink-0">
+                <circle cx="12" cy="12" r="3" />
+                <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z" />
+              </svg>
             </div>
-          </div>
+          </button>
         )}
 
         {isAdmin && onOpenAdmin && (pinned || hovered) && (
@@ -258,7 +283,7 @@ export default function Sidebar({
             onClick={onOpenAdmin}
             className="w-full px-3 py-1.5 rounded-lg bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/30 text-amber-400 text-[11px] font-mono transition-colors text-left"
           >
-            ⚙ Admin Dashboard
+            Admin Dashboard
           </button>
         )}
 

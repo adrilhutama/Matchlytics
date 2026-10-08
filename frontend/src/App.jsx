@@ -38,6 +38,8 @@ import QuantLab from './components/QuantLab'
 import PortfolioTracker from './components/PortfolioTracker'
 import ModelLedger from './components/ModelLedger'
 import AdminDashboard from './components/AdminDashboard'
+import AdminPanel from './components/AdminPanel'
+import UserProfile from './components/UserProfile'
 import { AuthProvider, useAuth } from './context/AuthContext'
 import {
   isDateInRange,
@@ -140,7 +142,7 @@ function AppInner() {
   const [lastUpdated,         setLastUpdated]         = useState(null)
   const [realtimeToast,       setRealtimeToast]       = useState(false)
 
-  // Multi-workspace terminal state: 'terminal' | 'quant_lab' | 'portfolio' | 'ledger'
+  // Multi-workspace terminal state: 'terminal' | 'quant_lab' | 'portfolio' | 'ledger' | 'profile'
   const [activeWorkspace,     setActiveWorkspace]     = useState('terminal')
   const [isAdminView,         setIsAdminView]         = useState(false)
   const [isCommandPaletteOpen, setIsCommandPaletteOpen] = useState(false)
@@ -418,6 +420,17 @@ function AppInner() {
     setShowUpgradeModal(true)
   }, [])
 
+  // Profile view navigation
+  const handleOpenProfile = useCallback(() => {
+    setActiveWorkspace('profile')
+    window.scrollTo({ top: 0, behavior: 'smooth' })
+  }, [])
+
+  const handleBackFromProfile = useCallback(() => {
+    setActiveWorkspace('terminal')
+    window.scrollTo({ top: 0, behavior: 'smooth' })
+  }, [])
+
   // Quant Lab navigation action
   const handleSelectForLab = useCallback((fixture) => {
     if (!canAccessQuantFeatures) {
@@ -464,6 +477,15 @@ function AppInner() {
     setActiveWorkspace(ws)
     window.scrollTo({ top: 0, behavior: 'smooth' })
   }, [canAccessQuantFeatures, selectedLabFixture, fixtures, openUpgradeFor])
+
+  // Admin guard: only whitelisted emails can open admin
+  const handleOpenAdmin = useCallback(() => {
+    const raw = import.meta.env.VITE_ADMIN_EMAILS || ''
+    const emails = raw.split(',').map((e) => e.trim().toLowerCase()).filter(Boolean)
+    if (emails.includes((user?.email || '').toLowerCase())) {
+      setIsAdminView(true)
+    }
+  }, [user])
 
   // Data fetching: Standings
   const fetchStandings = useCallback(async () => {
@@ -944,7 +966,7 @@ function AppInner() {
   if (isAdminView) {
     return (
       <div className="w-full min-h-screen bg-pitch-950 text-slate-100">
-        <AdminDashboard onBack={() => setIsAdminView(false)} />
+        <AdminPanel onBack={() => setIsAdminView(false)} />
       </div>
     )
   }
@@ -966,7 +988,8 @@ function AppInner() {
         onSignOut={signOut}
         activeWorkspace={activeWorkspace}
         onSelectWorkspace={handleSelectWorkspace}
-        onOpenAdmin={() => setIsAdminView(true)}
+        onOpenAdmin={handleOpenAdmin}
+        onOpenProfile={handleOpenProfile}
       />
 
       {/* Main Content Area */}
@@ -1032,18 +1055,20 @@ function AppInner() {
         <SubscriptionBanner />
 
         {/* Multi-Workspace Top Sub-Nav Switcher */}
-        <WorkspaceNav
-          activeWorkspace={activeWorkspace}
-          onWorkspaceChange={handleSelectWorkspace}
-          onSelectWorkspace={handleSelectWorkspace}
-          activeFixtureCount={fixtures.length}
-          valueCount={valueCount}
-          valueBetCount={valueCount}
-          portfolioCount={portfolioPositions.length}
-          selectedLabFixture={selectedLabFixture}
-          onOpenCommandPalette={() => setIsCommandPaletteOpen(true)}
-          tier={tier}
-        />
+        {activeWorkspace !== 'profile' && (
+          <WorkspaceNav
+            activeWorkspace={activeWorkspace}
+            onWorkspaceChange={handleSelectWorkspace}
+            onSelectWorkspace={handleSelectWorkspace}
+            activeFixtureCount={fixtures.length}
+            valueCount={valueCount}
+            valueBetCount={valueCount}
+            portfolioCount={portfolioPositions.length}
+            selectedLabFixture={selectedLabFixture}
+            onOpenCommandPalette={() => setIsCommandPaletteOpen(true)}
+            tier={tier}
+          />
+        )}
 
         {/* Realtime Toast Notification */}
         {realtimeToast && (
@@ -1187,6 +1212,11 @@ function AppInner() {
             <ModelLedger
               settledFixtures={(settledFixtures || []).filter(Boolean)}
             />
+          )}
+
+          {/* Workspace 5: User Profile & Account Settings */}
+          {activeWorkspace === 'profile' && (
+            <UserProfile onBack={handleBackFromProfile} />
           )}
         </main>
 
