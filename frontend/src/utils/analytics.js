@@ -18,8 +18,8 @@ const FACTORIALS = [1, 1, 2, 6, 24, 120];
  * P(score_x_y) = P(x; lambda_h) * P(y; lambda_a) * 100%
  */
 export function computePoissonMatrix(lambdaHome, lambdaAway, maxGoals = 5) {
-  const lh = Math.max(0.2, Math.min(4.5, Number(lambdaHome) || 1.35));
-  const la = Math.max(0.2, Math.min(4.5, Number(lambdaAway) || 1.35));
+  const lh = Math.max(0.6, Math.min(3.2, Number(lambdaHome) || 1.35));
+  const la = Math.max(0.6, Math.min(3.2, Number(lambdaAway) || 1.35));
 
   const probH = [];
   const probA = [];
@@ -132,7 +132,8 @@ export function calculateZeroVigOdds(oddsHome, oddsDraw, oddsAway) {
 export function calculateEdgeAndEV(odds, modelProbPercent) {
   const o = Number(odds);
   const pModel = Number(modelProbPercent);
-  if (!o || o <= 1 || !pModel || pModel <= 0) {
+  // Apply guardrails matching Python find_best_pick: odds [1.25, 12.0], prob >= 15%
+  if (!o || o < 1.25 || o > 12.0 || !pModel || pModel < 15) {
     return { impliedProb: 0, evPercent: 0, netEdge: 0 };
   }
   const impliedProb = (1 / o) * 100;
@@ -243,8 +244,8 @@ function samplePoisson(lambda) {
  * Default 10,000 iterations to match QuantLab and Python evaluator.
  */
 export function runMonteCarloSimulation(lambdaHome, lambdaAway, iterations = 10000) {
-  const lh = Math.max(0.2, Math.min(4.5, Number(lambdaHome) || 1.35));
-  const la = Math.max(0.2, Math.min(4.5, Number(lambdaAway) || 1.35));
+  const lh = Math.max(0.6, Math.min(3.2, Number(lambdaHome) || 1.35));
+  const la = Math.max(0.6, Math.min(3.2, Number(lambdaAway) || 1.35));
 
   let homeWins = 0;
   let draws = 0;

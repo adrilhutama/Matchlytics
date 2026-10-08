@@ -65,7 +65,7 @@ class TestRoundRobinRotation:
 
     def test_default_request_pacing(self):
         manager = OddsPoolManager(keys=["key_alpha"])
-        assert manager.request_delay == 0.5
+        assert manager.request_delay == 6.5
 
     def test_round_robin_sequence(self):
         keys = ["key_alpha_1111", "key_bravo_2222", "key_charlie_3333"]

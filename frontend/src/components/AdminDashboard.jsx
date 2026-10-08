@@ -543,9 +543,9 @@ export default function AdminDashboard({ onBack }) {
           <div className="pt-4 border-t border-pitch-800">
             <p className="text-[11px] text-slate-500 font-mono mb-2">Workflow Schedule:</p>
             <ul className="text-[11px] text-slate-400 font-mono space-y-1">
-              <li>sync_standings.yml &mdash; Daily at 03:00 UTC</li>
-              <li>sync_fixtures.yml &mdash; Mondays at 02:00 UTC</li>
-              <li>sync_daily.yml &mdash; Twice daily at 06:00 & 14:00 UTC</li>
+              <li>sync_standings.yml - Daily at 03:00 UTC</li>
+              <li>sync_fixtures.yml - Mondays at 02:00 UTC</li>
+              <li>sync_daily.yml - Twice daily at 06:00 & 14:00 UTC</li>
             </ul>
           </div>
         </div>

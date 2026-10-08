@@ -238,7 +238,8 @@ export default function MatchCard({
       <div>
         {/* ---- Header: League, Kickoff Time, Odds Source & Watchlist Star ---- */}
         <div className="flex items-start justify-between gap-3 mb-3">
-          <div className="flex flex-col gap-1 min-w-0">
+          <div className="flex flex-col gap-1.5 min-w-0">
+            {/* League badge */}
             <div className="flex items-center gap-2">
               {league_logo && (
                 <img
@@ -252,7 +253,7 @@ export default function MatchCard({
                   onError={(e) => { e.currentTarget.style.display = 'none' }}
                 />
               )}
-              <span className="text-xs text-slate-400 font-semibold truncate" title={league_name}>
+              <span className="text-[11px] font-bold text-slate-300 uppercase tracking-wider truncate" title={league_name}>
                 {league_name}
               </span>
             </div>
@@ -260,46 +261,44 @@ export default function MatchCard({
             {/* Market feed indicator */}
             <div className="flex items-center gap-2">
               <span
-                className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded text-[10px] font-mono ${
+                className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md text-[10px] font-mono font-semibold ${
                   hasRealOdds
-                    ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20'
-                    : 'bg-pitch-900 text-slate-400 border border-pitch-700'
+                    ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/40'
+                    : 'bg-pitch-900 text-slate-500 border border-pitch-700'
                 }`}
               >
-                <span>{hasRealOdds ? '●' : '○'}</span>
-                <span>{hasRealOdds ? 'Consensus Sharp Feed' : 'Model Fair Only'}</span>
+                <span className={`w-1.5 h-1.5 rounded-full ${hasRealOdds ? 'bg-emerald-400 animate-pulse' : 'bg-slate-500'}`} />
+                <span>{hasRealOdds ? 'LIVE FEED' : 'MODEL'}</span>
               </span>
-            </div>
 
-            {/* Multi-Market EV Badges in Header */}
-            {(totalsEdge || spreadsEdge) && (
-              <div className="flex flex-wrap items-center gap-1.5 pt-0.5">
-                {totalsEdge && (
-                  <span
-                    className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-mono font-bold bg-amber-500/15 text-amber-300 border border-amber-500/30"
-                    title="Identified +EV Edge in Totals market"
-                  >
-                    <span>★</span>
-                    <span>+EV Totals: {totalsEdge.label} (+{totalsEdge.ev}%)</span>
-                  </span>
-                )}
-                {spreadsEdge && (
-                  <span
-                    className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-mono font-bold bg-sky-500/15 text-sky-300 border border-sky-500/30"
-                    title="Identified +EV Edge in Asian Handicap market"
-                  >
-                    <span>★</span>
-                    <span>+EV Spread: {spreadsEdge.label} (+{spreadsEdge.ev}%)</span>
-                  </span>
-                )}
-              </div>
-            )}
+              {/* Multi-Market EV Badges in Header */}
+              {(totalsEdge || spreadsEdge) && (
+                <div className="flex items-center gap-1.5">
+                  {totalsEdge && (
+                    <span
+                      className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md text-[10px] font-mono font-bold bg-amber-500/20 text-amber-400 border border-amber-500/40"
+                      title="Identified +EV Edge in Totals market"
+                    >
+                      O/U +{totalsEdge.ev}%
+                    </span>
+                  )}
+                  {spreadsEdge && (
+                    <span
+                      className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md text-[10px] font-mono font-bold bg-sky-500/20 text-sky-400 border border-sky-500/40"
+                      title="Identified +EV Edge in Asian Handicap market"
+                    >
+                      AH +{spreadsEdge.ev}%
+                    </span>
+                  )}
+                </div>
+              )}
+            </div>
           </div>
 
           {/* Right Header: Timing & Pin Button */}
-          <div className="flex items-center gap-1.5 flex-shrink-0">
+          <div className="flex items-center gap-2 flex-shrink-0">
             <div className="text-right">
-              <span className="inline-block px-2 py-0.5 rounded bg-pitch-900 border border-pitch-700 text-[11px] font-medium text-amber-400 tabular-nums">
+              <span className="inline-block px-2 py-1 rounded-lg bg-gradient-to-r from-amber-500/20 to-amber-600/10 border border-amber-500/30 text-[11px] font-bold text-amber-400 tabular-nums">
                 {relativeBadge}
               </span>
               {timeStr && (
@@ -312,11 +311,15 @@ export default function MatchCard({
               type="button"
               onClick={() => onToggleWatchlist(fixture.id)}
               aria-label={isPinned ? `Unpin ${home_team_name} vs ${away_team_name} from watchlist` : `Pin ${home_team_name} vs ${away_team_name} to watchlist`}
-              className="w-11 h-11 min-w-[44px] min-h-[44px] flex items-center justify-center rounded-xl bg-pitch-900/80 hover:bg-pitch-700 text-slate-400 hover:text-amber-400 border border-pitch-700 transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500 active:scale-95 touch-manipulation"
+              className={`w-9 h-9 flex items-center justify-center rounded-xl transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500 active:scale-95 touch-manipulation ${
+                isPinned
+                  ? 'bg-amber-500/20 text-amber-400 border border-amber-500/40'
+                  : 'bg-pitch-900/80 text-slate-500 hover:text-amber-400 border border-pitch-700 hover:border-amber-500/30'
+              }`}
             >
               <svg
-                width="15"
-                height="15"
+                width="14"
+                height="14"
                 viewBox="0 0 24 24"
                 fill={isPinned ? '#f59e0b' : 'none'}
                 stroke={isPinned ? '#f59e0b' : 'currentColor'}
@@ -331,82 +334,191 @@ export default function MatchCard({
         </div>
 
         {/* ---- Teams & Predicted Score ---- */}
-        <div className="flex items-center justify-between gap-2.5 mb-3">
+        <div className="flex items-center justify-between gap-3 mb-4">
           {/* Home */}
-          <div className="flex flex-col items-center gap-1 flex-1 text-center min-w-0">
-            <TeamLogo src={homeLogo} name={homeName} />
-            <span className="text-xs font-semibold text-slate-200 line-clamp-2 leading-tight min-h-[2.4em] flex items-center justify-center">
+          <div className="flex flex-col items-center gap-1.5 flex-1 text-center min-w-0">
+            <div className="relative">
+              <TeamLogo src={homeLogo} name={homeName} />
+              {homeStandings?.form && (
+                <div className="absolute -bottom-1 left-1/2 -translate-x-1/2">
+                  <FormGuide form={homeStandings.form} size="sm" />
+                </div>
+              )}
+            </div>
+            <span className="text-xs font-bold text-slate-100 line-clamp-2 leading-tight min-h-[2.4em] flex items-center justify-center">
               {home_team_name}
             </span>
-            {homeStandings?.form && (
-              <FormGuide form={homeStandings.form} size="sm" />
-            )}
             {homeStandings?.home_played > 0 && (
-              <span className="text-[10px] text-slate-500 font-mono">
-                H: {homeStandings.home_goals_for}:{homeStandings.home_goals_against} ({homeStandings.home_played}H)
+              <span className="text-[9px] text-slate-500 font-mono">
+                H: {homeStandings.home_goals_for}:{homeStandings.home_goals_against}
               </span>
             )}
           </div>
 
           {/* Centre: predicted score + metadata */}
-          <div className="flex flex-col items-center gap-1 flex-shrink-0 px-1">
+          <div className="flex flex-col items-center gap-1 flex-shrink-0 px-2">
             {predicted_score ? (
               <div className="text-center">
-                <p className="text-[10px] text-slate-500 font-mono uppercase tracking-wider">
-                  Predicted
-                </p>
-                <p className="text-xl sm:text-2xl font-bold text-slate-100 tabular-nums tracking-tight leading-none">
+                <p className="text-[9px] text-slate-500 font-mono uppercase tracking-widest">PRED</p>
+                <p className="text-2xl sm:text-3xl font-black text-white tabular-nums tracking-tight leading-none">
                   {predicted_score}
                 </p>
               </div>
             ) : (
-              <p className="text-xs text-slate-500 font-semibold font-mono">vs</p>
+              <p className="text-xs text-slate-600 font-bold font-mono">VS</p>
             )}
             <LambdaRow lambdaHome={lambda_home} lambdaAway={lambda_away} />
           </div>
 
           {/* Away */}
-          <div className="flex flex-col items-center gap-1 flex-1 text-center min-w-0">
-            <TeamLogo src={awayLogo} name={awayName} />
-            <span className="text-xs font-semibold text-slate-200 line-clamp-2 leading-tight min-h-[2.4em] flex items-center justify-center">
+          <div className="flex flex-col items-center gap-1.5 flex-1 text-center min-w-0">
+            <div className="relative">
+              <TeamLogo src={awayLogo} name={awayName} />
+              {awayStandings?.form && (
+                <div className="absolute -bottom-1 left-1/2 -translate-x-1/2">
+                  <FormGuide form={awayStandings.form} size="sm" />
+                </div>
+              )}
+            </div>
+            <span className="text-xs font-bold text-slate-100 line-clamp-2 leading-tight min-h-[2.4em] flex items-center justify-center">
               {away_team_name}
             </span>
-            {awayStandings?.form && (
-              <FormGuide form={awayStandings.form} size="sm" />
-            )}
             {awayStandings?.away_played > 0 && (
-              <span className="text-[10px] text-slate-500 font-mono">
-                A: {awayStandings.away_goals_for}:{awayStandings.away_goals_against} ({awayStandings.away_played}A)
+              <span className="text-[9px] text-slate-500 font-mono">
+                A: {awayStandings.away_goals_for}:{awayStandings.away_goals_against}
               </span>
             )}
           </div>
         </div>
 
-        {/* ---- 1X2 Probabilities (Compact) ---- */}
-        {(prob_home != null || prob_draw != null || prob_away != null) && (
+        {/* ---- 1X2 Odds Display (Sports Betting Style) ---- */}
+        {(odds_home || odds_draw || odds_away) && (
           <div className="mb-3">
-            <ProbabilityBar
-              probHome={prob_home}
-              probDraw={prob_draw}
-              probAway={prob_away}
-            />
+            <div className="grid grid-cols-3 gap-2">
+              {/* Home */}
+              <button
+                type="button"
+                onClick={() => onToggleSlip && onToggleSlip({
+                  fixtureId: fixture.id,
+                  homeTeam: home_team_name,
+                  awayTeam: away_team_name,
+                  pick: 'HOME',
+                  pickLabel: `${home_team_name} Win`,
+                  odds: odds_home,
+                  modelProb: prob_home,
+                  ev: ((Number(prob_home) / 100) * Number(odds_home) - 1) * 100,
+                  leagueName: league_name,
+                  matchDate: match_date,
+                })}
+                className={`relative p-2.5 rounded-xl border transition-all text-center ${
+                  value_pick === 'HOME'
+                    ? 'border-amber-500/60 bg-amber-500/15 shadow-lg shadow-amber-500/20'
+                    : 'border-pitch-700 bg-pitch-900/80 hover:border-sky-500/40 hover:bg-sky-500/10'
+                }`}
+              >
+                <p className="text-[10px] text-slate-500 font-mono uppercase tracking-wider mb-0.5">Home</p>
+                <p className={`text-lg font-black tabular-nums ${value_pick === 'HOME' ? 'text-amber-400' : 'text-sky-400'}`}>
+                  {odds_home ? Number(odds_home).toFixed(2) : '-'}
+                </p>
+                <p className="text-[10px] text-slate-500 font-mono mt-0.5">
+                  {prob_home ? `${Math.round(prob_home)}%` : '-'}
+                </p>
+                {value_pick === 'HOME' && (
+                  <span className="absolute -top-1.5 -right-1.5 w-5 h-5 rounded-full bg-amber-500 text-pitch-950 text-[10px] font-black flex items-center justify-center">
+                    ★
+                  </span>
+                )}
+              </button>
+
+              {/* Draw */}
+              <button
+                type="button"
+                onClick={() => onToggleSlip && onToggleSlip({
+                  fixtureId: fixture.id,
+                  homeTeam: home_team_name,
+                  awayTeam: away_team_name,
+                  pick: 'DRAW',
+                  pickLabel: 'Draw',
+                  odds: odds_draw,
+                  modelProb: prob_draw,
+                  ev: ((Number(prob_draw) / 100) * Number(odds_draw) - 1) * 100,
+                  leagueName: league_name,
+                  matchDate: match_date,
+                })}
+                className={`relative p-2.5 rounded-xl border transition-all text-center ${
+                  value_pick === 'DRAW'
+                    ? 'border-amber-500/60 bg-amber-500/15 shadow-lg shadow-amber-500/20'
+                    : 'border-pitch-700 bg-pitch-900/80 hover:border-slate-500/40 hover:bg-slate-500/10'
+                }`}
+              >
+                <p className="text-[10px] text-slate-500 font-mono uppercase tracking-wider mb-0.5">Draw</p>
+                <p className={`text-lg font-black tabular-nums ${value_pick === 'DRAW' ? 'text-amber-400' : 'text-slate-300'}`}>
+                  {odds_draw ? Number(odds_draw).toFixed(2) : '-'}
+                </p>
+                <p className="text-[10px] text-slate-500 font-mono mt-0.5">
+                  {prob_draw ? `${Math.round(prob_draw)}%` : '-'}
+                </p>
+                {value_pick === 'DRAW' && (
+                  <span className="absolute -top-1.5 -right-1.5 w-5 h-5 rounded-full bg-amber-500 text-pitch-950 text-[10px] font-black flex items-center justify-center">
+                    ★
+                  </span>
+                )}
+              </button>
+
+              {/* Away */}
+              <button
+                type="button"
+                onClick={() => onToggleSlip && onToggleSlip({
+                  fixtureId: fixture.id,
+                  homeTeam: home_team_name,
+                  awayTeam: away_team_name,
+                  pick: 'AWAY',
+                  pickLabel: `${away_team_name} Win`,
+                  odds: odds_away,
+                  modelProb: prob_away,
+                  ev: ((Number(prob_away) / 100) * Number(odds_away) - 1) * 100,
+                  leagueName: league_name,
+                  matchDate: match_date,
+                })}
+                className={`relative p-2.5 rounded-xl border transition-all text-center ${
+                  value_pick === 'AWAY'
+                    ? 'border-amber-500/60 bg-amber-500/15 shadow-lg shadow-amber-500/20'
+                    : 'border-pitch-700 bg-pitch-900/80 hover:border-rose-500/40 hover:bg-rose-500/10'
+                }`}
+              >
+                <p className="text-[10px] text-slate-500 font-mono uppercase tracking-wider mb-0.5">Away</p>
+                <p className={`text-lg font-black tabular-nums ${value_pick === 'AWAY' ? 'text-amber-400' : 'text-rose-400'}`}>
+                  {odds_away ? Number(odds_away).toFixed(2) : '-'}
+                </p>
+                <p className="text-[10px] text-slate-500 font-mono mt-0.5">
+                  {prob_away ? `${Math.round(prob_away)}%` : '-'}
+                </p>
+                {value_pick === 'AWAY' && (
+                  <span className="absolute -top-1.5 -right-1.5 w-5 h-5 rounded-full bg-amber-500 text-pitch-950 text-[10px] font-black flex items-center justify-center">
+                    ★
+                  </span>
+                )}
+              </button>
+            </div>
           </div>
         )}
 
-        {/* ---- Compact +EV Highlight Bar (Visible in Default State) ---- */}
+        {/* ---- +EV Highlight Bar (Visible when there's a value pick) ---- */}
         {isValue && (
-          <div className="mb-3 p-2 rounded-xl bg-amber-500/10 border border-amber-500/30 flex items-center justify-between gap-2">
-            <div className="flex items-center gap-2 min-w-0">
-              <span className="w-2 h-2 rounded-full bg-amber-400 animate-pulse flex-shrink-0" />
-              <span className="text-xs font-bold text-amber-300 truncate">
-                +EV Edge: {value_pick} ({ev_percentage > 0 ? `+${ev_percentage}%` : `${ev_percentage}%`})
-              </span>
+          <div className="mb-3 p-3 rounded-xl bg-gradient-to-r from-amber-500/20 to-amber-600/10 border border-amber-500/40">
+            <div className="flex items-center justify-between gap-2">
+              <div className="flex items-center gap-2 min-w-0">
+                <span className="text-amber-400 text-sm" aria-hidden="true">★</span>
+                <span className="text-sm font-black text-amber-400 truncate">
+                  +{Number(ev_percentage).toFixed(1)}% EV · {value_pick === 'HOME' ? home_team_name : value_pick === 'AWAY' ? away_team_name : 'Draw'}
+                </span>
+              </div>
+              {recKellyPct != null && (
+                <span className="text-[11px] font-mono font-bold text-amber-300 whitespace-nowrap bg-amber-500/20 px-2 py-0.5 rounded-md">
+                  {recKellyPct}% stake
+                </span>
+              )}
             </div>
-            {recKellyPct != null && (
-              <span className="text-[10px] font-mono text-amber-400/90 whitespace-nowrap">
-                Rec: {recKellyPct}% Stake
-              </span>
-            )}
           </div>
         )}
 
@@ -643,13 +755,14 @@ export default function MatchCard({
       </div>
 
       {/* ---- Progressive Disclosure Toggle Footer ---- */}
-      <div className="pt-2 mt-2 border-t border-pitch-800/60">
+      <div className="pt-3 mt-2 border-t border-pitch-800/60">
         <button
           type="button"
           onClick={() => setIsExpanded((prev) => !prev)}
-          className="w-full min-h-[44px] py-2 px-3 rounded-xl bg-pitch-950/70 hover:bg-pitch-800 text-slate-300 hover:text-amber-400 border border-pitch-800/80 text-xs font-mono transition-colors flex items-center justify-center gap-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500 active:scale-98 touch-manipulation"
+          className="w-full min-h-[44px] py-2.5 px-3 rounded-xl bg-pitch-950/80 hover:bg-pitch-800 text-slate-400 hover:text-amber-400 border border-pitch-800 hover:border-amber-500/30 text-xs font-mono font-semibold transition-all flex items-center justify-center gap-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500 active:scale-98 touch-manipulation"
         >
-          <span>{isExpanded ? '▲ Collapse Deep Dive' : '▼ Deep Dive & Odds Matrix'}</span>
+          <span className={`transition-transform duration-200 ${isExpanded ? 'rotate-180' : ''}`}>▼</span>
+          <span>{isExpanded ? 'Collapse Details' : 'Show Markets & Analysis'}</span>
         </button>
       </div>
     </article>

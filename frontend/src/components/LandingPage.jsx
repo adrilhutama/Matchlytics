@@ -675,25 +675,46 @@ function TrackRecordPanel({ settledFixtures, onOpenBacktest }) {
   const settledCount = settled.length
 
   const wins = settled.filter((f) => f.outcome === 'WON').length
-  const winRate = settledCount > 0 ? (wins / settledCount) * 100 : 58.4
+  const winRate = settledCount > 0 ? (wins / settledCount) * 100 : null
 
-  const simulatedEquity = useMemo(() => {
-    let current = 100
-    const points = [current]
-    for (let i = 0; i < 20; i++) {
-      current += (Math.sin(i) * 0.5 + 0.8) * 1.5
-      points.push(Number(current.toFixed(1)))
-    }
-    return points
-  }, [])
+  const brierScore = settledCount > 0 ? 'Calculated in terminal' : null
+  const equityChange = settledCount > 0 ? '+0.0%' : null
+
+  if (settledCount === 0) {
+    return (
+      <div className="rounded-2xl bg-pitch-800 border border-pitch-700 p-5 sm:p-8">
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 pb-6 border-b border-pitch-700">
+          <div>
+            <h3 className="text-xl font-bold text-slate-100">Settlement Ledger</h3>
+            <p className="mt-1 text-xs sm:text-sm text-slate-400">
+              Post-match reconciliation is available once fixtures are settled.
+            </p>
+          </div>
+          <div className="flex items-center gap-3">
+            <button
+              type="button"
+              onClick={onOpenBacktest}
+              className="min-h-[44px] px-4 rounded-xl border border-pitch-600 bg-pitch-900 text-xs font-mono font-semibold text-slate-300 hover:text-white hover:border-pitch-500 transition-colors cursor-pointer"
+            >
+              Open Performance Tracker
+            </button>
+          </div>
+        </div>
+        <div className="mt-6 py-8 text-center">
+          <p className="text-sm text-slate-500 font-mono">No settled fixtures in the current window.</p>
+          <p className="mt-2 text-xs text-slate-600">Settlement data appears after match completion.</p>
+        </div>
+      </div>
+    )
+  }
 
   return (
     <div className="rounded-2xl bg-pitch-800 border border-pitch-700 p-5 sm:p-8">
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 pb-6 border-b border-pitch-700">
         <div>
-          <h3 className="text-xl font-bold text-slate-100">Live Engine Settlement Ledger</h3>
+          <h3 className="text-xl font-bold text-slate-100">Settlement Ledger</h3>
           <p className="mt-1 text-xs sm:text-sm text-slate-400">
-            Official post-match reconciliation across all monitored European top-flight fixtures.
+            Post-match reconciliation across monitored fixtures.
           </p>
         </div>
         <div className="flex items-center gap-3">
@@ -711,26 +732,27 @@ function TrackRecordPanel({ settledFixtures, onOpenBacktest }) {
         <div className="p-4 rounded-xl bg-pitch-900 border border-pitch-700">
           <p className="text-[10px] font-mono uppercase text-slate-500">Monitored Settlements</p>
           <p className="mt-1 text-2xl font-mono font-bold text-slate-100 tabular-nums">
-            {settledCount > 0 ? settledCount : '348'}
+            {settledCount}
           </p>
         </div>
         <div className="p-4 rounded-xl bg-pitch-900 border border-pitch-700">
           <p className="text-[10px] font-mono uppercase text-slate-500">Model Win Rate</p>
           <p className="mt-1 text-2xl font-mono font-bold text-emerald-400 tabular-nums">
-            {Number(winRate || 0).toFixed(1)}%
+            {winRate != null ? Number(winRate).toFixed(1) + '%' : '--'}
           </p>
         </div>
         <div className="p-4 rounded-xl bg-pitch-900 border border-pitch-700">
           <p className="text-[10px] font-mono uppercase text-slate-500">Brier Calibration Score</p>
-          <p className="mt-1 text-2xl font-mono font-bold text-amber-400 tabular-nums">0.188</p>
+          <p className="mt-1 text-2xl font-mono font-bold text-amber-400 tabular-nums">
+            {brierScore || '--'}
+          </p>
         </div>
         <div className="p-3 sm:p-4 rounded-xl bg-pitch-900 border border-pitch-700 flex flex-col justify-between min-w-0">
-          <p className="text-[10px] font-mono uppercase text-slate-500 truncate">Equity Curve Simulation</p>
+          <p className="text-[10px] font-mono uppercase text-slate-500 truncate">Equity Change</p>
           <div className="mt-2 flex items-center justify-between gap-1.5 min-w-0">
-            <span className="text-xs sm:text-sm font-mono text-emerald-400 font-bold shrink-0">+18.4%</span>
-            <div className="w-16 sm:w-20 h-7 shrink-0 flex items-center justify-end">
-              <EquitySpark equity={simulatedEquity} />
-            </div>
+            <span className="text-xs sm:text-sm font-mono text-emerald-400 font-bold shrink-0">
+              {equityChange || '+0.0%'}
+            </span>
           </div>
         </div>
       </div>
@@ -884,29 +906,46 @@ export default function LandingPage({
 
       <main id="top" className="flex-1">
         {/* Hero Section */}
-        <section className="relative w-full border-b border-pitch-900/60 py-8 sm:py-16 overflow-hidden">
-          {/* Ambient radial glow */}
+        <section className="relative w-full border-b border-pitch-900/60 py-12 sm:py-20 overflow-hidden">
+          {/* Dynamic background elements */}
+          <div className="absolute inset-0 bg-gradient-to-br from-pitch-950 via-pitch-900/50 to-pitch-950 pointer-events-none" />
           <div
-            className="absolute top-1/4 right-1/4 -translate-y-1/2 w-96 h-96 bg-amber-500/[0.04] rounded-full blur-3xl pointer-events-none -z-10"
+            className="absolute top-0 left-1/4 w-96 h-96 bg-amber-500/[0.06] rounded-full blur-3xl pointer-events-none -z-10"
+            aria-hidden="true"
+          />
+          <div
+            className="absolute bottom-0 right-1/4 w-80 h-80 bg-emerald-500/[0.04] rounded-full blur-3xl pointer-events-none -z-10"
+            aria-hidden="true"
+          />
+          {/* Grid pattern overlay */}
+          <div
+            className="absolute inset-0 opacity-5 pointer-events-none"
+            style={{
+              backgroundImage: 'linear-gradient(rgba(245,158,11,0.3) 1px, transparent 1px), linear-gradient(90deg, rgba(245,158,11,0.3) 1px, transparent 1px)',
+              backgroundSize: '40px 40px'
+            }}
             aria-hidden="true"
           />
 
-          <div className="w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="relative w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
             <div className="grid lg:grid-cols-2 gap-10 lg:gap-14 items-center">
               <div className="min-w-0 animate-fade-in">
-                <p className="inline-flex items-center gap-2 min-h-[32px] px-3 py-1.5 rounded-lg font-mono text-[11px] sm:text-xs uppercase tracking-[0.14em] text-slate-300 border border-amber-500/40 bg-amber-500/[0.06] value-glow">
-                  <span className="text-amber-400" aria-hidden="true">◈</span>
-                  Proprietary Quantitative Terminal
-                </p>
-                <h1 className="mt-5 w-full max-w-full text-3xl sm:text-5xl lg:text-6xl font-bold tracking-tight text-white leading-tight break-normal">
-                  Institutional Sports Market Intelligence Driven by Mathematical Rigor.
+                {/* Live stats ticker */}
+                <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-pitch-800/80 border border-emerald-500/30 mb-6">
+                  <span className="live-dot" aria-hidden="true" />
+                  <span className="text-[11px] font-mono text-emerald-400 font-semibold">LIVE FEED ACTIVE</span>
+                </div>
+
+                <h1 className="mt-2 w-full max-w-full text-4xl sm:text-5xl lg:text-6xl font-black tracking-tight leading-tight break-normal">
+                  <span className="text-white">Find Your</span>
+                  <br />
+                  <span className="text-gradient-amber">Edge in Every Match</span>
                 </h1>
                 <p className="mt-5 text-base sm:text-lg text-slate-400 leading-relaxed max-w-xl">
-                  Systematic edge discovery across major European leagues. Eliminate bookmaker margins
-                  through bivariate Poisson distributions, consensus de-vigging, and disciplined
-                  fractional Kelly risk management.
+                  Quantitative football analysis powered by bivariate Poisson models and consensus de-vigging.
+                  Quarter-Kelly staking with a hard 2.5% cap keeps your bankroll protected.
                 </p>
-                <div className="mt-7 w-full flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
+                <div className="mt-8 w-full flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
                   <a
                     href={APP_LIVE_URL}
                     onClick={(e) => {
@@ -915,33 +954,40 @@ export default function LandingPage({
                         handleLaunchApp()
                       }
                     }}
-                    className="min-h-[48px] w-full sm:w-auto px-6 rounded-xl bg-amber-500 text-pitch-950 text-sm font-bold hover:bg-amber-400 transition-all shadow-md shadow-amber-500/20 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-400 text-center inline-flex items-center justify-center cursor-pointer"
+                    className="cta-primary min-h-[52px] w-full sm:w-auto px-8 rounded-xl text-sm font-bold hover:bg-amber-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-400 text-center inline-flex items-center justify-center cursor-pointer"
                   >
-                    Launch SaaS Terminal
+                    Launch Terminal
+                    <svg className="w-4 h-4 ml-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7l5 5m0 0l-5 5m5-5H6" />
+                    </svg>
                   </a>
                   <button
                     type="button"
                     onClick={scrollToPricing}
-                    className="min-h-[48px] w-full sm:w-auto px-6 rounded-xl border border-pitch-600 bg-pitch-800 text-slate-200 text-sm font-semibold hover:border-pitch-500 hover:bg-pitch-700 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500 text-center inline-flex items-center justify-center cursor-pointer"
+                    className="cta-secondary min-h-[52px] w-full sm:w-auto px-8 rounded-xl text-sm font-semibold hover:border-pitch-500 hover:bg-pitch-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500 text-center inline-flex items-center justify-center cursor-pointer"
                   >
-                    View Pricing Architecture
+                    View Pricing
                   </button>
                 </div>
 
-                {/* Enterprise validation badges */}
-                <ul className="mt-6 flex flex-wrap gap-2" aria-label="Verified engine proofs">
-                  {PROOF_BADGES.map((b) => (
+                {/* Trust indicators */}
+                <ul className="mt-8 flex flex-wrap gap-3" aria-label="Verified engine proofs">
+                  {PROOF_BADGES.map((b, idx) => (
                     <li
                       key={b.label}
-                      className="inline-flex items-center gap-1.5 min-h-[36px] px-3.5 py-1.5 rounded-lg bg-pitch-800/80 border border-pitch-700 text-[11px] font-mono text-slate-300"
+                      className={`inline-flex items-center gap-2 min-h-[40px] px-4 py-2 rounded-lg text-[11px] font-mono font-semibold ${
+                        idx === 0 ? 'bg-emerald-500/15 border border-emerald-500/40 text-emerald-400' :
+                        idx === 1 ? 'bg-amber-500/15 border border-amber-500/40 text-amber-400' :
+                        'bg-sky-500/15 border border-sky-500/40 text-sky-400'
+                      }`}
                     >
-                      <span className="text-amber-400" aria-hidden="true">{b.icon}</span>
+                      <span aria-hidden="true">{b.icon}</span>
                       {b.label}
                     </li>
                   ))}
                 </ul>
 
-                <p className="mt-5 text-[11px] font-mono text-slate-600">
+                <p className="mt-6 text-[11px] font-mono text-slate-600">
                   The public feed streams today&apos;s verified horizons. Open the terminal to unlock paid access windows.
                 </p>
               </div>
@@ -949,7 +995,7 @@ export default function LandingPage({
               <div className="min-w-0 w-full animate-slide-up relative">
                 {/* Radial ambient glow behind Live Edge Monitor */}
                 <div
-                  className="absolute -inset-4 sm:-inset-6 rounded-3xl bg-[radial-gradient(ellipse_at_center,_var(--tw-gradient-stops))] from-amber-500/10 via-transparent to-transparent -z-10 pointer-events-none blur-xl"
+                  className="absolute -inset-4 sm:-inset-6 rounded-3xl bg-gradient-to-br from-amber-500/15 via-transparent to-emerald-500/10 -z-10 pointer-events-none blur-2xl"
                   aria-hidden="true"
                 />
                 <div className="w-full max-w-md mx-auto">
@@ -960,30 +1006,67 @@ export default function LandingPage({
           </div>
         </section>
 
+        {/* Live stats ticker strip */}
+        {evPicks.length > 0 && (
+          <div className="border-y border-pitch-800 bg-pitch-900/50 py-3 overflow-hidden">
+            <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+              <div className="flex items-center gap-6 overflow-x-auto no-scrollbar">
+                <span className="flex-shrink-0 text-[10px] font-mono text-slate-500 uppercase tracking-wider">Live Edges:</span>
+                {evPicks.slice(0, 5).map((pick, idx) => {
+                  const pf = pickFields(pick)
+                  if (!pf) return null
+                  return (
+                    <div key={idx} className="flex-shrink-0 flex items-center gap-2 px-3 py-1.5 rounded-lg bg-pitch-800 border border-pitch-700">
+                      <span className="text-[11px] font-mono text-slate-300 truncate max-w-[140px]">{pf.label}</span>
+                      <span className="text-[11px] font-mono text-amber-400 font-bold">@{Number(pick.odds_home || pick.odds_draw || pick.odds_away || 0).toFixed(2)}</span>
+                      <span className="text-[10px] font-mono text-emerald-400">+{Number(pick.ev_percentage || 0).toFixed(1)}%</span>
+                    </div>
+                  )
+                })}
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* 01 Methodology: four quant disciplines */}
         <section id="methodology" className="w-full py-8 sm:py-16 border-b border-pitch-900/60 scroll-mt-24">
           <div className="w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
             <div className="max-w-2xl">
               <SectionKicker index="01" title="Methodology" />
-              <h2 className="text-2xl sm:text-3xl font-bold text-slate-100 tracking-tight">
-                Four disciplines, applied to every fixture before it reaches the feed.
+              <h2 className="text-2xl sm:text-3xl font-black text-slate-100 tracking-tight">
+                Four pillars. Zero guesswork.
               </h2>
               <p className="mt-3 text-sm sm:text-base text-slate-400 leading-relaxed">
-                The stack is deliberately narrow: pricing, modelling, detection, and staking. Each
-                stage has one job, and each job is deterministic, so a result can always be replayed
-                and audited.
+                Every fixture runs through our pipeline before it appears. No shortcuts, no black boxes.
               </p>
             </div>
 
             <div className="mt-8 grid sm:grid-cols-2 gap-4">
-              {pillars.map((p) => (
-                <article key={p.index} className="rounded-2xl bg-pitch-800 border border-pitch-700 p-5 sm:p-6 flex flex-col justify-between">
+              {pillars.map((p, idx) => (
+                <article
+                  key={p.index}
+                  className={`gradient-border rounded-2xl p-5 sm:p-6 flex flex-col justify-between ${
+                    idx === 0 ? 'from-emerald-500/20 to-transparent' :
+                    idx === 1 ? 'from-amber-500/20 to-transparent' :
+                    idx === 2 ? 'from-sky-500/20 to-transparent' :
+                    'from-rose-500/20 to-transparent'
+                  }`}
+                >
                   <div>
-                    <p className="font-mono text-xs text-amber-400 font-semibold">{p.index}</p>
-                    <h3 className="mt-1.5 text-base font-bold text-slate-100">{p.title}</h3>
-                    <p className="mt-2 text-xs sm:text-sm text-slate-400 leading-relaxed">{p.body}</p>
+                    <div className="flex items-center gap-3 mb-3">
+                      <span className={`w-8 h-8 rounded-lg flex items-center justify-center font-mono text-sm font-black ${
+                        idx === 0 ? 'bg-emerald-500/20 text-emerald-400' :
+                        idx === 1 ? 'bg-amber-500/20 text-amber-400' :
+                        idx === 2 ? 'bg-sky-500/20 text-sky-400' :
+                        'bg-rose-500/20 text-rose-400'
+                      }`}>
+                        {p.index}
+                      </span>
+                      <h3 className="text-base font-bold text-slate-100">{p.title}</h3>
+                    </div>
+                    <p className="text-xs sm:text-sm text-slate-400 leading-relaxed">{p.body}</p>
                   </div>
-                  <p className="mt-4 text-[11px] font-mono text-slate-500 bg-pitch-950 border border-pitch-800 rounded-lg px-3 py-2 overflow-x-auto no-scrollbar whitespace-nowrap">
+                  <p className="mt-4 text-[10px] font-mono text-slate-500 bg-pitch-950/80 border border-pitch-800 rounded-lg px-3 py-2 overflow-x-auto no-scrollbar whitespace-nowrap">
                     {p.formula}
                   </p>
                 </article>
@@ -1009,12 +1092,16 @@ export default function LandingPage({
 
             {/* Three-step workflow cards */}
             <ol className="mt-8 grid grid-cols-1 md:grid-cols-3 gap-4">
-              {PIPELINE_SECURITY_CARDS.map((c) => (
-                <li key={c.index} className="min-w-0 relative rounded-2xl bg-pitch-800 border border-pitch-700 p-5 sm:p-6 flex flex-col justify-between">
+              {PIPELINE_SECURITY_CARDS.map((c, idx) => (
+                <li key={c.index} className="min-w-0 relative rounded-2xl bg-pitch-800 border border-pitch-700 p-5 sm:p-6 flex flex-col justify-between group hover:border-amber-500/40 transition-colors">
                   <div>
                     <span className="font-mono text-[11px] text-amber-400/90 font-semibold">STEP {c.index.replace('0', '')}</span>
-                    <h3 className="mt-1.5 text-base font-bold text-slate-100">{c.title}</h3>
+                    <h3 className="mt-1.5 text-base font-bold text-slate-100 group-hover:text-amber-400 transition-colors">{c.title}</h3>
                     <p className="mt-2 text-xs sm:text-sm text-slate-400 leading-relaxed">{c.body}</p>
+                  </div>
+                  <div className="mt-4 flex items-center gap-2 text-[11px] font-mono text-slate-500">
+                    <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" aria-hidden="true" />
+                    <span>Active</span>
                   </div>
                 </li>
               ))}
@@ -1043,13 +1130,11 @@ export default function LandingPage({
           <div className="w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
             <div className="max-w-2xl">
               <SectionKicker index="03" title="Pricing" />
-              <h2 className="text-2xl sm:text-3xl font-bold text-slate-100 tracking-tight">
-                One access ladder, three horizons deep.
+              <h2 className="text-2xl sm:text-3xl font-black text-slate-100 tracking-tight">
+                Simple pricing. Serious edge.
               </h2>
               <p className="mt-3 text-sm sm:text-base text-slate-400 leading-relaxed">
-                Start on today&apos;s horizon, extend to the weekly window with Pro Pass, or open the
-                full season in a single rate. Prices here match the terminal checkout exactly, so
-                the two surfaces never drift.
+                Start free, upgrade when you are ready. No hidden fees, no surprises.
               </p>
             </div>
 
@@ -1057,18 +1142,18 @@ export default function LandingPage({
               {PRICING_TIERS.map((tier) => (
                 <article
                   key={tier.id}
-                  className={`min-w-0 flex flex-col justify-between h-full rounded-2xl border p-5 sm:p-6 relative transition-all ${
+                  className={`min-w-0 flex flex-col justify-between h-full rounded-2xl border p-6 relative transition-all ${
                     tier.featured
-                      ? 'border-amber-500/50 bg-pitch-800/90 shadow-xl shadow-amber-500/10 ring-1 ring-amber-500/30'
-                      : 'border-pitch-700 bg-pitch-800/60 hover:border-pitch-600'
+                      ? 'border-amber-500/60 bg-gradient-to-b from-amber-500/10 to-pitch-800/90 shadow-xl shadow-amber-500/15 ring-1 ring-amber-500/40'
+                      : 'border-pitch-700 bg-pitch-800/60 hover:border-pitch-600 hover:bg-pitch-800/80'
                   }`}
                 >
                   {tier.badge && (
                     <span
-                      className={`absolute -top-3 right-5 px-3 py-0.5 rounded-full text-[10px] font-mono font-bold tracking-wide shadow-sm ${
+                      className={`absolute -top-3 left-5 px-3 py-1 rounded-full text-[10px] font-mono font-bold tracking-wide ${
                         tier.id === 'annual'
-                          ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/40'
-                          : 'bg-amber-500 text-pitch-950 font-bold'
+                          ? 'bg-emerald-500 text-pitch-950 border border-emerald-400'
+                          : 'bg-amber-500 text-pitch-950 border border-amber-400'
                       }`}
                     >
                       {tier.badge}
@@ -1076,25 +1161,22 @@ export default function LandingPage({
                   )}
                   <div>
                     <div>
-                      <h3 className="text-base font-bold text-slate-100">{tier.name}</h3>
-                      <p className="mt-0.5 text-xs text-slate-500 font-mono">{tier.cadence}</p>
+                      <h3 className="text-lg font-black text-slate-100">{tier.name}</h3>
+                      <p className="mt-1 text-xs text-slate-500 font-mono">{tier.cadence}</p>
                     </div>
-                    <div className="mt-5">
-                      <p className="text-3xl sm:text-4xl font-black tracking-tight text-slate-100 break-words min-w-0 font-mono">
+                    <div className="mt-6">
+                      <p className="text-4xl font-black tracking-tight text-slate-100 break-words min-w-0 font-mono">
                         {tier.price}
                       </p>
-                      <p className="mt-1.5 text-xs font-mono text-amber-400/90">{tier.scope}</p>
+                      <p className="mt-2 text-xs font-mono font-semibold text-amber-400 uppercase tracking-wider">{tier.scope}</p>
                     </div>
-                    <ul className="mt-6 space-y-2.5 flex-1">
-                      {tier.perks.map((perk) => (
-                        <li key={perk} className="flex items-start gap-2.5 text-[13px] text-slate-300 leading-snug">
-                          <span
-                            className={`mt-1.5 w-1.5 h-1.5 rounded-full flex-shrink-0 ${
-                              tier.featured ? 'bg-amber-400 shadow-sm shadow-amber-400' : 'bg-emerald-400'
-                            }`}
-                            aria-hidden="true"
-                          />
-                          <span className="min-w-0">{perk}</span>
+                    <ul className="mt-6 space-y-3 flex-1">
+                      {tier.perks.map((perk, idx) => (
+                        <li key={idx} className="flex items-start gap-3 text-[13px] text-slate-300 leading-snug">
+                          <svg className="w-4 h-4 text-emerald-400 flex-shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                          </svg>
+                          <span>{perk}</span>
                         </li>
                       ))}
                     </ul>
@@ -1107,10 +1189,10 @@ export default function LandingPage({
                         handleLaunchApp()
                       }
                     }}
-                    className={`mt-8 min-h-[48px] w-full inline-flex items-center justify-center rounded-xl text-sm font-bold transition-all focus-visible:outline-none focus-visible:ring-2 cursor-pointer ${
+                    className={`mt-8 min-h-[52px] w-full inline-flex items-center justify-center rounded-xl text-sm font-bold transition-all focus-visible:outline-none focus-visible:ring-2 cursor-pointer ${
                       tier.featured
-                        ? 'bg-amber-500 text-pitch-950 hover:bg-amber-400 shadow-md shadow-amber-500/20 ring-amber-400'
-                        : 'border border-pitch-600 bg-pitch-900 text-slate-200 hover:border-pitch-500 hover:bg-pitch-800 ring-amber-500'
+                        ? 'cta-primary'
+                        : 'cta-secondary'
                     }`}
                   >
                     {tier.cta}

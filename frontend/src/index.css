@@ -4,8 +4,8 @@
 
 /* ============================================================
    Global design tokens
-   ENERGY 2 / RHYTHM 2 / MOTION 1
-   Palette: pitch-dark base + amber accent (single deliberate accent)
+   ENERGY 3 / RHYTHM 3 / MOTION 2
+   Palette: pitch-dark base + amber accent, dynamic gradients
    ============================================================ */
 
 @layer base {
@@ -13,10 +13,6 @@
     box-sizing: border-box;
   }
 
-  /* Full-bleed guard: the document, the mount node, and every layout
-     branch must resolve to exactly the viewport width. A #root or body
-     that ends up narrower than the viewport makes iOS Safari zoom the
-     whole page out into a rigid narrow frame with side gutters. */
   html,
   body,
   #root {
@@ -35,18 +31,18 @@
   }
 
   body {
-    @apply bg-pitch-950 text-slate-300 font-sans antialiased;
+    @apply bg-pitch-950 text-slate-200 font-sans antialiased;
     min-height: 100dvh;
   }
 
-  /* Accessible focus ring: visible, high-contrast indicator */
+  /* Accessible focus ring */
   :focus-visible {
     outline: 2px solid theme('colors.amber.500');
-    outline-offset: 3px;
+    outline-offset: 2px;
     border-radius: 4px;
   }
 
-  /* Scrollbar styling: matches dark palette */
+  /* Scrollbar styling */
   ::-webkit-scrollbar        { width: 6px; height: 6px; }
   ::-webkit-scrollbar-track  { background: theme('colors.pitch.900'); }
   ::-webkit-scrollbar-thumb  { background: theme('colors.pitch.600'); border-radius: 3px; }
@@ -54,7 +50,7 @@
 }
 
 @layer components {
-  /* Shimmer animation used by skeleton loaders */
+  /* Shimmer animation for skeleton loaders */
   .shimmer {
     background: linear-gradient(
       90deg,
@@ -66,44 +62,162 @@
     animation: shimmer 1.6s ease-in-out infinite;
   }
 
-  /* Probability bar track */
-  .prob-track {
-    @apply relative h-1.5 rounded-full bg-pitch-700 overflow-hidden;
+  /* Gradient text utility */
+  .text-gradient-amber {
+    background: linear-gradient(135deg, #fbbf24 0%, #f59e0b 50%, #d97706 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
   }
 
-  /* The amber glow is reserved solely for the +EV value badge.
-     This is the one element where glow is justified: it is the
-     single most important signal on the dashboard. (R-13) */
+  .text-gradient-emerald {
+    background: linear-gradient(135deg, #34d399 0%, #10b981 50%, #059669 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+
+  /* Value glow - reserved for +EV signals only */
   .value-glow {
-    box-shadow: 0 0 12px 2px rgba(245, 158, 11, 0.35);
+    box-shadow: 0 0 16px 4px rgba(245, 158, 11, 0.4), 0 0 40px 8px rgba(245, 158, 11, 0.15);
   }
 
-  /* Glass treatment: used only on the filter bar header (1 element, dose cap) (R-10) */
-  .glass-filter {
-    background: rgba(14, 17, 23, 0.75);
-    backdrop-filter: blur(12px);
-    -webkit-backdrop-filter: blur(12px);
-    border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+  /* Emerald glow for win states */
+  .emerald-glow {
+    box-shadow: 0 0 12px 3px rgba(16, 185, 129, 0.3), 0 0 30px 6px rgba(16, 185, 129, 0.1);
   }
 
-  /* Card base: solid surface, no float shadow by default */
+  /* Glass treatment - used sparingly */
+  .glass-panel {
+    background: rgba(14, 17, 23, 0.8);
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+    border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  }
+
+  /* Card base with subtle hover lift */
   .match-card {
     @apply bg-pitch-800 border border-pitch-700 rounded-xl;
-    transition: border-color 0.2s ease, transform 0.15s ease;
+    transition: border-color 0.2s ease, transform 0.15s ease, box-shadow 0.2s ease;
   }
 
   .match-card:hover {
     @apply border-pitch-600;
-    transform: translateY(-1px);
+    transform: translateY(-2px);
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
   }
 
-  /* Value card gets a subtle amber border to signal it without glow overload */
+  /* Value card - amber accent border and glow */
   .match-card--value {
-    border-color: rgba(245, 158, 11, 0.35);
+    border-color: rgba(245, 158, 11, 0.5);
+    box-shadow: 0 0 20px rgba(245, 158, 11, 0.15), inset 0 0 20px rgba(245, 158, 11, 0.03);
   }
 
   .match-card--value:hover {
-    border-color: rgba(245, 158, 11, 0.6);
+    border-color: rgba(245, 158, 11, 0.7);
+    box-shadow: 0 0 24px rgba(245, 158, 11, 0.25), inset 0 0 24px rgba(245, 158, 11, 0.05);
+  }
+
+  /* Primary CTA button */
+  .cta-primary {
+    @apply bg-gradient-to-r from-amber-500 to-amber-400 text-pitch-950 font-bold;
+    box-shadow: 0 4px 14px rgba(245, 158, 11, 0.35);
+    transition: all 0.2s ease;
+  }
+
+  .cta-primary:hover {
+    box-shadow: 0 6px 20px rgba(245, 158, 11, 0.5);
+    transform: translateY(-1px);
+  }
+
+  /* Secondary CTA button */
+  .cta-secondary {
+    @apply border border-pitch-600 bg-pitch-800 text-slate-200 font-semibold;
+    transition: all 0.2s ease;
+  }
+
+  .cta-secondary:hover {
+    @apply border-pitch-500 bg-pitch-700;
+  }
+
+  /* Animated gradient border for featured cards */
+  .gradient-border {
+    position: relative;
+    background: linear-gradient(135deg, #151a24, #1a2030);
+    border-radius: 16px;
+  }
+
+  .gradient-border::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    border-radius: 16px;
+    padding: 1px;
+    background: linear-gradient(135deg, rgba(245, 158, 11, 0.5), rgba(16, 185, 129, 0.3), rgba(245, 158, 11, 0.5));
+    -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+    mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+    -webkit-mask-composite: xor;
+    mask-composite: exclude;
+    pointer-events: none;
+  }
+
+  /* Pulsing live indicator */
+  .live-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: #10b981;
+    box-shadow: 0 0 8px 2px rgba(16, 185, 129, 0.6);
+    animation: pulse-live 2s ease-in-out infinite;
+  }
+
+  @keyframes pulse-live {
+    0%, 100% { opacity: 1; transform: scale(1); }
+    50% { opacity: 0.7; transform: scale(1.2); }
+  }
+
+  /* Probability bar track */
+  .prob-track {
+    @apply relative h-2 rounded-full bg-pitch-700 overflow-hidden;
+  }
+
+  .prob-fill-home {
+    @apply bg-gradient-to-r from-sky-500 to-sky-400;
+  }
+
+  .prob-fill-draw {
+    @apply bg-gradient-to-r from-slate-500 to-slate-400;
+  }
+
+  .prob-fill-away {
+    @apply bg-gradient-to-r from-rose-500 to-rose-400;
+  }
+
+  /* Odds display - large and prominent */
+  .odds-display {
+    @apply font-mono font-bold tabular-nums;
+  }
+
+  .odds-home { @apply text-sky-400; }
+  .odds-draw { @apply text-slate-300; }
+  .odds-away { @apply text-rose-400; }
+
+  /* EV badge */
+  .ev-badge {
+    @apply inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-bold font-mono;
+  }
+
+  .ev-badge-high {
+    @apply bg-emerald-500/20 text-emerald-400 border border-emerald-500/40;
+    box-shadow: 0 0 12px rgba(16, 185, 129, 0.2);
+  }
+
+  .ev-badge-medium {
+    @apply bg-amber-500/20 text-amber-400 border border-amber-500/40;
+  }
+
+  .ev-badge-low {
+    @apply bg-slate-500/20 text-slate-400 border border-slate-500/30;
   }
 }
 
@@ -112,15 +226,13 @@
     text-wrap: balance;
   }
 
-  /* Number columns: monospace for tabular alignment */
+  /* Tabular numbers for all numerical data */
   .tabular-nums {
     font-family: theme('fontFamily.mono');
     font-variant-numeric: tabular-nums;
   }
 
-  /* Hide scrollbar while preserving native touch momentum scrolling.
-     Used on pill rows and horizontal table panning so it does not
-     visually obstruct the UI yet still allows fluid swipe gestures. */
+  /* Hide scrollbar for horizontal scroll containers */
   .no-scrollbar::-webkit-scrollbar {
     display: none;
   }
@@ -129,7 +241,7 @@
     scrollbar-width: none;
   }
 
-  /* Safe-area insets for modern mobile viewports (iOS Safari / WebKit Dynamic Island & Home indicator) */
+  /* Safe-area insets for mobile */
   .pt-safe {
     padding-top: env(safe-area-inset-top, 0px);
   }
@@ -142,13 +254,26 @@
   .pr-safe {
     padding-right: env(safe-area-inset-right, 0px);
   }
-
-  /* Support both no-scrollbar and scrollbar-none naming */
-  .scrollbar-none::-webkit-scrollbar {
-    display: none;
-  }
   .scrollbar-none {
     -ms-overflow-style: none;
     scrollbar-width: none;
   }
+  .scrollbar-none::-webkit-scrollbar {
+    display: none;
+  }
+
+  /* Gradient background utilities */
+  .bg-gradient-amber-glow {
+    background: radial-gradient(ellipse at center, rgba(245, 158, 11, 0.15) 0%, transparent 70%);
+  }
+
+  .bg-gradient-green-glow {
+    background: radial-gradient(ellipse at center, rgba(16, 185, 129, 0.1) 0%, transparent 70%);
+  }
+
+  /* Staggered animation delays */
+  .stagger-1 { animation-delay: 0.1s; }
+  .stagger-2 { animation-delay: 0.2s; }
+  .stagger-3 { animation-delay: 0.3s; }
+  .stagger-4 { animation-delay: 0.4s; }
 }

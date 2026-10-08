@@ -27,7 +27,7 @@ if not logger.handlers:
     logger.setLevel(logging.INFO)
 
 # Polite pacing delay between outgoing requests to avoid IP burst limits
-REQUEST_DELAY_SECONDS: float = 0.5
+REQUEST_DELAY_SECONDS: float = 6.5
 
 
 def sanitize_key(key: str | None) -> str:
