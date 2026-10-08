@@ -178,9 +178,9 @@ def main() -> None:
             away_team = m.get("awayTeam", {})
 
             if home_team:
-                ensure_team_metadata(supabase, home_team, comp_code)
+                ensure_team_metadata(supabase, team_dict=home_team, competition_code=comp_code)
             if away_team:
-                ensure_team_metadata(supabase, away_team, comp_code)
+                ensure_team_metadata(supabase, team_dict=away_team, competition_code=comp_code)
 
             row = parse_fixture_row(m, comp_code=comp_code)
             if row:
@@ -205,9 +205,9 @@ def main() -> None:
                 away_team = m.get("awayTeam", {})
 
                 if home_team:
-                    ensure_team_metadata(supabase, home_team, code)
+                    ensure_team_metadata(supabase, team_dict=home_team, competition_code=code)
                 if away_team:
-                    ensure_team_metadata(supabase, away_team, code)
+                    ensure_team_metadata(supabase, team_dict=away_team, competition_code=code)
 
                 row = parse_fixture_row(m, league, code)
                 if row:
