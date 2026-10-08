@@ -57,6 +57,26 @@ function StatusDot({ status }) {
   )
 }
 
+function StatusPill({ status }) {
+  const isBanned = (status || '').toLowerCase() === 'banned'
+  return (
+    <span
+      className={`inline-flex items-center px-2 py-0.5 rounded text-[10px] font-mono font-medium border ${
+        isBanned
+          ? 'bg-rose-500/15 text-rose-400 border-rose-500/30'
+          : 'bg-emerald-500/15 text-emerald-400 border-emerald-500/30'
+      }`}
+    >
+      <span
+        className={`w-1.5 h-1.5 rounded-full mr-1.5 ${
+          isBanned ? 'bg-rose-400' : 'bg-emerald-400'
+        }`}
+      />
+      {isBanned ? 'BANNED' : 'ACTIVE'}
+    </span>
+  )
+}
+
 export default function AdminPanel({ onBack }) {
   const { user, profile } = useAuth()
   const isAdmin = user && ADMIN_EMAILS.includes((user.email || '').toLowerCase())
@@ -459,9 +479,9 @@ export default function AdminPanel({ onBack }) {
             <div className="pt-3 border-t border-pitch-800">
               <p className="text-[10px] text-slate-500 font-mono mb-2">Workflow Schedule:</p>
               <ul className="text-[10px] text-slate-500 font-mono space-y-0.5">
-                <li>sync_standings.yml &mdash; Daily at 03:00 UTC</li>
-                <li>sync_fixtures.yml &mdash; Mondays at 02:00 UTC</li>
-                <li>sync_daily.yml &mdash; Twice daily at 06:00 &amp; 14:00 UTC</li>
+                <li>sync_standings.yml - Daily at 03:00 UTC</li>
+                <li>sync_fixtures.yml - Mondays at 02:00 UTC</li>
+                <li>sync_daily.yml - Twice daily at 06:00 &amp; 14:00 UTC</li>
               </ul>
             </div>
           </div>
