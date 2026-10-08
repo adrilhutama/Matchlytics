@@ -1,0 +1,64 @@
+name: Ingest Upcoming Fixtures (Fan-Out)
+
+on:
+  schedule:
+    # Runs weekly every Monday at 03:00 UTC
+    - cron: "0 3 * * 1"
+  workflow_dispatch:
+    inputs:
+      leagues:
+        description: "Comma-separated league codes (default: all)"
+        required: false
+        default: ""
+
+jobs:
+  sync-subagent:
+    name: "${{ matrix.group_name }}"
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - group_name: "Western Europe Core"
+            leagues: "PL,PD,BL1"
+          - group_name: "Southern & Central Europe"
+            leagues: "SA,FL1,CL"
+          - group_name: "Secondary European Leagues"
+            leagues: "DED,PPL,ELC"
+          - group_name: "Americas & Tournaments"
+            leagues: "BSA,WC,EC"
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: "pip"
+          cache-dependency-path: scripts/requirements.txt
+
+      - name: Upgrade pip
+        run: python -m pip install --upgrade pip
+
+      - name: Install dependencies
+        run: pip install --no-cache-dir -r scripts/requirements.txt
+
+      - name: Run Monthly Fixtures Subagent
+        env:
+          PYTHONUNBUFFERED: "1"
+          FOOTBALL_DATA_TOKENS: ${{ secrets.FOOTBALL_DATA_TOKENS || secrets.FOOTBALL_DATA_TOKEN }}
+          FOOTBALL_DATA_TOKEN: ${{ secrets.FOOTBALL_DATA_TOKEN }}
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY || secrets.SUPABASE_SERVICE_KEY }}
+          SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY || secrets.SUPABASE_SERVICE_ROLE_KEY }}
+        run: |
+          cd scripts
+          python -u sync_monthly_fixtures.py --leagues "${{ matrix.leagues }}"
+
+      - name: Log completion
+        if: always()
+        run: echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] ${{ matrix.group_name }} finished"

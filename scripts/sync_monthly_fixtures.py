@@ -5,10 +5,15 @@
 #
 # Run manually or on a separate monthly workflow to conserve
 # the 100 req/day free-tier quota.
+#
+# Usage:
+#   python sync_monthly_fixtures.py                  # all ACTIVE_LEAGUES
+#   python sync_monthly_fixtures.py --leagues PL,PD   # subset only
 # ============================================================
 
 from __future__ import annotations
 
+import argparse
 import time
 from datetime import date, timedelta
 from typing import Any
@@ -38,8 +43,22 @@ except ModuleNotFoundError:
     from football_data_pool import football_pool
     from _utils import extract_venue_and_referee, ensure_team_metadata, ensure_competition_metadata
 
+# Explicit per-request timeout: (connect_seconds, read_seconds).
+# Prevents the process from hanging indefinitely on a stalled connection.
+REQUEST_TIMEOUT = (5.0, 15.0)
 
-def fetch_fixtures_range(competition_code: str, from_date: str, to_date: str, pool: Any = None) -> list[dict]:
+# Maximum number of retry attempts per competition when falling back
+# to per-league queries (covers transient network errors before giving up).
+MAX_RETRIES = 3
+
+
+def fetch_fixtures_range(
+    competition_code: str,
+    from_date: str,
+    to_date: str,
+    pool: Any = None,
+    max_retries: int = MAX_RETRIES,
+) -> list[dict]:
     """Fetch scheduled fixtures from football-data.org for a competition within a date range."""
     client = pool or football_pool
     url = f"{BASE_URL}/competitions/{competition_code}/matches"
@@ -48,18 +67,27 @@ def fetch_fixtures_range(competition_code: str, from_date: str, to_date: str, po
         "dateTo":   to_date,
         "status":   "SCHEDULED",
     }
-    resp = client.get(url, params=params, timeout=15)
-    if resp.status_code != 200:
-        error_msg = resp.text
+    last_error: Exception | None = None
+    for attempt in range(1, max_retries + 1):
         try:
-            error_msg = resp.json().get("message", error_msg)
-        except Exception:
-            pass
-        print(f"    [football-data.org Error] {competition_code}: {resp.status_code} - {error_msg}")
-        return []
-
-    data = resp.json()
-    return data.get("matches", [])
+            resp = client.get(url, params=params, timeout=REQUEST_TIMEOUT)
+        except requests.RequestException as exc:
+            last_error = exc
+            print(f"    [WARN] Attempt {attempt}/{max_retries} failed for {competition_code}: {exc}")
+            if attempt < max_retries:
+                time.sleep(REQUEST_DELAY)
+            continue
+        if resp.status_code != 200:
+            error_msg = resp.text
+            try:
+                error_msg = resp.json().get("message", error_msg)
+            except Exception:
+                pass
+            print(f"    [football-data.org Error] {competition_code}: {resp.status_code} - {error_msg}")
+            return []
+        return resp.json().get("matches", [])
+    print(f"    [ERROR] All {max_retries} attempts exhausted for {competition_code}: {last_error}")
+    return []
 
 
 def fetch_cross_league_fixtures(
@@ -81,7 +109,11 @@ def fetch_cross_league_fixtures(
         "dateTo":   to_date,
         "status":   "SCHEDULED",
     }
-    resp = client.get(url, params=params, timeout=15)
+    try:
+        resp = client.get(url, params=params, timeout=REQUEST_TIMEOUT)
+    except requests.RequestException as exc:
+        print(f"    [football-data.org Error] Multi-competition ({comp_str}): request failed - {exc}")
+        return []
     if resp.status_code != 200:
         error_msg = resp.text
         try:
@@ -158,14 +190,81 @@ def upsert_fixtures(rows: list[dict], supabase_client: Any = None) -> None:
         print(f"    [WARN] Upsert fixtures error: {exc}")
 
 
+def build_league_filter(args: argparse.Namespace) -> list[dict]:
+    """Return the list of leagues to process based on --leagues CLI flag."""
+    if args.leagues:
+        requested = [c.strip().upper() for c in args.leagues.split(",") if c.strip()]
+        filtered = [l for l in ACTIVE_LEAGUES if l["code"] in requested]
+        missing = set(requested) - {l["code"] for l in ACTIVE_LEAGUES}
+        if missing:
+            print(f"    [WARN] Unknown league code(s) ignored: {', '.join(sorted(missing))}")
+        if not filtered:
+            print(f"    [ERROR] No matching leagues for --leagues {args.leagues}. Aborting.")
+            return []
+        print(f"    Filtered to {len(filtered)} league(s): {[l['code'] for l in filtered]}")
+        return filtered
+    return ACTIVE_LEAGUES
+
+
 def main() -> None:
+    parser = argparse.ArgumentParser(description="Sync upcoming football fixtures for the next 30 days.")
+    parser.add_argument(
+        "--leagues",
+        type=str,
+        default="",
+        help="Comma-separated list of competition codes to sync (default: all ACTIVE_LEAGUES)",
+    )
+    args = parser.parse_args()
+
     today    = date.today()
     from_str = today.strftime("%Y-%m-%d")
     to_str   = (today + timedelta(days=30)).strftime("%Y-%m-%d")
 
-    print(f"Syncing fixtures from {from_str} to {to_str}...")
-    comp_codes = [l["code"] for l in ACTIVE_LEAGUES]
+    target_leagues = build_league_filter(args)
+    if not target_leagues:
+        return
+
+    comp_codes = [l["code"] for l in target_leagues]
     comp_str = ",".join(comp_codes)
+
+    # Single-league mode: skip multi-competition query, go straight to per-league
+    if len(target_leagues) < len(ACTIVE_LEAGUES):
+        print(f"Syncing fixtures for {len(target_leagues)} league(s) from {from_str} to {to_str}...")
+        total = 0
+        for league in target_leagues:
+            code = league["code"]
+            name = league["name"]
+            print(f"  Competition: {name} ({code}) [ID={league['id']}]")
+            try:
+                raw = fetch_fixtures_range(code, from_str, to_str)
+                rows = []
+                for m in raw:
+                    home_team = m.get("homeTeam", {})
+                    away_team = m.get("awayTeam", {})
+
+                    if home_team:
+                        ensure_competition_metadata(supabase, code)
+                        ensure_team_metadata(supabase, team_dict=home_team, competition_code=code)
+                    if away_team:
+                        ensure_competition_metadata(supabase, code)
+                        ensure_team_metadata(supabase, team_dict=away_team, competition_code=code)
+
+                    row = parse_fixture_row(m, league, code)
+                    if row:
+                        rows.append(row)
+
+                upsert_fixtures(rows, supabase)
+                total += len(rows)
+            except requests.HTTPError as exc:
+                print(f"    HTTP error for {name}: {exc}")
+            except Exception as exc:
+                print(f"    Unexpected error for {name}: {exc}")
+            time.sleep(REQUEST_DELAY)
+        print(f"\nDone. Total fixtures synced: {total}")
+        return
+
+    # All-leagues mode: attempt multi-competition query first, fall back to per-league
+    print(f"Syncing fixtures from {from_str} to {to_str}...")
     print(f"Attempting optimized multi-competition query for: {comp_str}")
 
     multi_matches = fetch_cross_league_fixtures(comp_codes, from_str, to_str)
@@ -195,7 +294,7 @@ def main() -> None:
     # Fallback to per-competition ingestion if multi-competition returns no matches
     print("Multi-competition returned empty. Falling back to per-league queries...")
     total = 0
-    for league in ACTIVE_LEAGUES:
+    for league in target_leagues:
         code = league["code"]
         name = league["name"]
         print(f"  Competition: {name} ({code}) [ID={league['id']}]")
