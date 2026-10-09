@@ -93,4 +93,84 @@ export default defineConfig({
       },
     }),
   ],
+  build: {
+    rollupOptions: {
+      output: {
+        // Manual chunk splitting for better caching
+        manualChunks: {
+          // Vendor chunks
+          'vendor-react': ['react', 'react-dom'],
+          'vendor-supabase': ['@supabase/supabase-js'],
+          // Core app chunk
+          'app-core': [
+            './src/lib/supabase',
+            './src/context/AuthContext',
+            './src/utils/analytics',
+          ],
+          // UI component chunk
+          'ui-components': [
+            './src/components/ui/Button',
+            './src/components/ui/Badge',
+            './src/components/ui/Chip',
+            './src/components/ui/utils',
+          ],
+          // Terminal workspace
+          'terminal-workspace': [
+            './src/components/TerminalScanner',
+            './src/components/TableView',
+            './src/components/CompactTableView',
+            './src/components/MatchCard',
+            './src/components/FilterBar',
+            './src/components/Sidebar',
+            './src/components/MobileNav',
+          ],
+          // Quant workspace
+          'quant-workspace': [
+            './src/components/QuantLab',
+            './src/components/ScoreMatrixModal',
+            './src/components/KellyCalculatorModal',
+          ],
+          // Portfolio workspace
+          'portfolio-workspace': [
+            './src/components/PortfolioTracker',
+            './src/components/ParlaySlipDrawer',
+          ],
+          // Ledger workspace
+          'ledger-workspace': [
+            './src/components/ModelLedger',
+            './src/components/PerformanceModal',
+          ],
+          // Admin workspace
+          'admin-workspace': [
+            './src/components/AdminDashboard',
+            './src/components/AdminPanel',
+          ],
+          // User workspace
+          'user-workspace': [
+            './src/components/UserProfile',
+            './src/components/DailyPicksModal',
+          ],
+          // Virtualization
+          'virtual-list': [
+            './src/components/VirtualList',
+          ],
+        },
+        // Chunk file naming
+        chunkFileNames: 'assets/[name]-[hash].js',
+        entryFileNames: 'assets/[name]-[hash].js',
+        assetFileNames: 'assets/[name]-[hash].[ext]',
+      },
+    },
+    // Optimize build settings
+    minify: 'terser',
+    terserOptions: {
+      compress: {
+        drop_console: true,
+        drop_debugger: true,
+      },
+    },
+    // Target modern browsers for smaller bundles
+    target: 'es2020',
+    cssCodeSplit: true,
+  },
 })

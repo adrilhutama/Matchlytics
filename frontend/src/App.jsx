@@ -9,7 +9,7 @@
 // Desktop Left Sidebar (lg+) & Mobile Top Brand Bar & Sticky Workspace Nav
 // Zero em dash characters used (R-02 compliance)
 
-import { useState, useEffect, useCallback, useMemo, useRef, Component } from 'react'
+import { useState, useEffect, useCallback, useMemo, useRef, Component, React } from 'react'
 import { supabase } from './lib/supabase'
 import Header from './components/Header'
 import FilterBar, { DATE_RANGES } from './components/FilterBar'
@@ -34,13 +34,14 @@ import SubscriptionModal from './components/SubscriptionModal'
 import SubscriptionBanner from './components/SubscriptionBanner'
 import WorkspaceNav from './components/WorkspaceNav'
 import CommandPalette from './components/CommandPalette'
-import QuantLab from './components/QuantLab'
-import PortfolioTracker from './components/PortfolioTracker'
-import ModelLedger from './components/ModelLedger'
-import AdminDashboard from './components/AdminDashboard'
-import AdminPanel from './components/AdminPanel'
-import UserProfile from './components/UserProfile'
-import DailyPicksModal from './components/DailyPicksModal'
+// Lazy loaded components for bundle splitting
+const QuantLab = React.lazy(() => import('./components/QuantLab'))
+const PortfolioTracker = React.lazy(() => import('./components/PortfolioTracker'))
+const ModelLedger = React.lazy(() => import('./components/ModelLedger'))
+const AdminDashboard = React.lazy(() => import('./components/AdminDashboard'))
+const AdminPanel = React.lazy(() => import('./components/AdminPanel'))
+const UserProfile = React.lazy(() => import('./components/UserProfile'))
+const DailyPicksModal = React.lazy(() => import('./components/DailyPicksModal'))
 import { AuthProvider, useAuth } from './context/AuthContext'
 import {
   isDateInRange,
@@ -1238,42 +1239,50 @@ function AppInner() {
 
           {/* Workspace 2: Quant Lab (Single Match Deep-Dive) */}
           {activeWorkspace === 'quant_lab' && (
-            <QuantLab
-              fixture={selectedLabFixture}
-              selectedFixture={selectedLabFixture}
-              allFixtures={fixtures}
-              fixtures={fixtures}
-              onSelectFixture={setSelectedLabFixture}
-              standingsMap={standingsMap}
-              onLogPosition={handleLogPosition}
-              userBankroll={bankrollAmount}
-              bankrollAmount={bankrollAmount}
-              onBackToScanner={handleBackToScanner}
-            />
+            <React.Suspense fallback={<LoadingState />}>
+              <QuantLab
+                fixture={selectedLabFixture}
+                selectedFixture={selectedLabFixture}
+                allFixtures={fixtures}
+                fixtures={fixtures}
+                onSelectFixture={setSelectedLabFixture}
+                standingsMap={standingsMap}
+                onLogPosition={handleLogPosition}
+                userBankroll={bankrollAmount}
+                bankrollAmount={bankrollAmount}
+                onBackToScanner={handleBackToScanner}
+              />
+            </React.Suspense>
           )}
 
           {/* Workspace 3: Bankroll & Bet Tracker */}
           {activeWorkspace === 'portfolio' && (
-            <PortfolioTracker
-              positions={portfolioPositions}
-              bankroll={bankrollAmount}
-              onUpdateBankroll={handleUpdateBankroll}
-              onUpdateStatus={handleUpdatePositionStatus}
-              onDeletePosition={handleDeletePosition}
-              onAddPosition={handleAddManualPosition}
-            />
+            <React.Suspense fallback={<LoadingState />}>
+              <PortfolioTracker
+                positions={portfolioPositions}
+                bankroll={bankrollAmount}
+                onUpdateBankroll={handleUpdateBankroll}
+                onUpdateStatus={handleUpdatePositionStatus}
+                onDeletePosition={handleDeletePosition}
+                onAddPosition={handleAddManualPosition}
+              />
+            </React.Suspense>
           )}
 
           {/* Workspace 4: Track Record & Model Ledger */}
           {activeWorkspace === 'ledger' && (
-            <ModelLedger
-              settledFixtures={(settledFixtures || []).filter(Boolean)}
-            />
+            <React.Suspense fallback={<LoadingState />}>
+              <ModelLedger
+                settledFixtures={(settledFixtures || []).filter(Boolean)}
+              />
+            </React.Suspense>
           )}
 
           {/* Workspace 5: User Profile & Account Settings */}
           {activeWorkspace === 'profile' && (
-            <UserProfile onBack={handleBackFromProfile} />
+            <React.Suspense fallback={<LoadingState />}>
+              <UserProfile onBack={handleBackFromProfile} />
+            </React.Suspense>
           )}
         </main>
 
