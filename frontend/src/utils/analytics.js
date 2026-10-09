@@ -638,14 +638,22 @@ export function simulateBankroll(settledFixtures, kellyPct = 2.5) {
       kellyProfit = -(kellyPct / 100)
     }
 
+    const homeName = f.home_team?.name || f.home_team_name || f.homeTeam || f.home || f.team_home || '?'
+    const awayName = f.away_team?.name || f.away_team_name || f.awayTeam || f.away || f.team_away || '?'
+    // Fallback: if both are '?', try to extract from fixture_name field
+    const matchLabel = (homeName !== '?' || awayName !== '?')
+      ? `${homeName} vs ${awayName}`
+      : (f.fixture_name || 'Competition Match')
+    const leagueName = f.league_name || f.league || f.competition_code || 'League'
+
     flatBalance += flatProfit
     kellyBalance += kellyProfit
 
     flatEquity.push({
       index: bets.length,
       match_date: f.match_date,
-      matchLabel: `${f.home_team_name ?? '?'} vs ${f.away_team_name ?? '?'}`,
-      league: f.league_name,
+      matchLabel,
+      league: leagueName,
       equity: Math.round(flatBalance * 100) / 100,
       betProfit: Math.round(flatProfit * 100) / 100,
     })
@@ -653,16 +661,16 @@ export function simulateBankroll(settledFixtures, kellyPct = 2.5) {
     kellyEquity.push({
       index: bets.length,
       match_date: f.match_date,
-      matchLabel: `${f.home_team_name ?? '?'} vs ${f.away_team_name ?? '?'}`,
-      league: f.league_name,
+      matchLabel,
+      league: leagueName,
       equity: Math.round(kellyBalance * 100) / 100,
       betProfit: Math.round(kellyProfit * 100) / 100,
     })
 
     bets.push({
       match_date: f.match_date,
-      matchLabel: `${f.home_team_name ?? '?'} vs ${f.away_team_name ?? '?'}`,
-      league: f.league_name,
+      matchLabel,
+      league: leagueName,
       selection: pick,
       home_score: f.home_score,
       away_score: f.away_score,

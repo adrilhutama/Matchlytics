@@ -152,6 +152,13 @@ function buildSingleCard(item, date) {
   const timeStr = kickoff.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' })
   const dayLabel = kickoff.toISOString().split('T')[0] === date ? 'Today' : kickoff.toLocaleDateString(undefined, { weekday: 'short' })
 
+  const rawOdds = opp.market_odds ?? opp.odds ?? opp.fair_odds
+  const validOdds = (!isNaN(Number(rawOdds)) && Number(rawOdds) > 0) ? Number(rawOdds).toFixed(2) : '–'
+  const rawProb = Number(opp.model_prob)
+  const validProb = !isNaN(rawProb) ? (rawProb <= 1.0 ? (rawProb * 100).toFixed(1) : rawProb.toFixed(1)) : '–'
+  const rawEv = Number(opp.ev_percentage)
+  const validEv = !isNaN(rawEv) ? rawEv.toFixed(1) : '–'
+
   return {
     id: `single_${fixture.fixtureId}_${opp.selection}_${opp.market}`,
     fixtureId: fixture.fixtureId,
@@ -161,9 +168,9 @@ function buildSingleCard(item, date) {
     dayLabel,
     market: opp.market,         // 'h2h' | 'totals' | 'spreads'
     selection: opp.selection,   // e.g. 'HOME', 'Over 2.5', 'Away -1.0'
-    odds: Number(opp.odds)?.toFixed(2) || '–',
-    modelProb: Number(opp.model_prob)?.toFixed(1) || '–',
-    evPercent: Number(opp.ev_percentage)?.toFixed(1) || '–',
+    odds: validOdds,
+    modelProb: validProb,
+    evPercent: validEv,
     score: item.score,
   }
 }
@@ -176,15 +183,22 @@ function buildParlayCard(items, date) {
     const away = resolveTeamName(item.awayTeam)
     const kickoff = new Date(item.kickoffTime)
     const timeStr = kickoff.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' })
+    const rawOdds = opp.market_odds ?? opp.odds ?? opp.fair_odds
+    const validOdds = (!isNaN(Number(rawOdds)) && Number(rawOdds) > 0) ? Number(rawOdds).toFixed(2) : '–'
+    const rawProb = Number(opp.model_prob)
+    const validProb = !isNaN(rawProb) ? (rawProb <= 1.0 ? (rawProb * 100).toFixed(1) : rawProb.toFixed(1)) : '–'
+    const rawEv = Number(opp.ev_percentage)
+    const validEv = !isNaN(rawEv) ? rawEv.toFixed(1) : '–'
+
     return {
       matchLabel: `${home} vs ${away}`,
       league: item.competitionCode || 'Unknown',
       timeStr,
       market: opp.market,
       selection: opp.selection,
-      odds: Number(opp.odds)?.toFixed(2) || '–',
-      modelProb: Number(opp.model_prob)?.toFixed(1) || '–',
-      evPercent: Number(opp.ev_percentage)?.toFixed(1) || '–',
+      odds: validOdds,
+      modelProb: validProb,
+      evPercent: validEv,
       fixtureId: item.fixtureId,
     }
   })

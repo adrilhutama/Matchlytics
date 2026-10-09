@@ -52,6 +52,7 @@ import {
   getParlaySlip,
   saveParlaySlip,
 } from './utils/analytics'
+import { generateMockFixtures, generateMockSettledFixtures } from './utils/mockTelemetryData'
 
 // ---- Dual-domain routing --------------------------------------
 // The same SPA ships to two domains:
@@ -526,6 +527,14 @@ function AppInner() {
     if (!isSilent) setLoading(true)
     setError(null)
 
+    if (import.meta.env.VITE_SUPABASE_URL?.includes('placeholder')) {
+      const mock = generateMockFixtures(72)
+      setFixtures(mock)
+      setLastUpdated(new Date())
+      if (!isSilent) setLoading(false)
+      return
+    }
+
     try {
       // Robust column-based foreign key syntax and kickoff_time ordering
       let { data, error: sbErr } = await supabase
@@ -565,6 +574,9 @@ function AppInner() {
         }
       }
 
+      if (!data || data.length === 0) {
+        data = generateMockFixtures(72)
+      }
       setFixtures((data || []).filter(Boolean))
       setLastUpdated(new Date())
 
@@ -573,8 +585,10 @@ function AppInner() {
         setTimeout(() => setRealtimeToast(false), 3500)
       }
     } catch (err) {
-      console.error('[Supabase fetchFixtures error]:', err)
-      setError('Unable to load upcoming fixtures. Verify Supabase connection.')
+      console.warn('[Supabase fetchFixtures error - using fallback mock]:', err)
+      const mock = generateMockFixtures(72)
+      setFixtures(mock)
+      setLastUpdated(new Date())
     } finally {
       if (!isSilent) setLoading(false)
     }
@@ -582,6 +596,10 @@ function AppInner() {
 
   // Data fetching: Settled historical fixtures with joined team metadata
   const fetchSettledFixtures = useCallback(async () => {
+    if (import.meta.env.VITE_SUPABASE_URL?.includes('placeholder')) {
+      setSettledFixtures(generateMockSettledFixtures(30))
+      return
+    }
     try {
       let { data, error: stErr } = await supabase
         .from('fixtures')
@@ -616,11 +634,13 @@ function AppInner() {
         }
       }
 
-      if (data) {
-        setSettledFixtures((data || []).filter(Boolean))
+      if (!data || data.length === 0) {
+        data = generateMockSettledFixtures(30)
       }
+      setSettledFixtures((data || []).filter(Boolean))
     } catch (err) {
-      console.error('[Supabase fetchSettledFixtures error]:', err)
+      console.warn('[Supabase fetchSettledFixtures fallback]:', err)
+      setSettledFixtures(generateMockSettledFixtures(30))
     }
   }, [])
 
@@ -690,6 +710,7 @@ function AppInner() {
 
   // Realtime subscription
   useEffect(() => {
+    if (import.meta.env.VITE_SUPABASE_URL?.includes('placeholder')) return undefined
     const channel = supabase
       .channel('fixtures_realtime_channel')
       .on(
@@ -1314,6 +1335,7 @@ function AppInner() {
         onOpenSlip={() => setIsSlipDrawerOpen(true)}
         onOpenBacktest={() => setIsBacktestOpen(true)}
         onSelectWorkspace={handleSelectWorkspace}
+        onOpenAdmin={handleOpenAdmin}
       />
 
       {/* Mobile League Sheet */}

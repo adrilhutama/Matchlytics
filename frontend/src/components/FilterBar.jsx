@@ -119,7 +119,7 @@ export default function FilterBar({
               onBlur={() => setSearchFocused(false)}
               placeholder="Search teams..."
               aria-label="Search fixtures"
-              className="w-full pl-9 pr-8 py-2 rounded-lg bg-pitch-800 border border-pitch-700 text-sm text-slate-200 placeholder-slate-500 focus:border-amber-500 focus:ring-1 focus:ring-amber-500 transition-all"
+              className="w-full pl-9 pr-8 py-2 rounded-lg bg-pitch-800 border border-pitch-700 text-sm text-slate-200 placeholder-slate-500 focus:border-amber-500 focus:ring-1 focus:ring-amber-500 transition-all min-h-[44px] sm:min-h-auto"
             />
             {searchQuery && (
               <button
@@ -146,7 +146,7 @@ export default function FilterBar({
                   type="button"
                   onClick={() => onMarketChange(cat.id)}
                   aria-pressed={isActive}
-                  className={`px-3 py-1.5 text-xs font-semibold rounded-md transition-all ${
+                  className={`px-3 py-1.5 text-xs font-semibold rounded-md transition-all min-h-[44px] sm:min-h-auto ${
                     isActive
                       ? 'bg-amber-500 text-pitch-950 shadow-sm'
                       : 'text-slate-400 hover:text-slate-200'
@@ -171,7 +171,7 @@ export default function FilterBar({
                 onClick={() => handlePillClick(r)}
                 aria-pressed={isActive}
                 title={isLocked ? UPGRADE_HINTS[r.id] : undefined}
-                className={`px-3 py-1.5 text-xs font-semibold rounded-lg border transition-all ${
+                className={`px-3 py-1.5 text-xs font-semibold rounded-lg border transition-all min-h-[44px] sm:min-h-auto ${
                   isActive
                     ? 'bg-pitch-700 text-amber-300 border-amber-500/50'
                     : isLocked
@@ -194,7 +194,7 @@ export default function FilterBar({
             onClick={handleValueToggle}
             aria-pressed={valueOnly}
             title={evLocked ? 'Pro feature' : undefined}
-            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold border transition-all ${
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold border transition-all min-h-[44px] sm:min-h-auto ${
               valueOnly && !evLocked
                 ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/50'
                 : 'bg-pitch-800 text-slate-500 border-pitch-700 hover:text-slate-300'
@@ -212,7 +212,7 @@ export default function FilterBar({
             type="button"
             onClick={onToggleWatchlistTab}
             aria-pressed={showWatchlistOnly}
-            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold border transition-all ${
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold border transition-all min-h-[44px] sm:min-h-auto ${
               showWatchlistOnly
                 ? 'bg-amber-500 text-pitch-950 border-amber-500'
                 : 'bg-pitch-800 text-slate-400 border-pitch-700 hover:text-slate-200'
@@ -232,7 +232,7 @@ export default function FilterBar({
                 type="button"
                 onClick={() => onViewModeChange(mode)}
                 aria-pressed={viewMode === mode}
-                className={`px-2.5 py-1 text-xs font-semibold rounded-md transition-all ${
+                className={`px-2.5 py-1 text-xs font-semibold rounded-md transition-all min-h-[44px] sm:min-h-auto ${
                   viewMode === mode
                     ? 'bg-amber-500 text-pitch-950'
                     : 'text-slate-400 hover:text-slate-200'
@@ -267,7 +267,7 @@ export default function FilterBar({
             onClick={() => onLeagueChange('all')}
             className="flex-shrink-0"
           />
-          {leagues.map((league) => (
+          {leagues.filter((l) => l.id !== 'all' && l.code !== 'ALL' && l.code?.toLowerCase() !== 'all').map((league) => (
             <LeagueChip
               key={league.id}
               league={league}

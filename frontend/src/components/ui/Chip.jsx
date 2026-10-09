@@ -15,7 +15,7 @@ export const Chip = ({
   count,
   ...props
 }) => {
-  const baseClass = 'inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[12px] font-medium border transition-all duration-150 select-none'
+  const baseClass = 'inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[12px] font-medium border transition-all duration-150 select-none min-h-[44px] sm:min-h-auto'
   
   const stateClass = locked
     ? 'bg-pitch-900 text-slate-600 border-pitch-800 cursor-not-allowed opacity-60'

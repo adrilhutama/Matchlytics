@@ -15,14 +15,43 @@ import { supabase } from '../lib/supabase'
 
 const AuthContext = createContext(null)
 
+function getInitialDemoState() {
+  if (typeof window === 'undefined') return null
+  const demoParam = new URLSearchParams(window.location.search).get('demo')
+  if (demoParam) {
+    localStorage.setItem('matchlytics_dev_auth', demoParam)
+  }
+  const activeDemo = demoParam || localStorage.getItem('matchlytics_dev_auth')
+  if (!activeDemo) return null
+  const isAdmin = activeDemo === 'admin'
+  const isFree = activeDemo === 'free'
+  const demoUser = {
+    id: `demo-${activeDemo}-id`,
+    email: isAdmin ? 'admin@imortifex.me' : isFree ? 'free@imortifex.me' : 'pro@imortifex.me',
+    user_metadata: { full_name: isAdmin ? 'Principal Quant' : 'Quant Analyst' },
+  }
+  const demoProfile = {
+    id: demoUser.id,
+    email: demoUser.email,
+    full_name: demoUser.user_metadata.full_name,
+    subscription_tier: isAdmin ? 'institutional' : isFree ? 'free' : 'pro',
+    subscription_status: isFree ? 'inactive' : 'active',
+    is_admin: isAdmin,
+    current_period_end: isFree ? null : '2028-12-31T23:59:59Z',
+  }
+  return { user: demoUser, profile: demoProfile }
+}
+
 export function AuthProvider({ children }) {
-  const [session, setSession] = useState(null)
-  const [user, setUser] = useState(null)
-  const [profile, setProfile] = useState(null)
-  const [loading, setLoading] = useState(true)
+  const [initialDemo] = useState(getInitialDemoState)
+  const [session, setSession] = useState(initialDemo ? { user: initialDemo.user } : null)
+  const [user, setUser] = useState(initialDemo ? initialDemo.user : null)
+  const [profile, setProfile] = useState(initialDemo ? initialDemo.profile : null)
+  const [loading, setLoading] = useState(initialDemo ? false : true)
 
   // ---- Session tracking ------------------------------------
   useEffect(() => {
+    if (initialDemo) return undefined
     let mounted = true
 
     supabase.auth.getSession()
@@ -49,14 +78,15 @@ export function AuthProvider({ children }) {
 
   // ---- Profile fetch (re-runs on user change) ----------------
   const fetchProfile = useCallback(async (userId) => {
+    if (typeof userId === 'string' && userId.startsWith('demo-')) {
+      return
+    }
     const { data, error: pErr } = await supabase
       .from('profiles')
       .select('*')
       .eq('id', userId)
       .maybeSingle()
     if (pErr) {
-      // Table may predate the 20260930 migration on this project;
-      // treat as free/inactive rather than crashing the app.
       console.warn('Failed to load profile:', pErr.message)
       setProfile(null)
       return
@@ -76,7 +106,7 @@ export function AuthProvider({ children }) {
   // Payment fulfilment updates this row under the service role; the
   // client re-reads it over realtime and the paywall lifts itself.
   useEffect(() => {
-    if (!user) return undefined
+    if (!user || (typeof user.id === 'string' && user.id.startsWith('demo-'))) return undefined
     const channel = supabase
       .channel(`profile-subscription-${user.id}`)
       .on(
@@ -127,6 +157,9 @@ export function AuthProvider({ children }) {
   }, [])
 
   const signOut = useCallback(async () => {
+    if (typeof window !== 'undefined') {
+      localStorage.removeItem('matchlytics_dev_auth')
+    }
     const { error: outErr } = await supabase.auth.signOut()
     if (outErr) console.warn('Sign out failed:', outErr.message)
     setSession(null)

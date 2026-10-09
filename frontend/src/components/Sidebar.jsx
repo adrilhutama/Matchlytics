@@ -172,7 +172,7 @@ export default function Sidebar({
               onClick={() => onOpenAdmin?.()}
               aria-current={activeWorkspace === 'admin' ? 'page' : undefined}
               title={!pinned && !hovered ? ADMIN_WORKSPACE.label : undefined}
-              className={`w-full min-h-[36px] rounded-xl transition-all duration-150 flex items-center gap-3 relative ${
+              className={`w-full min-h-[44px] rounded-xl transition-all duration-150 flex items-center gap-3 relative ${
                 activeWorkspace === 'admin'
                   ? 'bg-amber-500/15 text-amber-400'
                   : 'text-slate-400 hover:bg-pitch-900 hover:text-slate-200'
@@ -302,11 +302,12 @@ export default function Sidebar({
           )}
 
           {/* Admin Button */}
-          {isAdmin && onOpenAdmin && (pinned || hovered) && (
+          {isAdmin && onOpenAdmin && (
             <button
               type="button"
               onClick={onOpenAdmin}
-              className="w-full px-3 py-1.5 rounded-lg bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/30 text-amber-400 text-[11px] font-mono transition-colors text-left"
+              title="Admin Dashboard"
+              className="w-full px-3 py-1.5 rounded-lg bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/30 text-amber-400 text-[11px] font-mono transition-colors text-left min-h-[44px]"
             >
               Admin Dashboard
             </button>
