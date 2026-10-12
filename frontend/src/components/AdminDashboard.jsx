@@ -67,6 +67,11 @@ export default function AdminDashboard({ onBack }) {
   const [syncing, setSyncing] = useState(false)
   const [syncResult, setSyncResult] = useState(null)
 
+  // Pipeline health state
+  const [healthMetrics, setHealthMetrics] = useState(null)
+  const [healthLoading, setHealthLoading] = useState(false)
+  const [healthError, setHealthError] = useState(null)
+
   // ---- Auth guard --------------------------------------------------------
   // Primary gate: env-defined ADMIN_EMAILS whitelist (operational control).
   // Secondary: verify is_admin flag in profiles row when available.
@@ -131,6 +136,24 @@ export default function AdminDashboard({ onBack }) {
     }
     setPosLoading(false)
   }, [])
+
+  // ---- Fetch pipeline health metrics -------------------------------
+  const fetchHealthMetrics = useCallback(async () => {
+    setHealthLoading(true)
+    setHealthError(null)
+    try {
+      const { data, error } = await supabase.rpc('get_pipeline_health_metrics')
+      if (error) throw error
+      setHealthMetrics(data)
+    } catch (err) {
+      console.error('Failed to fetch health metrics:', err.message)
+      setHealthError(err.message)
+      setHealthMetrics(null)
+    }
+    setHealthLoading(false)
+  }, [])
+
+  useEffect(() => { fetchHealthMetrics() }, [fetchHealthMetrics])
 
   // ---- Fetch audit log ---------------------------------------------------
   const fetchAuditLog = useCallback(async () => {
@@ -506,7 +529,110 @@ export default function AdminDashboard({ onBack }) {
         </div>
       )}
 
-      {/* ---- Pipeline Tab ---- */}
+      {/* ---- Pipeline Health Card ---- */}
+      <div className="rounded-xl bg-pitch-900 border border-pitch-700/80 p-5 space-y-4">
+        <div className="flex items-center justify-between">
+          <div>
+            <h3 className="text-sm font-bold text-slate-100">Pipeline Health & Telemetry</h3>
+            <p className="text-[11px] font-mono text-slate-500 mt-0.5">
+              Real-time synchronization status across all data sources
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={fetchHealthMetrics}
+            disabled={healthLoading}
+            className="px-3 py-1.5 rounded-lg bg-pitch-800 hover:bg-pitch-700 disabled:bg-pitch-950 text-slate-300 hover:text-amber-400 disabled:text-slate-600 text-xs font-mono transition-colors flex items-center gap-2"
+          >
+            {healthLoading ? (
+              <>
+                <span className="w-3 h-3 border-2 border-amber-500/40 border-t-amber-500 rounded-full animate-spin" />
+                Loading...
+              </>
+            ) : (
+              'Refresh'
+            )}
+          </button>
+        </div>
+
+        {healthError ? (
+          <div className="p-3 rounded-lg bg-rose-500/10 border border-rose-500/30 text-xs text-rose-400 font-mono">
+            {healthError}
+          </div>
+        ) : healthMetrics ? (
+          <div className="space-y-4">
+            {/* Status Badge */}
+            <div className="flex items-center gap-3">
+              <span className={`px-3 py-1.5 rounded-full text-xs font-bold font-mono border ${
+                healthMetrics.status === 'operational'
+                  ? 'bg-emerald-500/20 text-emerald-400 border-emerald-500/40'
+                  : healthMetrics.status === 'stale'
+                  ? 'bg-rose-500/20 text-rose-400 border-rose-500/40'
+                  : 'bg-amber-500/20 text-amber-400 border-amber-500/40'
+              }`}>
+                {healthMetrics.status === 'operational' ? 'Operational'
+                  : healthMetrics.status === 'stale' ? 'Stale Sync'
+                  : 'Degraded'}
+              </span>
+              <span className="text-[11px] text-slate-500 font-mono">
+                Last check: {new Date(healthMetrics.computed_at).toLocaleTimeString()}
+              </span>
+            </div>
+
+            {/* Key Metrics Grid */}
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+              {[
+                { label: 'Total Fixtures', value: healthMetrics.total_fixtures, color: 'text-slate-100' },
+                { label: 'Pending', value: healthMetrics.pending_fixtures, color: 'text-sky-400' },
+                { label: 'Settled', value: healthMetrics.finished_fixtures, color: 'text-emerald-400' },
+                { label: '+EV Picks', value: healthMetrics.active_ev_picks, color: 'text-amber-400' },
+              ].map((metric) => (
+                <div key={metric.label} className="p-3 rounded-lg bg-pitch-950 border border-pitch-800">
+                  <span className="text-[10px] text-slate-500 font-mono block">{metric.label}</span>
+                  <span className={`text-xl font-bold font-mono ${metric.color}`}>{metric.value}</span>
+                </div>
+              ))}
+            </div>
+
+            {/* Timestamps */}
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+              {[
+                { label: 'Last Fixture Sync', value: healthMetrics.last_sync_at },
+                { label: 'Last Standings Sync', value: healthMetrics.last_standings_sync },
+                { label: 'Odds Coverage', value: `${healthMetrics.odds_coverage_pct}%` },
+              ].map((item) => (
+                <div key={item.label} className="p-3 rounded-lg bg-pitch-950 border border-pitch-800">
+                  <span className="text-[10px] text-slate-500 font-mono block">{item.label}</span>
+                  <span className="text-xs text-slate-200 font-mono">
+                    {item.value
+                      ? new Date(item.value).toLocaleString(undefined, {
+                          year: 'numeric', month: 'short', day: '2-digit',
+                          hour: '2-digit', minute: '2-digit',
+                        })
+                      : '-'}
+                  </span>
+                </div>
+              ))}
+            </div>
+
+            {/* Pipeline Status Detail */}
+            <div className="flex items-center gap-2 text-xs font-mono">
+              <span className={`w-2 h-2 rounded-full ${
+                healthMetrics.pipeline_stale ? 'bg-rose-500 animate-pulse' : 'bg-emerald-500'
+              }`} />
+              <span className={healthMetrics.pipeline_stale ? 'text-rose-400' : 'text-emerald-400'}>
+                {healthMetrics.pipeline_stale ? 'Pipeline stale - no sync in 24h' : 'Pipeline active'}
+              </span>
+            </div>
+          </div>
+        ) : (
+          <div className="flex items-center justify-center py-8">
+            <div className="w-5 h-5 border-2 border-amber-500/40 border-t-amber-500 rounded-full animate-spin" />
+          </div>
+        )}
+      </div>
+
+      {/* ---- Pipeline Control Tab ---- */}
       {activeTab === 'pipeline' && (
         <div className="rounded-xl bg-pitch-900 border border-pitch-700/80 p-6 space-y-4">
           <h3 className="text-sm font-bold text-slate-100">Pipeline Control</h3>
