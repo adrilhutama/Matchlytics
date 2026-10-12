@@ -28,6 +28,7 @@ import Sidebar from './components/Sidebar'
 import MobileNav from './components/MobileNav'
 import MobileLeagueDrawer from './components/MobileLeagueDrawer'
 import InstallPrompt from './components/InstallPrompt'
+import PWAInstallPrompt from './components/PWAInstallPrompt'
 import LandingPage from './components/LandingPage'
 import LoginPage from './components/LoginPage'
 import SubscriptionModal from './components/SubscriptionModal'
@@ -928,6 +929,7 @@ function AppInner() {
       />
 
       <InstallPrompt />
+      <PWAInstallPrompt />
 
       <DailyPicksModal
         isOpen={isDailyPicksOpen}
