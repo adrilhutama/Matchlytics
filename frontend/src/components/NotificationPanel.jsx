@@ -90,7 +90,7 @@ export default function NotificationPanel({ onClose }) {
     const { error } = await supabase
       .from('user_notifications')
       .update({ read: true })
-      .in_('id', unreadIds)
+      .in('id', unreadIds)
 
     if (error) {
       console.error('Failed to mark all as read:', error.message)

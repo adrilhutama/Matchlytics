@@ -1019,6 +1019,8 @@ def sync_competition(
                 "market_odds":         market_odds or {},
                 "ev_opportunities":    ev_opps or [],
                 "best_ev_opportunity": best_ev,
+                "value_pick":          final_value_pick or None,
+                "ev_percentage":       round(final_ev_pct, 2) if final_ev_pct is not None else None,
                 "venue":               venue_val,
                 "referee":             referee_val,
                 "h2h_data":            h2h_data or {},

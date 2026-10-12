@@ -109,7 +109,7 @@ function SingleCard({ card, onAddToSlip, isInSlip }) {
   )
 }
 
-function ParlayCard({ parlay, tierAccess, onAddToSlip, lockedReason }) {
+function ParlayCard({ parlay, tierAccess, onAddToSlip, lockedReason, handleAddParlayToSlip }) {
   if (!parlay) return null
 
   const totalOdds = parseFloat(parlay.totalOdds)
@@ -334,6 +334,7 @@ export default function DailyPicksModal({ isOpen, onClose, fixtures, onAddToSlip
                   tierAccess={canSeeParlay2}
                   lockedReason={isAdmin ? undefined : 'Upgrade to Pro to unlock daily 2-team parlays'}
                   onAddToSlip={handleAddParlayToSlip}
+                  handleAddParlayToSlip={handleAddParlayToSlip}
                 />
               </section>
 
@@ -350,6 +351,7 @@ export default function DailyPicksModal({ isOpen, onClose, fixtures, onAddToSlip
                   tierAccess={canSeeParlay3}
                   lockedReason={isAdmin ? undefined : 'Upgrade to Institutional for high-multiplier 3-leg slips'}
                   onAddToSlip={handleAddParlayToSlip}
+                  handleAddParlayToSlip={handleAddParlayToSlip}
                 />
               </section>
 
@@ -366,6 +368,7 @@ export default function DailyPicksModal({ isOpen, onClose, fixtures, onAddToSlip
                   tierAccess={canSeeParlay4}
                   lockedReason={isAdmin ? undefined : 'Upgrade to Institutional for 4-team mega parlays'}
                   onAddToSlip={handleAddParlayToSlip}
+                  handleAddParlayToSlip={handleAddParlayToSlip}
                 />
               </section>
             </>

@@ -75,7 +75,14 @@ export default function ModelLedger({ settledFixtures = [] }) {
     let brierSum = 0
     let brierN = 0
     filteredBets.forEach((b) => {
-      if (b.brierContribution != null) {
+      const ph = b.prob_home ?? null
+      const pd = b.prob_draw ?? null
+      const pa = b.prob_away ?? null
+      if (ph != null && pd != null && pa != null) {
+        const yh = b.outcome === 'HOME' ? 1 : 0
+        const yd = b.outcome === 'DRAW' ? 1 : 0
+        const ya = b.outcome === 'AWAY' ? 1 : 0
+        b.brierContribution = (ph/100 - yh) ** 2 + (pd/100 - yd) ** 2 + (pa/100 - ya) ** 2
         brierSum += b.brierContribution
         brierN += 1
       }

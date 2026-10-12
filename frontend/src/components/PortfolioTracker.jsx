@@ -300,7 +300,7 @@ export default function PortfolioTracker({
                     pnlStr = `-${currencyCode} ${Math.round(stake).toLocaleString()}`
                     pnlColor = 'text-rose-400 font-bold'
                   } else if (pos.status === 'VOID') {
-                    pnlStr = '{currencyCode} 0 (Void)'
+                    pnlStr = `${currencyCode} 0 (Void)`
                     pnlColor = 'text-slate-400'
                   }
 

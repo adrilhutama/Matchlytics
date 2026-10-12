@@ -228,6 +228,10 @@ def evaluate_full_history(supabase: Any) -> dict:
             flat_bankroll = round(flat_bankroll + profit_flat, 4)
             kelly_bankroll = round(kelly_bankroll + profit_k, 4)
 
+            # Track +EV bet count for win_rate / roi denominator
+            if val_pick in ("HOME", "DRAW", "AWAY"):
+                ev_bets_count += 1
+
             if val_pick in ("HOME", "DRAW", "AWAY"):
                 home_t = r.get("home_team") or r.get("home_team_id") or "?"
                 away_t = r.get("away_team") or r.get("away_team_id") or "?"
