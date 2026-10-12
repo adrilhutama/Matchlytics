@@ -52,6 +52,9 @@ htmlcov/
 .coverage
 coverage.xml
 
+# PWA dev service worker cache
+frontend/dev-dist/
+
 # Local AI Agent customizations
 .agents/
 
