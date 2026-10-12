@@ -86,12 +86,14 @@ def fetch_and_settle_completed_matches(
 
             if mid and h_score is not None and a_score is not None:
                 try:
+                    now_iso = datetime.now(timezone.utc).isoformat()
                     # Update fixture record in Supabase
                     update_payload = {
                         "status": "FT",
                         "actual_home_score": int(h_score),
                         "actual_away_score": int(a_score),
-                        "updated_at": datetime.now(timezone.utc).isoformat(),
+                        "settled_at": now_iso,
+                        "updated_at": now_iso,
                     }
                     try:
                         supabase.table("fixtures").update(update_payload).eq("id", mid).execute()
@@ -100,7 +102,7 @@ def fetch_and_settle_completed_matches(
                             "status": "FT",
                             "home_score": int(h_score),
                             "away_score": int(a_score),
-                            "updated_at": datetime.now(timezone.utc).isoformat(),
+                            "updated_at": now_iso,
                         }
                         supabase.table("fixtures").update(legacy_payload).eq("id", mid).execute()
                     settled_count += 1
