@@ -104,7 +104,7 @@ export default function TerminalScanner({
 
       {/* Mobile: Simple Scrollable Card Grid (no AutoSizer needed) */}
       {viewMode === 'cards' && (
-        <div className="sm:hidden space-y-3 pb-4">
+        <div className="sm:hidden space-y-4 pb-4">
           {validFixtures.map((fixture, idx) => (
             <MatchCard
               key={fixture.id}

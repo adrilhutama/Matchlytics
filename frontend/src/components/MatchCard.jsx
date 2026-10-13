@@ -247,7 +247,7 @@ export default function MatchCard({
 
   return (
     <article
-      className={`match-card ${isValue ? 'match-card--value' : hasMultiMarketEV ? 'match-card--multi' : ''} p-3.5 sm:p-4 animate-slide-up flex flex-col justify-between transition-all ${isHighValue ? 'high-value-accent' : ''}`}
+      className={`match-card ${isValue ? 'match-card--value' : hasMultiMarketEV ? 'match-card--multi' : ''} p-4 sm:p-4 animate-slide-up transition-all ${isHighValue ? 'high-value-accent' : ''}`}
       style={style}
       aria-label={`${home_team_name} vs ${away_team_name}, ${dateStr}`}
     >
@@ -440,17 +440,17 @@ export default function MatchCard({
                   leagueName: league_name,
                   matchDate: match_date,
                 })}
-                className={`relative p-2.5 rounded-xl border transition-all text-center hover:scale-105 active:scale-95 ${
+                className={`relative p-3 sm:p-2.5 rounded-xl border transition-all text-center hover:scale-105 active:scale-95 ${
                   value_pick === 'HOME'
                     ? 'border-amber-500/60 bg-amber-500/15 shadow-lg shadow-amber-500/20'
                     : 'border-pitch-700 bg-pitch-900/80 hover:border-sky-500/40 hover:bg-sky-500/10'
                 }`}
               >
-                <p className="text-[10px] text-slate-500 font-mono uppercase tracking-wider mb-0.5">Home</p>
-                <p className={`text-lg font-black tabular-nums ${value_pick === 'HOME' ? 'text-amber-400' : 'text-sky-400'}`}>
+                <p className="text-sm sm:text-[10px] text-slate-500 font-mono uppercase tracking-wider mb-0.5">Home</p>
+                <p className={`text-xl sm:text-lg font-black tabular-nums ${value_pick === 'HOME' ? 'text-amber-400' : 'text-sky-400'}`}>
                   {odds_home ? Number(odds_home).toFixed(2) : '-'}
                 </p>
-                <p className="text-[10px] text-slate-500 font-mono mt-0.5">
+                <p className="text-[11px] sm:text-[10px] text-slate-500 font-mono mt-0.5">
                   {prob_home ? `${Math.round(prob_home)}%` : '-'}
                 </p>
                 {value_pick === 'HOME' && (
@@ -475,17 +475,17 @@ export default function MatchCard({
                   leagueName: league_name,
                   matchDate: match_date,
                 })}
-                className={`relative p-2.5 rounded-xl border transition-all text-center hover:scale-105 active:scale-95 ${
+                className={`relative p-3 sm:p-2.5 rounded-xl border transition-all text-center hover:scale-105 active:scale-95 ${
                   value_pick === 'DRAW'
                     ? 'border-amber-500/60 bg-amber-500/15 shadow-lg shadow-amber-500/20'
                     : 'border-pitch-700 bg-pitch-900/80 hover:border-slate-500/40 hover:bg-slate-500/10'
                 }`}
               >
-                <p className="text-[10px] text-slate-500 font-mono uppercase tracking-wider mb-0.5">Draw</p>
-                <p className={`text-lg font-black tabular-nums ${value_pick === 'DRAW' ? 'text-amber-400' : 'text-slate-300'}`}>
+                <p className="text-sm sm:text-[10px] text-slate-500 font-mono uppercase tracking-wider mb-0.5">Draw</p>
+                <p className={`text-xl sm:text-lg font-black tabular-nums ${value_pick === 'DRAW' ? 'text-amber-400' : 'text-slate-300'}`}>
                   {odds_draw ? Number(odds_draw).toFixed(2) : '-'}
                 </p>
-                <p className="text-[10px] text-slate-500 font-mono mt-0.5">
+                <p className="text-[11px] sm:text-[10px] text-slate-500 font-mono mt-0.5">
                   {prob_draw ? `${Math.round(prob_draw)}%` : '-'}
                 </p>
                 {value_pick === 'DRAW' && (
@@ -510,17 +510,17 @@ export default function MatchCard({
                   leagueName: league_name,
                   matchDate: match_date,
                 })}
-                className={`relative p-2.5 rounded-xl border transition-all text-center hover:scale-105 active:scale-95 ${
+                className={`relative p-3 sm:p-2.5 rounded-xl border transition-all text-center hover:scale-105 active:scale-95 ${
                   value_pick === 'AWAY'
                     ? 'border-amber-500/60 bg-amber-500/15 shadow-lg shadow-amber-500/20'
                     : 'border-pitch-700 bg-pitch-900/80 hover:border-rose-500/40 hover:bg-rose-500/10'
                 }`}
               >
-                <p className="text-[10px] text-slate-500 font-mono uppercase tracking-wider mb-0.5">Away</p>
-                <p className={`text-lg font-black tabular-nums ${value_pick === 'AWAY' ? 'text-amber-400' : 'text-rose-400'}`}>
+                <p className="text-sm sm:text-[10px] text-slate-500 font-mono uppercase tracking-wider mb-0.5">Away</p>
+                <p className={`text-xl sm:text-lg font-black tabular-nums ${value_pick === 'AWAY' ? 'text-amber-400' : 'text-rose-400'}`}>
                   {odds_away ? Number(odds_away).toFixed(2) : '-'}
                 </p>
-                <p className="text-[10px] text-slate-500 font-mono mt-0.5">
+                <p className="text-[11px] sm:text-[10px] text-slate-500 font-mono mt-0.5">
                   {prob_away ? `${Math.round(prob_away)}%` : '-'}
                 </p>
                 {value_pick === 'AWAY' && (
@@ -812,10 +812,10 @@ export default function MatchCard({
               <button
                 type="button"
                 onClick={() => onSelectForLab && onSelectForLab(fixture)}
-                className="min-h-[44px] py-2 px-3 rounded-xl bg-amber-500/15 hover:bg-amber-500/25 border border-amber-500/30 text-amber-300 font-semibold flex items-center justify-center gap-1.5 transition-colors active:scale-98 touch-manipulation"
+                className="min-h-[48px] py-3 px-3 rounded-xl bg-amber-500/15 hover:bg-amber-500/25 border border-amber-500/30 text-amber-300 font-semibold flex items-center justify-center gap-1.5 transition-colors active:scale-98 touch-manipulation text-sm"
                 title="Open fixture in Quant Lab"
               >
-                <span>⚅</span>
+                <span className="text-base">⚅</span>
                 <span>Quant Lab</span>
               </button>
 
@@ -836,10 +836,10 @@ export default function MatchCard({
                     modelProb: valueProb || prob_home || 50,
                     evPercentage: ev_percentage || 0,
                   })}
-                  className="min-h-[44px] py-2 px-3 rounded-xl bg-pitch-950 hover:bg-pitch-800 border border-pitch-700 text-slate-200 flex items-center justify-center gap-1.5 transition-colors active:scale-98 touch-manipulation"
+                  className="min-h-[48px] py-3 px-3 rounded-xl bg-pitch-950 hover:bg-pitch-800 border border-pitch-700 text-slate-200 flex items-center justify-center gap-1.5 transition-colors active:scale-98 touch-manipulation text-sm"
                   title="Log position into Portfolio Tracker"
                 >
-                  <span>⊞</span>
+                  <span className="text-base">⊞</span>
                   <span>Log Position</span>
                 </button>
               )}
@@ -850,14 +850,14 @@ export default function MatchCard({
               <button
                 type="button"
                 onClick={() => triggerUpgrade ? triggerUpgrade('Score Matrix requires a Pro pass') : onOpenMatrix(fixture)}
-                className="min-h-[44px] py-2 px-2.5 rounded-xl bg-pitch-950 hover:bg-pitch-800 border border-pitch-800 text-slate-400 hover:text-slate-200 text-center transition-colors"
+                className="min-h-[48px] py-3 px-2.5 rounded-xl bg-pitch-950 hover:bg-pitch-800 border border-pitch-800 text-slate-400 hover:text-slate-200 text-center transition-colors text-sm"
               >
                 Matrix Modal
               </button>
               <button
                 type="button"
                 onClick={() => triggerUpgrade ? triggerUpgrade('Quant and Kelly require a Pro pass') : onOpenQuantModal && onOpenQuantModal(fixture)}
-                className="min-h-[44px] py-2 px-2.5 rounded-xl bg-pitch-950 hover:bg-pitch-800 border border-pitch-800 text-slate-400 hover:text-slate-200 text-center transition-colors"
+                className="min-h-[48px] py-3 px-2.5 rounded-xl bg-pitch-950 hover:bg-pitch-800 border border-pitch-800 text-slate-400 hover:text-slate-200 text-center transition-colors text-sm"
               >
                 Kelly Modal
               </button>
