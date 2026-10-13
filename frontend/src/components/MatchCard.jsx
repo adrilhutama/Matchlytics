@@ -84,6 +84,7 @@ export default function MatchCard({
     predicted_score,
     prob_over_25,  prob_btts_yes,
     value_pick, ev_percentage,
+    best_ev_opportunity,
   } = fixture
 
   const h2hOdds = fixture?.market_odds?.h2h || {}
@@ -112,6 +113,17 @@ export default function MatchCard({
   const awayStandings = standingsMap[fixture?.away_team_id] || standingsMap[`${fixture?.league_id}_${fixture?.away_team_id}`] || null
 
   const isValue = Boolean(value_pick)
+
+  // Derive best pick from best_ev_opportunity (supports multi-market picks)
+  const bestEv = fixture?.best_ev_opportunity || null
+  const bestPickMarket = bestEv?.market || 'h2h'
+  const bestPickSelection = bestEv?.selection || null
+  const bestPickOdds = bestEv?.odds || null
+  const bestPickModelProb = bestEv?.model_prob || null
+  const bestPickEV = bestEv?.ev_percentage || null
+  const hasMultiMarketEV = bestPickSelection && bestPickMarket !== 'h2h'
+
+  const isValuePickInSlip = value_pick ? slipPicks.includes(value_pick) : false
   const hasRealOdds = isRealMarketOdds(fixture)
   const { relativeBadge, timeStr, dateStr } = formatLocalizedMatchDate(match_date)
 
@@ -227,8 +239,6 @@ export default function MatchCard({
     }
   }, [isValue, valueOdds, valueProb])
 
-  const isValuePickInSlip = value_pick ? slipPicks.includes(value_pick) : false
-
   return (
     <article
       className={`match-card ${isValue ? 'match-card--value' : ''} p-3.5 sm:p-4 animate-slide-up flex flex-col justify-between transition-all`}
@@ -291,6 +301,20 @@ export default function MatchCard({
                     </span>
                   )}
                 </div>
+              )}
+
+              {/* Best EV Opportunity Badge (multi-market fallback when no H2H pick) */}
+              {hasMultiMarketEV && !isValue && bestPickEV && (
+                <span
+                  className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md text-[10px] font-mono font-bold border ${
+                    bestPickMarket === 'totals'
+                      ? 'bg-emerald-500/20 text-emerald-400 border-emerald-500/40'
+                      : 'bg-sky-500/20 text-sky-400 border-sky-500/40'
+                  }`}
+                  title={`Best EV: ${bestPickSelection} (${bestPickMarket}) at ${Number(bestPickOdds).toFixed(2)} @ ${Number(bestPickModelProb).toFixed(0)}% model`}
+                >
+                  ★ [{bestPickMarket === 'totals' ? 'TOTALS' : 'AH'}] {bestPickSelection} +{Number(bestPickEV).toFixed(1)}%
+                </span>
               )}
             </div>
           </div>
@@ -503,19 +527,52 @@ export default function MatchCard({
           </div>
         )}
 
-        {/* ---- +EV Highlight Bar (Visible when there's a value pick) ---- */}
-        {isValue && (
-          <div className="mb-3 p-3 rounded-xl bg-gradient-to-r from-amber-500/20 to-amber-600/10 border border-amber-500/40">
+        {/* ---- +EV Highlight Bar (H2H or Multi-Market) ---- */}
+        {(isValue || hasMultiMarketEV) && (
+          <div className={`mb-3 p-3 rounded-xl border ${
+            hasMultiMarketEV && !isValue
+              ? 'bg-gradient-to-r from-sky-500/20 to-sky-600/10 border-sky-500/40'
+              : 'bg-gradient-to-r from-amber-500/20 to-amber-600/10 border-amber-500/40'
+          }`}>
             <div className="flex items-center justify-between gap-2">
               <div className="flex items-center gap-2 min-w-0">
                 <span className="text-amber-400 text-sm" aria-hidden="true">★</span>
-                <span className="text-sm font-black text-amber-400 truncate">
-                  +{Number(ev_percentage).toFixed(1)}% EV · {value_pick === 'HOME' ? home_team_name : value_pick === 'AWAY' ? away_team_name : 'Draw'}
-                </span>
+                {hasMultiMarketEV && !isValue ? (
+                  <>
+                    <span className={`text-xs font-mono font-bold px-1.5 py-0.5 rounded ${
+                      bestPickMarket === 'totals'
+                        ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/40'
+                        : 'bg-sky-500/20 text-sky-400 border border-sky-500/40'
+                    }`}>
+                      {bestPickMarket === 'totals' ? 'TOTALS' : 'AH'}
+                    </span>
+                    <span className="text-sm font-black text-sky-400 truncate">
+                      +{Number(bestPickEV).toFixed(1)}% EV · {bestPickSelection} @ {bestPickOdds ? Number(bestPickOdds).toFixed(2) : '-'}
+                    </span>
+                  </>
+                ) : (
+                  <>
+                    {value_pick === 'HOME' && (
+                      <span className="text-sm font-black text-amber-400 truncate">
+                        +{Number(ev_percentage).toFixed(1)}% EV · {home_team_name} Win
+                      </span>
+                    )}
+                    {value_pick === 'DRAW' && (
+                      <span className="text-sm font-black text-amber-400 truncate">
+                        +{Number(ev_percentage).toFixed(1)}% EV · Draw
+                      </span>
+                    )}
+                    {value_pick === 'AWAY' && (
+                      <span className="text-sm font-black text-amber-400 truncate">
+                        +{Number(ev_percentage).toFixed(1)}% EV · {away_team_name} Win
+                      </span>
+                    )}
+                  </>
+                )}
               </div>
-              {recKellyPct != null && (
+              {(recKellyPct != null || (bestPickEV && !isValue)) && (
                 <span className="text-[11px] font-mono font-bold text-amber-300 whitespace-nowrap bg-amber-500/20 px-2 py-0.5 rounded-md">
-                  {recKellyPct}% stake
+                  {recKellyPct != null ? `${recKellyPct}% stake` : `EV +${Number(bestPickEV).toFixed(1)}%`}
                 </span>
               )}
             </div>
@@ -658,6 +715,52 @@ export default function MatchCard({
                         <span>Target: {value_pick} @ {valueOdds ? Number(valueOdds).toFixed(2) : '-'}</span>
                       </div>
                     )}
+                  </div>
+                )}
+
+                {/* Multi-Market Best Pick Strip (shown when no H2H pick but best_ev_opportunity exists) */}
+                {hasMultiMarketEV && !isValue && (
+                  <div className="p-2.5 rounded-xl bg-pitch-950/70 border border-sky-500/20 space-y-2">
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <ValueBadge
+                        pick={bestPickSelection}
+                        evPct={bestPickEV}
+                        odds={bestPickOdds}
+                        modelProb={bestPickModelProb}
+                        marketType={bestPickMarket}
+                        onClick={onOpenQuantModal ? () => onOpenQuantModal(fixture) : null}
+                      />
+
+                      {/* Add to Parlay Slip Button for multi-market pick */}
+                      {onToggleSlip && bestPickOdds && (
+                        <button
+                          type="button"
+                          onClick={() => onToggleSlip({
+                            fixtureId: fixture.id,
+                            homeTeam: home_team_name,
+                            awayTeam: away_team_name,
+                            market: bestPickMarket,
+                            pick: bestPickSelection,
+                            pickLabel: `${bestPickSelection} [${bestPickMarket === 'totals' ? 'TOTALS' : 'AH'}]`,
+                            odds: bestPickOdds,
+                            modelProb: bestPickModelProb,
+                            ev: bestPickEV,
+                            leagueName: league_name,
+                            matchDate: match_date,
+                          })}
+                          className="px-2.5 py-1 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 min-h-[36px] bg-pitch-900 border border-pitch-700 text-slate-300 hover:text-sky-400 hover:border-sky-500/40"
+                        >
+                          <span>+ Slip</span>
+                        </button>
+                      )}
+                    </div>
+
+                    <div className="text-[10px] text-slate-400 font-mono">
+                      <span className="px-1.5 py-0.5 rounded border border-sky-500/30 bg-sky-500/10 text-sky-400">
+                        {bestPickMarket === 'totals' ? 'TOTALS' : 'AH'}
+                      </span>
+                      {' '}{bestPickSelection} @ {Number(bestPickOdds).toFixed(2)}
+                    </div>
                   </div>
                 )}
               </div>

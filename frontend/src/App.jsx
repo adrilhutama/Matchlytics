@@ -332,8 +332,8 @@ function AppInner() {
     const valid = (fixtures || []).filter(Boolean)
     if (!selectedLabFixture && valid.length > 0) {
       const sortedByValue = [...valid]
-        .filter((f) => Boolean(f?.value_pick))
-        .sort((a, b) => (b?.ev_percentage || 0) - (a?.ev_percentage || 0))
+        .filter((f) => Boolean(f?.value_pick) || Boolean(f?.best_ev_opportunity))
+        .sort((a, b) => (b?.ev_percentage || b?.best_ev_opportunity?.ev_percentage || 0) - (a?.ev_percentage || a?.best_ev_opportunity?.ev_percentage || 0))
       setSelectedLabFixture(sortedByValue[0] || valid[0] || null)
     }
   }, [fixtures, selectedLabFixture])
@@ -485,8 +485,8 @@ function AppInner() {
     if (ws === 'quant_lab' && !selectedLabFixture && fixtures.length > 0) {
       const valid = (fixtures || []).filter(Boolean)
       const sortedByValue = [...valid]
-        .filter((f) => Boolean(f?.value_pick))
-        .sort((a, b) => (b?.ev_percentage || 0) - (a?.ev_percentage || 0))
+        .filter((f) => Boolean(f?.value_pick) || Boolean(f?.best_ev_opportunity))
+        .sort((a, b) => (b?.ev_percentage || b?.best_ev_opportunity?.ev_percentage || 0) - (a?.ev_percentage || a?.best_ev_opportunity?.ev_percentage || 0))
       setSelectedLabFixture(sortedByValue[0] || valid[0] || null)
     }
     setActiveWorkspace(ws)
@@ -790,7 +790,7 @@ function AppInner() {
 
   const currentLeagueLabel = LEAGUES.find((l) => l.id === activeLeague)?.label
   const currentDateRangeLabel = DATE_RANGES.find((r) => r.id === dateRange)?.label
-  const valueCount = (fixtures || []).filter((f) => Boolean(f?.value_pick)).length
+  const valueCount = (fixtures || []).filter((f) => Boolean(f?.value_pick) || Boolean(f?.best_ev_opportunity)).length
 
   useEffect(() => {
     if (activeFeed === 'value') {

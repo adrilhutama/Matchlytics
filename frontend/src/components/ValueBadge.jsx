@@ -2,6 +2,8 @@
 // Tiered +EV Badge with Kelly Criterion fraction indicator.
 // Interactive click trigger to open the quantitative Kelly calculator modal.
 // Touch target >= 44px for full mobile usability.
+// Supports multi-market type indicators (TOTALS, AH, H2H).
+// Zero em dash characters (R-02 compliance).
 
 import { calculateKelly } from '../utils/analytics'
 
@@ -10,6 +12,7 @@ export default function ValueBadge({
   evPct,
   odds,
   modelProb,
+  marketType,
   onClick,
 }) {
   if (!pick || !evPct) return null
@@ -38,6 +41,14 @@ export default function ValueBadge({
     borderClass = 'border-emerald-500/40 bg-emerald-500/15 text-emerald-300'
   }
 
+  // Market type label for multi-market badges
+  const marketLabel = (() => {
+    if (marketType === 'totals') return 'TOTALS'
+    if (marketType === 'spreads') return 'AH'
+    if (marketType) return marketType.toUpperCase()
+    return null
+  })()
+
   const badgeContent = (
     <div className="inline-flex items-center gap-1.5 sm:gap-2">
       {/* Triangle indicator */}
@@ -51,19 +62,24 @@ export default function ValueBadge({
       >
         <polygon points="5,1 9,9 1,9" />
       </svg>
+      {marketLabel && (
+        <span className="text-[9px] font-mono font-bold text-slate-400 uppercase tracking-wider">
+          [{marketLabel}]
+        </span>
+      )}
       <span className="font-bold font-mono">
         +EV {numericEv.toFixed(1)}%
       </span>
       {kellyFraction && (
         <span className="text-[11px] font-mono text-slate-300 hidden sm:inline">
-          · Kelly {kellyFraction}%
+          . Kelly {kellyFraction}%
         </span>
       )}
       <span className="text-[10px] px-1.5 py-0.2 rounded bg-pitch-950/60 font-semibold uppercase">
         {tierBadge}
       </span>
       <span className="text-[11px] text-slate-400 font-mono ml-0.5" aria-hidden="true">
-        ⓘ
+        i
       </span>
     </div>
   )

@@ -100,7 +100,16 @@ export function TableRow({
     ev_percentage,
     market_odds,
     ev_opportunities,
+    best_ev_opportunity,
   } = fixture
+
+  // Derive best multi-market pick from best_ev_opportunity
+  const bestEv = best_ev_opportunity || null
+  const bestPickMarket = bestEv?.market || 'h2h'
+  const bestPickSelection = bestEv?.selection || null
+  const bestPickOdds = bestEv?.odds || null
+  const bestPickEV = bestEv?.ev_percentage || null
+  const hasMultiMarketEV = bestPickSelection && bestPickMarket !== 'h2h'
 
   const h2hOdds = fixture?.market_odds?.h2h || {}
   const rawOddsHome = typeof h2hOdds.home === 'number' ? h2hOdds.home : (h2hOdds.home?.price || h2hOdds.consensus?.home)
@@ -508,6 +517,18 @@ export function TableRow({
                 </span>
               )}
             </div>
+          ) : hasMultiMarketEV && bestPickEV ? (
+            <div className="inline-flex flex-col items-center gap-0.5">
+              <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-mono font-bold border ${
+                bestPickMarket === 'totals'
+                  ? 'bg-emerald-500/15 text-emerald-300 border-emerald-500/30'
+                  : 'bg-sky-500/15 text-sky-300 border-sky-500/30'
+              }`}>
+                <span>★</span>
+                <span>[{bestPickMarket === 'totals' ? 'TOTALS' : 'AH'}] {bestPickSelection}</span>
+                <span className="text-[9px]">+{Number(bestPickEV).toFixed(1)}%</span>
+              </span>
+            </div>
           ) : totalsEdge ? (
             <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-mono font-bold bg-amber-500/15 text-amber-300 border border-amber-500/30">
               ★ {totalsEdge.label} (+{totalsEdge.ev}%)
@@ -525,15 +546,20 @@ export function TableRow({
         <td className="py-3 px-3 text-center whitespace-nowrap align-middle">
           <div className="inline-flex items-center gap-1.5" onClick={(e) => e.stopPropagation()}>
             {/* + Slip quick toggle */}
-            {!quantLocked && onToggleSlip && (valOdds || odds_home) && (
+            {!quantLocked && onToggleSlip && (valOdds || bestPickOdds || odds_home) && (
               <button
                 type="button"
                 onClick={(e) => {
                   e.stopPropagation()
-                  const pickToUse = value_pick || 'HOME'
-                  const oddsToUse = valOdds || odds_home
-                  const probToUse = valProb || prob_home
-                  const labelToUse = valLabel || `${home_team_name} Win`
+                  // Prefer best_ev_opportunity when it covers a multi-market pick
+                  const hasBestEv = bestPickSelection && bestPickOdds
+                  const pickToUse = hasBestEv ? bestPickSelection : (value_pick || 'HOME')
+                  const oddsToUse = hasBestEv ? bestPickOdds : (valOdds || odds_home)
+                  const probToUse = hasBestEv ? bestPickModelProb : (valProb || prob_home)
+                  const labelToUse = hasBestEv
+                    ? `${bestPickSelection} [${bestPickMarket === 'totals' ? 'TOTALS' : 'AH'}]`
+                    : valLabel || `${home_team_name} Win`
+                  const evToUse = hasBestEv ? bestPickEV : (ev_percentage || 0)
                   onToggleSlip({
                     fixtureId: id,
                     homeTeam: home_team_name,
@@ -542,7 +568,7 @@ export function TableRow({
                     pickLabel: labelToUse,
                     odds: oddsToUse,
                     modelProb: probToUse,
-                    ev: ev_percentage || 0,
+                    ev: evToUse,
                     leagueName: league_name,
                     matchDate: match_date,
                   })
