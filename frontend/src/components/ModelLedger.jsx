@@ -74,6 +74,8 @@ export default function ModelLedger({ settledFixtures = [] }) {
 
     let brierSum = 0
     let brierN = 0
+    let logLossSum = 0
+    let logLossN = 0
     filteredBets.forEach((b) => {
       const ph = b.prob_home ?? null
       const pd = b.prob_draw ?? null
@@ -85,9 +87,18 @@ export default function ModelLedger({ settledFixtures = [] }) {
         b.brierContribution = (ph/100 - yh) ** 2 + (pd/100 - yd) ** 2 + (pa/100 - ya) ** 2
         brierSum += b.brierContribution
         brierN += 1
+
+        // Multi-class log-loss with epsilon clipping
+        const eps = 1e-15
+        const pHome = Math.max(eps, Math.min(1 - eps, ph / 100))
+        const pDraw = Math.max(eps, Math.min(1 - eps, pd / 100))
+        const pAway = Math.max(eps, Math.min(1 - eps, pa / 100))
+        logLossSum += yh * Math.log(pHome) + yd * Math.log(pDraw) + ya * Math.log(pAway)
+        logLossN += 1
       }
     })
     const brierScore = brierN > 0 ? Math.round((brierSum / brierN) * 1000) / 1000 : null
+    const logLoss = logLossN > 0 ? Math.round((-logLossSum / logLossN) * 1000) / 1000 : null
 
     return {
       total,
@@ -99,6 +110,7 @@ export default function ModelLedger({ settledFixtures = [] }) {
       flatRoi,
       kellyRoi,
       brierScore,
+      logLoss,
     }
   }, [filteredBets, flatSeries, kellySeries])
 
@@ -177,6 +189,40 @@ export default function ModelLedger({ settledFixtures = [] }) {
 
     return { bins, reliability, calLabel, outcomeStats, brierScore: activeStats.brierScore }
   }, [activeStats, filteredBets])
+
+  // Per-league calibration breakdown
+  const leagueCalibration = useMemo(() => {
+    if (fullSim.bets.length === 0) return null
+    const leaguesMap = {}
+    const eps = 1e-15
+    fullSim.bets.forEach((b) => {
+      const ph = b.prob_home ?? null
+      const pd = b.prob_draw ?? null
+      const pa = b.prob_away ?? null
+      if (ph == null || pd == null || pa == null) return
+      const key = b.league || 'Unknown'
+      if (!leaguesMap[key]) {
+        leaguesMap[key] = { league: key, count: 0, brierSum: 0, logLossSum: 0 }
+      }
+      const entry = leaguesMap[key]
+      entry.count += 1
+      const yh = b.outcome === 'HOME' ? 1 : 0
+      const yd = b.outcome === 'DRAW' ? 1 : 0
+      const ya = b.outcome === 'AWAY' ? 1 : 0
+      entry.brierSum += (ph/100 - yh) ** 2 + (pd/100 - yd) ** 2 + (pa/100 - ya) ** 2
+      const pHome = Math.max(eps, Math.min(1 - eps, ph / 100))
+      const pDraw = Math.max(eps, Math.min(1 - eps, pd / 100))
+      const pAway = Math.max(eps, Math.min(1 - eps, pa / 100))
+      entry.logLossSum += yh * Math.log(pHome) + yd * Math.log(pDraw) + ya * Math.log(pAway)
+    })
+    return Object.values(leaguesMap)
+      .map((entry) => ({
+        ...entry,
+        brierScore: entry.count > 0 ? entry.brierSum / entry.count : null,
+        logLoss: entry.count > 0 ? -entry.logLossSum / entry.count : null,
+      }))
+      .sort((a, b) => (a.logLoss ?? Infinity) - (b.logLoss ?? Infinity))
+  }, [fullSim.bets])
 
   // SVG Chart Dimensions
   const chartW = 720
@@ -298,6 +344,16 @@ export default function ModelLedger({ settledFixtures = [] }) {
           </p>
           <span className="text-[10px] text-slate-500 mt-1 block">
             {brierInfo ? brierInfo.label : 'Benchmark 0.18 to 0.22 (0.0% Calibrated)'}
+          </span>
+        </div>
+
+        <div className="p-4 rounded-2xl bg-pitch-900 border border-pitch-700/80 shadow-lg">
+          <span className="text-[11px] text-slate-400 block mb-1">Log-Loss (Cross-Entropy)</span>
+          <p className="text-lg sm:text-xl font-bold text-violet-400 tabular-nums">
+            {activeStats?.logLoss != null ? activeStats.logLoss.toFixed(3) : '0.000'}
+          </p>
+          <span className="text-[10px] text-slate-500 mt-1 block">
+            Naive baseline: 1.099 · Lower = better
           </span>
         </div>
       </div>
@@ -494,6 +550,80 @@ export default function ModelLedger({ settledFixtures = [] }) {
               })}
             </div>
           </div>
+
+          {/* Per-League Calibration Breakdown */}
+          {leagueCalibration && leagueCalibration.length > 0 && (
+            <div>
+              <p className="text-xs text-slate-400 font-semibold uppercase tracking-wider mb-2">
+                Per-League Calibration
+              </p>
+              <div className="overflow-x-auto">
+                <table className="w-full text-left text-xs font-mono">
+                  <thead>
+                    <tr className="border-b border-pitch-800 text-[11px] uppercase tracking-wider text-slate-500">
+                      <th className="py-2 px-3">League</th>
+                      <th className="py-2 px-3 text-center">Samples</th>
+                      <th className="py-2 px-3 text-right">Brier Score</th>
+                      <th className="py-2 px-3 text-right">Log-Loss</th>
+                      <th className="py-2 px-3 text-right">Improvement</th>
+                      <th className="py-2 px-3 text-center">Status</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-pitch-800/60">
+                    {leagueCalibration.map((entry) => {
+                      const naiveBrier = 0.222
+                      const naiveLogLoss = Math.log(3)
+                      const brierImprovement = entry.brierScore != null
+                        ? Math.round(((naiveBrier - entry.brierScore) / naiveBrier) * 1000) / 10
+                        : null
+                      const isInsufficient = entry.count < 5
+                      const brierColor = !entry.brierScore ? 'text-slate-500'
+                        : entry.brierScore < 0.20 ? 'text-emerald-400'
+                        : entry.brierScore < 0.25 ? 'text-amber-400'
+                        : 'text-rose-400'
+
+                      return (
+                        <tr key={entry.league} className="hover:bg-pitch-800/40 transition-colors">
+                          <td className="py-2 px-3 font-semibold text-slate-200">
+                            {entry.league}
+                          </td>
+                          <td className="py-2 px-3 text-center text-slate-400">
+                            {entry.count}
+                          </td>
+                          <td className={`py-2 px-3 text-right font-bold tabular-nums ${brierColor}`}>
+                            {entry.brierScore != null ? entry.brierScore.toFixed(3) : '--'}
+                          </td>
+                          <td className="py-2 px-3 text-right font-bold tabular-nums text-violet-400">
+                            {entry.logLoss != null ? entry.logLoss.toFixed(3) : '--'}
+                          </td>
+                          <td className="py-2 px-3 text-right text-slate-400">
+                            {brierImprovement != null ? `${brierImprovement >= 0 ? '+' : ''}${brierImprovement}%` : '--'}
+                          </td>
+                          <td className="py-2 px-3 text-center">
+                            {isInsufficient ? (
+                              <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-slate-500/10 text-slate-500 border border-slate-500/30">
+                                Accumulating
+                              </span>
+                            ) : (
+                              <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${
+                                entry.brierScore < 0.20 ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'
+                                  : entry.brierScore < 0.25 ? 'bg-amber-500/20 text-amber-400 border border-amber-500/30'
+                                  : 'bg-rose-500/20 text-rose-400 border border-rose-500/30'
+                              }`}>
+                                {entry.brierScore < 0.20 ? 'Well-Calibrated'
+                                  : entry.brierScore < 0.25 ? 'Moderate'
+                                  : 'Under-Calibrated'}
+                              </span>
+                            )}
+                          </td>
+                        </tr>
+                      )
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
         </div>
       )}
 

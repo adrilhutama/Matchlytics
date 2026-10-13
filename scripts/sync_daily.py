@@ -87,6 +87,55 @@ except ImportError:
 LAST_QUOTA_REMAINING: int | None = None
 
 
+def persist_quota_telemetry(supabase_client: Any) -> None:
+    """
+    Write today's Football Data API and The Odds API quota snapshots
+    into the api_quota_log table for admin dashboard consumption.
+    """
+    if not supabase_client:
+        return
+
+    today = date.today().isoformat()
+
+    # ---- Football Data API ----
+    ffd_status = football_pool.get_pool_status()
+    ffd_used = sum(t.calls_made for t in football_pool.pool)
+    ffd_remaining = ffd_status["tokens"][0]["requests_available"] if ffd_status["tokens"] else None
+    ffd_reset = None
+    if ffd_status["tokens"]:
+        ffd_reset_raw = ffd_status["tokens"][0].get("reset_seconds")
+        if ffd_reset_raw and ffd_reset_raw > 0:
+            from datetime import datetime, timezone, timedelta
+            ffd_reset = (datetime.now(timezone.utc) + timedelta(seconds=int(ffd_reset_raw))).isoformat()
+    try:
+        supabase_client.table("api_quota_log").upsert({
+            "provider": "football_data",
+            "day": today,
+            "requests_used": ffd_used,
+            "limit_daily": 60,
+            "remaining": ffd_remaining,
+            "reset_at": ffd_reset,
+        }, on_conflict="provider, day").execute()
+    except Exception as e:
+        print(f"    [WARN] Failed to persist football_data quota: {e}")
+
+    # ---- The Odds API ----
+    odds_sum = odds_pool.get_quota_summary()
+    odds_used = sum(k["calls_made"] for k in odds_sum.get("keys", []))
+    odds_remaining = odds_sum.get("total_remaining")
+    try:
+        supabase_client.table("api_quota_log").upsert({
+            "provider": "odds_api",
+            "day": today,
+            "requests_used": odds_used,
+            "limit_daily": 500,
+            "remaining": odds_remaining,
+            "reset_at": None,
+        }, on_conflict="provider, day").execute()
+    except Exception as e:
+        print(f"    [WARN] Failed to persist odds_api quota: {e}")
+
+
 def fetch_cross_league_matches(
     competition_codes: list[str] | str = "PL,PD,SA,BL1,FL1,CL",
     date_from: str | None = None,
@@ -1249,6 +1298,9 @@ def main() -> None:
     quota_sum = odds_pool.get_quota_summary()
     if quota_sum.get("total_remaining") is not None:
         LAST_QUOTA_REMAINING = quota_sum["total_remaining"]
+
+    # Persist quota telemetry to api_quota_log for admin dashboard
+    persist_quota_telemetry(supabase)
 
     # 5. Database housekeeping: prune matches finished > 45 days ago
     print("Running database housekeeping (clean_stale_fixtures)...")
