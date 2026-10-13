@@ -88,12 +88,28 @@ CREATE INDEX IF NOT EXISTS idx_portfolio_fixture ON public.portfolio_positions(f
 -- Enable RLS on portfolio_positions
 ALTER TABLE public.portfolio_positions ENABLE ROW LEVEL SECURITY;
 
+DROP POLICY IF EXISTS "Users can manage their own portfolio positions" ON public.portfolio_positions;
 CREATE POLICY "Users can manage their own portfolio positions"
 ON public.portfolio_positions
 FOR ALL
 USING (auth.uid() = user_id)
 WITH CHECK (auth.uid() = user_id);
 
--- Enable Realtime for teams and portfolio_positions
-ALTER PUBLICATION supabase_realtime ADD TABLE public.teams;
-ALTER PUBLICATION supabase_realtime ADD TABLE public.portfolio_positions;
+-- Enable Realtime for teams and portfolio_positions (skip if already member)
+DO $$
+BEGIN
+    IF NOT EXISTS (
+        SELECT 1 FROM pg_publication_tables WHERE pubname = 'supabase_realtime' AND schemaname = 'public' AND tablename = 'teams'
+    ) THEN
+        ALTER PUBLICATION supabase_realtime ADD TABLE public.teams;
+    END IF;
+END $$;
+
+DO $$
+BEGIN
+    IF NOT EXISTS (
+        SELECT 1 FROM pg_publication_tables WHERE pubname = 'supabase_realtime' AND schemaname = 'public' AND tablename = 'portfolio_positions'
+    ) THEN
+        ALTER PUBLICATION supabase_realtime ADD TABLE public.portfolio_positions;
+    END IF;
+END $$;
