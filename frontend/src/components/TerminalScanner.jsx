@@ -36,7 +36,7 @@ export default function TerminalScanner({
   return (
     <section aria-label="Terminal Scanner Feed" className="space-y-4">
       {/* Feed Metadata Status Bar */}
-      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-1 text-xs text-slate-400">
+      <div className="hidden sm:flex flex-col sm:flex-row items-start sm:items-center justify-between gap-1 text-xs text-slate-400">
         <p className="font-mono text-[11px] sm:text-xs">
           <strong className="text-amber-400">{fixtures.length}</strong>
           <span className="text-slate-500 mx-1">of</span>

@@ -1118,21 +1118,23 @@ function AppInner() {
         {/* Subscription status banner */}
         <SubscriptionBanner />
 
-        {/* Multi-Workspace Top Sub-Nav Switcher */}
+        {/* Multi-Workspace Top Sub-Nav Switcher (hidden on mobile, handled by bottom nav) */}
         {activeWorkspace !== 'profile' && (
-          <WorkspaceNav
-            activeWorkspace={activeWorkspace}
-            onWorkspaceChange={handleSelectWorkspace}
-            onSelectWorkspace={handleSelectWorkspace}
-            activeFixtureCount={fixtures.length}
-            valueCount={valueCount}
-            valueBetCount={valueCount}
-            portfolioCount={portfolioPositions.length}
-            selectedLabFixture={selectedLabFixture}
-            onOpenCommandPalette={() => setIsCommandPaletteOpen(true)}
-            onOpenDailyPicks={handleOpenDailyPicks}
-            tier={tier}
-          />
+          <div className="hidden lg:block">
+            <WorkspaceNav
+              activeWorkspace={activeWorkspace}
+              onWorkspaceChange={handleSelectWorkspace}
+              onSelectWorkspace={handleSelectWorkspace}
+              activeFixtureCount={fixtures.length}
+              valueCount={valueCount}
+              valueBetCount={valueCount}
+              portfolioCount={portfolioPositions.length}
+              selectedLabFixture={selectedLabFixture}
+              onOpenCommandPalette={() => setIsCommandPaletteOpen(true)}
+              onOpenDailyPicks={handleOpenDailyPicks}
+              tier={tier}
+            />
+          </div>
         )}
 
         {/* Realtime Toast Notification */}

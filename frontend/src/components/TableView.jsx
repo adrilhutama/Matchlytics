@@ -894,8 +894,8 @@ export default function TableView({
 
   return (
     <div className="w-full rounded-2xl border border-pitch-800 bg-pitch-950/60 overflow-hidden shadow-2xl">
-      {/* Mobile Swipe Hint Banner */}
-      <div className="md:hidden flex items-center justify-between px-3 py-2 text-[11px] font-mono text-slate-400 bg-pitch-950 border-b border-pitch-800">
+      {/* Mobile Swipe Hint Banner (hidden on small screens) */}
+      <div className="md:hidden hidden">
         <span className="flex items-center gap-1.5 text-amber-400 font-semibold">
           <span>&larr;&rarr;</span>
           <span>Swipe horizontally or tap any row to expand deep analysis</span>
