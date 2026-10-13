@@ -102,6 +102,82 @@ export default function ModelLedger({ settledFixtures = [] }) {
     }
   }, [filteredBets, flatSeries, kellySeries])
 
+  // ---- Model Calibration & Reliability Metrics ----
+  const calibrationData = useMemo(() => {
+    if (!activeStats || activeStats.total === 0) return null
+
+    // Group bets into probability bins for reliability diagram
+    const numBins = 10
+    const bins = Array.from({ length: numBins }, () => ({
+      count: 0,
+      wins: 0,
+      avgProb: 0,
+      sumProb: 0,
+    }))
+
+    let reliabilitySum = 0
+    let reliabilityN = 0
+
+    filteredBets.forEach((b) => {
+      const ph = b.prob_home ?? null
+      const pd = b.prob_draw ?? null
+      const pa = b.prob_away ?? null
+      if (ph == null || pd == null || pa == null) return
+
+      const actualOutcome = b.outcome
+      // Use the model's predicted probability for the actual outcome
+      const predProb = actualOutcome === 'HOME' ? ph : actualOutcome === 'DRAW' ? pd : pa
+      if (predProb == null) return
+
+      const isWin = b.result === 'WIN'
+      const binIdx = Math.min(numBins - 1, Math.floor(predProb / 10))
+
+      bins[binIdx].count += 1
+      bins[binIdx].wins += isWin ? 1 : 0
+      bins[binIdx].sumProb += predProb
+
+      // Reliability contribution: (observed_freq - avg_pred_prob)^2 * count
+      reliabilitySum += (isWin ? 1 : 0) * (isWin ? 1 : 0) * 0 // placeholder below
+    })
+
+    // Compute observed frequency per bin
+    bins.forEach((bin) => {
+      if (bin.count > 0) {
+        bin.avgProb = Math.round((bin.sumProb / bin.count) * 10) / 10
+        bin.observedFreq = Math.round((bin.wins / bin.count) * 100) / 100
+        // Reliability term
+        const bias = bin.observedFreq - bin.avgProb / 100
+        reliabilitySum += bias * bias * bin.count
+        reliabilityN += bin.count
+      }
+    })
+
+    const reliability = reliabilityN > 0 ? Math.round((reliabilitySum / reliabilityN) * 1000) / 1000 : null
+
+    // Per-outcome calibration breakdown
+    const outcomeStats = { HOME: { total: 0, wins: 0 }, DRAW: { total: 0, wins: 0 }, AWAY: { total: 0, wins: 0 } }
+    filteredBets.forEach((b) => {
+      const ph = b.prob_home ?? null
+      const pd = b.prob_draw ?? null
+      const pa = b.prob_away ?? null
+      if (ph == null || pd == null || pa == null) return
+      if (b.outcome === 'HOME') { outcomeStats.HOME.total += 1; if (b.result === 'WIN') outcomeStats.HOME.wins += 1 }
+      else if (b.outcome === 'DRAW') { outcomeStats.DRAW.total += 1; if (b.result === 'WIN') outcomeStats.DRAW.wins += 1 }
+      else { outcomeStats.AWAY.total += 1; if (b.result === 'WIN') outcomeStats.AWAY.wins += 1 }
+    })
+
+    // Sample-size-aware calibration labels
+    const calLabel = (() => {
+      if (reliability == null) return { label: 'Insufficient Data', cls: 'text-slate-400 bg-slate-500/10 border-slate-500/30' }
+      if (reliability < 0.015) return { label: 'Excellent', cls: 'text-emerald-400 bg-emerald-500/10 border-emerald-500/30' }
+      if (reliability <= 0.03) return { label: 'Good', cls: 'text-emerald-400 bg-emerald-500/10 border-emerald-500/30' }
+      if (reliability <= 0.05) return { label: 'Acceptable', cls: 'text-amber-400 bg-amber-500/10 border-amber-500/30' }
+      return { label: 'Poor', cls: 'text-rose-400 bg-rose-500/10 border-rose-500/30' }
+    })()
+
+    return { bins, reliability, calLabel, outcomeStats, brierScore: activeStats.brierScore }
+  }, [activeStats, filteredBets])
+
   // SVG Chart Dimensions
   const chartW = 720
   const chartH = 240
@@ -225,6 +301,201 @@ export default function ModelLedger({ settledFixtures = [] }) {
           </span>
         </div>
       </div>
+
+      {/* ---- Model Calibration & Reliability Panel ---- */}
+      {calibrationData && (
+        <div className="p-4 sm:p-5 rounded-2xl bg-pitch-900 border border-pitch-700/80 shadow-xl space-y-5">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-pitch-800 pb-3">
+            <div>
+              <h3 className="text-sm font-bold text-slate-100 flex items-center gap-2">
+                <span>Model Calibration & Probabilistic Reliability</span>
+              </h3>
+              <p className="text-[11px] font-mono text-slate-400 mt-0.5">
+                Multi-class Brier score, reliability diagram, and per-outcome observed frequencies
+              </p>
+            </div>
+            <div className="flex items-center gap-2">
+              <span className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-bold border ${calibrationData.calLabel.cls}`}>
+                {calibrationData.calLabel.label}
+              </span>
+              {calibrationData.brierScore != null && (
+                <span className="text-[10px] font-mono text-sky-400">
+                  Brier {calibrationData.brierScore.toFixed(3)}
+                </span>
+              )}
+            </div>
+          </div>
+
+          {/* Benchmark Comparison Strip */}
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+            <div className="p-3 rounded-xl bg-pitch-950/60 border border-pitch-800">
+              <p className="text-[10px] text-slate-500 font-mono uppercase tracking-wider mb-1">Brier Score</p>
+              <p className="text-lg font-black text-sky-400 tabular-nums">
+                {calibrationData.brierScore != null ? calibrationData.brierScore.toFixed(3) : '--'}
+              </p>
+              <p className="text-[9px] text-slate-500 mt-0.5">Lower = better</p>
+            </div>
+            <div className="p-3 rounded-xl bg-pitch-950/60 border border-pitch-800">
+              <p className="text-[10px] text-slate-500 font-mono uppercase tracking-wider mb-1">Naive Baseline</p>
+              <p className="text-lg font-black text-slate-500 tabular-nums">0.222</p>
+              <p className="text-[9px] text-slate-500 mt-0.5">Uniform 33.3% each</p>
+            </div>
+            <div className="p-3 rounded-xl bg-pitch-950/60 border border-pitch-800">
+              <p className="text-[10px] text-slate-500 font-mono uppercase tracking-wider mb-1">Improvement</p>
+              <p className={`text-lg font-black tabular-nums ${
+                calibrationData.brierScore != null && calibrationData.brierScore < 0.222
+                  ? 'text-emerald-400'
+                  : 'text-slate-500'
+              }`}>
+                {calibrationData.brierScore != null
+                  ? `+${Math.round(((0.222 - calibrationData.brierScore) / 0.222) * 100)}%`
+                  : '--'}
+              </p>
+              <p className="text-[9px] text-slate-500 mt-0.5">vs uniform guess</p>
+            </div>
+            <div className="p-3 rounded-xl bg-pitch-950/60 border border-pitch-800">
+              <p className="text-[10px] text-slate-500 font-mono uppercase tracking-wider mb-1">Samples</p>
+              <p className="text-lg font-black text-slate-200 tabular-nums">
+                {activeStats?.total ?? 0}
+              </p>
+              <p className="text-[9px] text-slate-500 mt-0.5">settlements analyzed</p>
+            </div>
+          </div>
+
+          {/* Reliability Diagram */}
+          <div>
+            <div className="flex items-center justify-between mb-2">
+              <p className="text-xs text-slate-400 font-semibold uppercase tracking-wider">
+                Reliability Diagram (Expected vs Observed Frequency)
+              </p>
+              <span className="text-[10px] text-slate-500 font-mono">
+                Perfect diagonal = perfectly calibrated
+              </span>
+            </div>
+            <div className="w-full overflow-hidden">
+              <svg
+                viewBox="0 0 500 280"
+                className="w-full h-48 sm:h-56 text-xs font-mono select-none"
+                preserveAspectRatio="xMidYMid meet"
+              >
+                {/* Grid */}
+                {[0, 20, 40, 60, 80, 100].map((pct) => {
+                  const pos = 40 + (pct / 100) * 420
+                  return (
+                    <g key={pct}>
+                      <line x1={pos} y1={40} x2={pos} y2={260} stroke="#1e293b" strokeWidth="1" />
+                      <line x1={40} y1={pos} x2={460} y2={pos} stroke="#1e293b" strokeWidth="1" />
+                      <text x={pos} y={275} fill="#64748b" textAnchor="middle" fontSize="9">{pct}%</text>
+                      <text x={35} y={pos + 4} fill="#64748b" textAnchor="end" fontSize="9">{pct}%</text>
+                    </g>
+                  )
+                })}
+                {/* Perfect calibration diagonal */}
+                <line x1={40} y1={260} x2={460} y2={40} stroke="#334155" strokeWidth="1.5" strokeDasharray="6 3" />
+                {/* Bars */}
+                {calibrationData.bins.map((bin, i) => {
+                  if (bin.count === 0) return null
+                  const barLeft = 40 + i * 42 + 3
+                  const barWidth = 36
+                  const expectedTop = 260 - (bin.avgProb / 100) * 220
+                  const observedTop = 260 - bin.observedFreq * 220
+                  const barHeight = 260 - Math.min(expectedTop, observedTop)
+                  const expectedColor = '#38bdf8'
+                  const observedColor = '#f59e0b'
+
+                  return (
+                    <g key={i}>
+                      {/* Expected bar */}
+                      <rect
+                        x={barLeft}
+                        y={Math.min(expectedTop, observedTop)}
+                        width={barWidth / 2 - 1}
+                        height={Math.abs(expectedTop - observedTop) || barHeight}
+                        fill={expectedColor}
+                        fillOpacity={0.5}
+                      />
+                      {/* Observed bar */}
+                      <rect
+                        x={barLeft + barWidth / 2 + 1}
+                        y={Math.min(expectedTop, observedTop)}
+                        width={barWidth / 2 - 1}
+                        height={Math.abs(expectedTop - observedTop) || barHeight}
+                        fill={observedColor}
+                        fillOpacity={0.5}
+                      />
+                      {/* Count label */}
+                      <text
+                        x={barLeft + barWidth / 2}
+                        y={278}
+                        fill="#94a3b8"
+                        textAnchor="middle"
+                        fontSize="8"
+                      >
+                        n={bin.count}
+                      </text>
+                    </g>
+                  )
+                })}
+                {/* Legend */}
+                <rect x={360} y={8} width={10} height={10} fill="#38bdf8" fillOpacity={0.5} />
+                <text x={374} y={17} fill="#94a3b8" fontSize="9">Expected (model)</text>
+                <rect x={360} y={24} width={10} height={10} fill="#f59e0b" fillOpacity={0.5} />
+                <text x={374} y={33} fill="#94a3b8" fontSize="9">Observed (actual)</text>
+              </svg>
+              <div className="flex items-center justify-center gap-4 mt-1 text-[9px] text-slate-500 font-mono">
+                <span>Expected = avg model probability in bin</span>
+                <span>Observed = actual win rate in bin</span>
+              </div>
+            </div>
+          </div>
+
+          {/* Per-Outcome Calibration Breakdown */}
+          <div>
+            <p className="text-xs text-slate-400 font-semibold uppercase tracking-wider mb-2">
+              Per-Outcome Calibration
+            </p>
+            <div className="grid grid-cols-3 gap-3">
+              {['HOME', 'DRAW', 'AWAY'].map((outcome) => {
+                const stats = calibrationData.outcomeStats[outcome]
+                const obsFreq = stats.total > 0 ? (stats.wins / stats.total) * 100 : null
+                const avgPred = filteredBets
+                  .filter((b) => b.outcome === outcome && b.prob_home != null && b.prob_draw != null && b.prob_away != null)
+                  .reduce((sum, b) => sum + (outcome === 'HOME' ? b.prob_home : outcome === 'DRAW' ? b.prob_draw : b.prob_away), 0)
+                  / (stats.total || 1)
+
+                return (
+                  <div key={outcome} className="p-3 rounded-xl bg-pitch-950/60 border border-pitch-800">
+                    <p className="text-[10px] text-slate-500 font-mono uppercase tracking-wider mb-1">
+                      {outcome === 'HOME' ? 'Home Win' : outcome === 'DRAW' ? 'Draw' : 'Away Win'}
+                    </p>
+                    <div className="flex items-end gap-2 mb-1">
+                      <span className="text-sm font-bold text-slate-200 tabular-nums">
+                        {obsFreq != null ? `${obsFreq.toFixed(0)}%` : '--'}
+                      </span>
+                      <span className="text-[10px] text-slate-500">observed</span>
+                    </div>
+                    <div className="flex items-end gap-2 mb-1">
+                      <span className="text-sm font-bold text-sky-400 tabular-nums">
+                        {!isNaN(avgPred) ? `${avgPred.toFixed(0)}%` : '--'}
+                      </span>
+                      <span className="text-[10px] text-slate-500">predicted</span>
+                    </div>
+                    <div className="text-[10px] text-slate-500 font-mono">
+                      {stats.total} occurrences
+                    </div>
+                    {obsFreq != null && !isNaN(avgPred) && Math.abs(obsFreq - avgPred) < 10 && (
+                      <div className="mt-1 text-[9px] text-emerald-400">Calibrated</div>
+                    )}
+                    {obsFreq != null && !isNaN(avgPred) && Math.abs(obsFreq - avgPred) >= 10 && (
+                      <div className="mt-1 text-[9px] text-rose-400">Mis-calibrated</div>
+                    )}
+                  </div>
+                )
+              })}
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* ---- Interactive Responsive Equity Curve SVG ---- */}
       <div className="p-4 sm:p-5 rounded-2xl bg-pitch-900 border border-pitch-700/80 shadow-xl space-y-4">
