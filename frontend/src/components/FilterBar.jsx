@@ -2,7 +2,10 @@
 // Compact two-tier sportsbook filter bar:
 //   Tier 1: Search + Market Segmented Control + Time Filter + View Mode
 //   Tier 2: Scrollable league pill rail with fade masks
+// Mobile: collapsible filter bar with "More" button for compact display
 // Zero em dash characters (R-02 compliance).
+
+import { useState } from 'react'
 
 export const DATE_RANGES = [
   { id: 'today', label: 'Today', shortLabel: 'T' },
@@ -62,6 +65,7 @@ export default function FilterBar({
 }) {
   const accessibleRanges = TIER_ACCESS[tier] || TIER_ACCESS.free
   const evLocked = !accessibleRanges.includes('week')
+  const [showMoreFilters, setShowMoreFilters] = useState(false)
 
   const handlePillClick = (r) => {
     if (accessibleRanges.includes(r.id)) {
@@ -84,7 +88,7 @@ export default function FilterBar({
       {/* ---- TIER 1: Compact Header Bar ---- */}
       <div className="flex items-center gap-2 flex-wrap sm:flex-nowrap">
         {/* Left: Search + Market Segmented Control */}
-        <div className="flex items-center gap-2 flex-1 min-w-0 sm:min-w-0">
+        <div className="flex items-center gap-2 flex-1 min-w-0">
           {/* Search */}
           <div className="relative flex-1 max-w-[220px] sm:max-w-[280px]">
             <div className="absolute inset-y-0 left-0 pl-2.5 flex items-center pointer-events-none text-slate-500">
@@ -180,7 +184,7 @@ export default function FilterBar({
                 : 'bg-pitch-900 text-slate-500 border-pitch-700 hover:text-slate-300'
             }`}
           >
-            <span className="text-[10px]">{valueOnly && !evLocked ? '&#x26A1;' : evLocked ? '&#x1F512;' : '·'}</span>
+            <span className="text-[10px]">{valueOnly && !evLocked ? '⚡' : evLocked ? '🔒' : '·'}</span>
             <span className="hidden sm:inline">+EV</span>
             {valueOnly && !evLocked && valueCount > 0 && (
               <span className="px-1 py-0.5 rounded bg-emerald-500/30 text-[10px] font-mono font-bold">{valueCount}</span>
@@ -198,7 +202,7 @@ export default function FilterBar({
                 : 'bg-pitch-900 text-slate-400 border-pitch-700 hover:text-slate-200'
             }`}
           >
-            <span>&#9733;</span>
+            <span>★</span>
             {watchlistCount > 0 && (
               <span className="px-1 py-0.5 rounded-full text-[10px] font-mono font-bold bg-pitch-950 text-amber-300">{watchlistCount}</span>
             )}
@@ -229,6 +233,42 @@ export default function FilterBar({
           </span>
         </div>
       </div>
+
+      {/* ---- Mobile: More Filters Toggle ---- */}
+      <div className="sm:hidden flex justify-center py-1">
+        <button
+          type="button"
+          onClick={() => setShowMoreFilters(!showMoreFilters)}
+          className="px-3 py-1.5 rounded-lg text-[11px] font-mono text-slate-400 hover:text-slate-200 border border-pitch-700 hover:border-pitch-600 transition-all bg-pitch-900/50"
+          aria-expanded={showMoreFilters}
+        >
+          {showMoreFilters ? 'Hide Filters ▲' : 'More Filters ▼'}
+        </button>
+      </div>
+
+      {/* ---- Mobile: Expanded Filter Section ---- */}
+      {showMoreFilters && (
+        <div className="sm:hidden space-y-2 pt-2 border-t border-pitch-800">
+          {/* Sort Options */}
+          <div className="flex items-center gap-2 flex-wrap">
+            <span className="text-[11px] text-slate-500 font-mono">Sort:</span>
+            {SORT_OPTIONS.map((opt) => (
+              <button
+                key={opt.id}
+                type="button"
+                onClick={() => onSortChange(opt.id)}
+                className={`px-2 py-1 rounded text-[11px] font-semibold border transition-all ${
+                  sortOption === opt.id
+                    ? 'bg-amber-500 text-pitch-950 border-amber-500'
+                    : 'bg-pitch-900 text-slate-400 border-pitch-700 hover:text-slate-200'
+                }`}
+              >
+                {opt.label}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* ---- TIER 2: League Pill Rail with fade masks ---- */}
       <div className="relative py-1">
