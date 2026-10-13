@@ -253,7 +253,7 @@ export default function MatchCard({
     >
       <div>
         {/* ---- Header: League, Kickoff Time, Odds Source & Watchlist Star ---- */}
-        <div className="flex items-start justify-between gap-3 mb-3">
+        <div className="flex items-start justify-between gap-2 sm:gap-3 mb-2 sm:mb-3">
           <div className="flex flex-col gap-1.5 min-w-0 flex-1">
             {/* League badge */}
             <div className="flex items-center gap-2">
@@ -364,7 +364,7 @@ export default function MatchCard({
         </div>
 
         {/* ---- Teams & Predicted Score ---- */}
-        <div className="flex items-center justify-between gap-3 mb-4">
+        <div className="flex items-center justify-between gap-2 sm:gap-3 mb-3 sm:mb-4">
           {/* Home */}
           <div className="flex flex-col items-center gap-1.5 flex-1 text-center min-w-0">
             <div className="relative">
@@ -423,7 +423,7 @@ export default function MatchCard({
 
         {/* ---- 1X2 Odds Display (Sports Betting Style) ---- */}
         {(odds_home || odds_draw || odds_away) && (
-          <div className="mb-3">
+          <div className="mb-2 sm:mb-3">
             <div className="grid grid-cols-3 gap-2">
               {/* Home */}
               <button
@@ -535,7 +535,7 @@ export default function MatchCard({
 
         {/* ---- +EV Highlight Bar (H2H or Multi-Market) ---- */}
         {(isValue || hasMultiMarketEV) && (
-          <div className={`mb-3 p-3 rounded-xl border ${
+          <div className={`mb-2 sm:mb-3 p-3 rounded-xl border ${
             hasMultiMarketEV && !isValue
               ? 'bg-gradient-to-r from-sky-500/20 to-sky-600/10 border-sky-500/40'
               : 'bg-gradient-to-r from-amber-500/20 to-amber-600/10 border-amber-500/40'
