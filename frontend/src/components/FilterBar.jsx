@@ -82,9 +82,9 @@ export default function FilterBar({
   return (
     <div className="space-y-1.5">
       {/* ---- TIER 1: Compact Header Bar ---- */}
-      <div className="flex items-center gap-2 flex-wrap">
+      <div className="flex items-center gap-2 flex-wrap sm:flex-nowrap">
         {/* Left: Search + Market Segmented Control */}
-        <div className="flex items-center gap-2 flex-1 min-w-0">
+        <div className="flex items-center gap-2 flex-1 min-w-0 sm:min-w-0">
           {/* Search */}
           <div className="relative flex-1 max-w-[220px] sm:max-w-[280px]">
             <div className="absolute inset-y-0 left-0 pl-2.5 flex items-center pointer-events-none text-slate-500">
@@ -140,7 +140,7 @@ export default function FilterBar({
         </div>
 
         {/* Center: Time Filter Pills */}
-        <div className="flex items-center gap-1" role="group" aria-label="Time range">
+        <div className="flex items-center gap-1 w-full sm:w-auto justify-center sm:justify-start mt-1 sm:mt-0" role="group" aria-label="Time range">
           {DATE_RANGES.map((r) => {
             const isActive = dateRange === r.id
             const isLocked = !accessibleRanges.includes(r.id)

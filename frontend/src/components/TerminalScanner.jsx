@@ -36,26 +36,26 @@ export default function TerminalScanner({
   return (
     <section aria-label="Terminal Scanner Feed" className="space-y-4">
       {/* Feed Metadata Status Bar */}
-      <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-slate-400">
-        <p className="font-mono">
-          Showing <strong className="text-amber-400">{fixtures.length}</strong> of{' '}
-          <strong className="text-slate-200">{allFixturesCount}</strong>{' '}
-          {allFixturesCount === 1 ? 'fixture' : 'fixtures'}
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-1 text-xs text-slate-400">
+        <p className="font-mono text-[11px] sm:text-xs">
+          <strong className="text-amber-400">{fixtures.length}</strong>
+          <span className="text-slate-500 mx-1">of</span>
+          <strong className="text-slate-200">{allFixturesCount}</strong>
           {showWatchlistOnly
-            ? ' in Watchlist'
+            ? <span className="text-slate-500"> watchlist</span>
             : activeLeague !== 'all'
-            ? ` in ${currentLeagueLabel}`
-            : ''}
-          {dateRange !== 'all' ? ` (${currentDateRangeLabel})` : ''}
+            ? <span className="text-slate-500"> {currentLeagueLabel}</span>
+            : null}
+          {dateRange !== 'all' ? <span className="text-slate-500">({currentDateRangeLabel})</span> : null}
         </p>
 
         <div className="flex items-center gap-3">
           <span className="inline-flex items-center gap-1.5 text-[11px] text-emerald-400 font-mono">
             <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" aria-hidden="true" />
-            Realtime Feed
+            Live
           </span>
           <span className="text-slate-500 hidden sm:inline font-mono">
-            Table-First Institutional Consensus
+            Institutional Consensus
           </span>
         </div>
       </div>
