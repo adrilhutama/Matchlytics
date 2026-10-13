@@ -254,7 +254,7 @@ export default function MatchCard({
       <div>
         {/* ---- Header: League, Kickoff Time, Odds Source & Watchlist Star ---- */}
         <div className="flex items-start justify-between gap-3 mb-3">
-          <div className="flex flex-col gap-1.5 min-w-0">
+          <div className="flex flex-col gap-1.5 min-w-0 flex-1">
             {/* League badge */}
             <div className="flex items-center gap-2">
               {league_logo && (
@@ -274,10 +274,10 @@ export default function MatchCard({
               </span>
             </div>
 
-            {/* Market feed indicator */}
-            <div className="flex items-center gap-2">
+            {/* Market feed indicator & EV badges - wrapped for mobile */}
+            <div className="flex items-center gap-2 flex-wrap">
               <span
-                className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md text-[10px] font-mono font-semibold ${
+                className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md text-[10px] font-mono font-semibold flex-shrink-0 ${
                   hasRealOdds
                     ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/40'
                     : 'bg-pitch-900 text-slate-500 border border-pitch-700'
@@ -289,7 +289,7 @@ export default function MatchCard({
 
               {/* Multi-Market EV Badges in Header */}
               {(totalsEdge || spreadsEdge) && (
-                <div className="flex items-center gap-1.5">
+                <div className="flex items-center gap-1.5 flex-wrap">
                   {totalsEdge && (
                     <span
                       className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md text-[10px] font-mono font-bold bg-amber-500/20 text-amber-400 border border-amber-500/40"
@@ -312,7 +312,7 @@ export default function MatchCard({
               {/* Best EV Opportunity Badge (multi-market fallback when no H2H pick) */}
               {hasMultiMarketEV && !isValue && bestPickEV && (
                 <span
-                  className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md text-[10px] font-mono font-bold border ${
+                  className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md text-[10px] font-mono font-bold border flex-shrink-0 ${
                     bestPickMarket === 'totals'
                       ? 'bg-emerald-500/20 text-emerald-400 border-emerald-500/40'
                       : 'bg-sky-500/20 text-sky-400 border-sky-500/40'
@@ -326,7 +326,7 @@ export default function MatchCard({
           </div>
 
           {/* Right Header: Timing & Pin Button */}
-          <div className="flex items-center gap-2 flex-shrink-0">
+          <div className="flex items-center gap-2 flex-shrink-0 ml-2">
             <div className="text-right">
               <span className="inline-block px-2 py-1 rounded-lg bg-gradient-to-r from-amber-500/20 to-amber-600/10 border border-amber-500/30 text-[11px] font-bold text-amber-400 tabular-nums">
                 {relativeBadge}
@@ -603,7 +603,7 @@ export default function MatchCard({
               <button
                 type="button"
                 onClick={() => setActiveMarketTab('h2h')}
-                className={`flex-1 py-1.5 px-2 rounded-lg text-xs font-semibold transition-all flex items-center justify-center gap-1.5 touch-manipulation min-h-[36px] ${
+                className={`flex-1 py-2 px-2 rounded-lg text-xs font-semibold transition-all flex items-center justify-center gap-1.5 touch-manipulation min-h-[44px] ${
                   activeMarketTab === 'h2h'
                     ? 'bg-pitch-800 text-amber-400 font-bold shadow-sm border border-pitch-700'
                     : 'text-slate-400 hover:text-slate-200'
@@ -617,7 +617,7 @@ export default function MatchCard({
               <button
                 type="button"
                 onClick={() => setActiveMarketTab('totals')}
-                className={`flex-1 py-1.5 px-2 rounded-lg text-xs font-semibold transition-all flex items-center justify-center gap-1.5 touch-manipulation min-h-[36px] ${
+                className={`flex-1 py-2 px-2 rounded-lg text-xs font-semibold transition-all flex items-center justify-center gap-1.5 touch-manipulation min-h-[44px] ${
                   activeMarketTab === 'totals'
                     ? 'bg-pitch-800 text-amber-400 font-bold shadow-sm border border-pitch-700'
                     : 'text-slate-400 hover:text-slate-200'
@@ -631,7 +631,7 @@ export default function MatchCard({
               <button
                 type="button"
                 onClick={() => setActiveMarketTab('spreads')}
-                className={`flex-1 py-1.5 px-2 rounded-lg text-xs font-semibold transition-all flex items-center justify-center gap-1.5 touch-manipulation min-h-[36px] ${
+                className={`flex-1 py-2 px-2 rounded-lg text-xs font-semibold transition-all flex items-center justify-center gap-1.5 touch-manipulation min-h-[44px] ${
                   activeMarketTab === 'spreads'
                     ? 'bg-pitch-800 text-amber-400 font-bold shadow-sm border border-pitch-700'
                     : 'text-slate-400 hover:text-slate-200'
@@ -705,7 +705,7 @@ export default function MatchCard({
                             leagueName: league_name,
                             matchDate: match_date,
                           })}
-                          className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 min-h-[36px] ${
+                          className={`px-2.5 py-2 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 min-h-[44px] ${
                             isValuePickInSlip
                               ? 'bg-amber-500 text-pitch-950'
                               : 'bg-pitch-900 border border-pitch-700 text-slate-300 hover:text-amber-400'
@@ -757,7 +757,7 @@ export default function MatchCard({
                             leagueName: league_name,
                             matchDate: match_date,
                           })}
-                          className="px-2.5 py-1 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 min-h-[36px] bg-pitch-900 border border-pitch-700 text-slate-300 hover:text-sky-400 hover:border-sky-500/40"
+                          className="px-2.5 py-2 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 min-h-[44px] bg-pitch-900 border border-pitch-700 text-slate-300 hover:text-sky-400 hover:border-sky-500/40"
                         >
                           <span>+ Slip</span>
                         </button>
