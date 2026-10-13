@@ -20,7 +20,10 @@ import TerminalScanner from './components/TerminalScanner'
 const ScoreMatrixModal = React.lazy(() => import('./components/ScoreMatrixModal'))
 const KellyCalculatorModal = React.lazy(() => import('./components/KellyCalculatorModal'))
 const PerformanceModal = React.lazy(() => import('./components/PerformanceModal'))
-import ParlaySlipDrawer from './components/ParlaySlipDrawer'
+const ParlaySlipDrawer = React.lazy(() => import('./components/ParlaySlipDrawer'))
+const DailyPicksModal = React.lazy(() => import('./components/DailyPicksModal'))
+const SubscriptionModal = React.lazy(() => import('./components/SubscriptionModal'))
+const UserProfile = React.lazy(() => import('./components/UserProfile'))
 import LoadingState from './components/LoadingState'
 import EmptyState from './components/EmptyState'
 import ErrorState from './components/ErrorState'
@@ -31,18 +34,15 @@ import InstallPrompt from './components/InstallPrompt'
 import PWAInstallPrompt from './components/PWAInstallPrompt'
 import LandingPage from './components/LandingPage'
 import LoginPage from './components/LoginPage'
-import SubscriptionModal from './components/SubscriptionModal'
 import SubscriptionBanner from './components/SubscriptionBanner'
 import WorkspaceNav from './components/WorkspaceNav'
 import CommandPalette from './components/CommandPalette'
+import { AuthProvider, useAuth } from './context/AuthContext'
 const QuantLab = React.lazy(() => import('./components/QuantLab'))
 const PortfolioTracker = React.lazy(() => import('./components/PortfolioTracker'))
 const ModelLedger = React.lazy(() => import('./components/ModelLedger'))
 const AdminDashboard = React.lazy(() => import('./components/AdminDashboard'))
 const AdminPanel = React.lazy(() => import('./components/AdminPanel'))
-import UserProfile from './components/UserProfile'
-import DailyPicksModal from './components/DailyPicksModal'
-import { AuthProvider, useAuth } from './context/AuthContext'
 import {
   isDateInRange,
   matchesSearch,
