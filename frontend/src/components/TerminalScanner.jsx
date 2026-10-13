@@ -33,6 +33,9 @@ export default function TerminalScanner({
   quantLocked = false,
   onTriggerUpgrade,
   viewMode = 'table',
+  visibleCount = 24,
+  totalCount = 0,
+  onLoadMore,
 }) {
   const validFixtures = (fixtures || []).filter(Boolean)
 
@@ -105,7 +108,7 @@ export default function TerminalScanner({
       {/* Mobile: Simple Scrollable Card Grid (no AutoSizer needed) */}
       {viewMode === 'cards' && (
         <div className="sm:hidden space-y-4 pb-4">
-          {validFixtures.map((fixture, idx) => (
+          {validFixtures.slice(0, visibleCount).map((fixture, idx) => (
             <MatchCard
               key={fixture.id}
               fixture={fixture}
@@ -123,6 +126,22 @@ export default function TerminalScanner({
               style={{ animationDelay: `${Math.min(idx * 30, 300)}ms` }}
             />
           ))}
+
+          {/* Load More Button */}
+          {visibleCount < totalCount && (
+            <div className="flex justify-center pt-4">
+              <button
+                type="button"
+                onClick={onLoadMore}
+                className="px-6 py-2.5 rounded-xl bg-pitch-950 border border-pitch-700 hover:border-amber-500/50 hover:bg-pitch-800 text-xs font-mono font-semibold text-slate-300 hover:text-amber-400 transition-all flex items-center gap-2.5 shadow-lg group focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500"
+              >
+                <span>Load More Fixtures</span>
+                <span className="px-2 py-0.5 rounded-md bg-pitch-900 group-hover:bg-amber-500/20 text-[10px] text-amber-400 border border-pitch-700 group-hover:border-amber-500/30 transition-colors">
+                  +{Math.min(24, totalCount - visibleCount)} of {totalCount - visibleCount} remaining
+                </span>
+              </button>
+            </div>
+          )}
         </div>
       )}
     </section>

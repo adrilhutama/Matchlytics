@@ -151,6 +151,7 @@ function AppInner() {
   const [isCommandPaletteOpen, setIsCommandPaletteOpen] = useState(false)
   const [selectedLabFixture,  setSelectedLabFixture]  = useState(null)
   const [workspaceKey,        setWorkspaceKey]        = useState(0)
+  const [visibleCount,        setVisibleCount]        = useState(24)
 
   // Portfolio journal state (persisted in localStorage)
   const [portfolioPositions, setPortfolioPositions] = useState(() => {
@@ -722,6 +723,11 @@ function AppInner() {
     }
   }, [fetchFixtures, fetchSettledFixtures])
 
+  // Slice-based pagination for smooth initial load
+  const paginatedFixtures = useMemo(() => {
+    return displayedFixtures.slice(0, visibleCount)
+  }, [displayedFixtures, visibleCount])
+
   // Client-side filtering & sorting
   const displayedFixtures = useMemo(() => {
     let result = (fixtures || []).filter(Boolean)
@@ -1228,7 +1234,7 @@ function AppInner() {
                 />
               ) : (
                 <TerminalScanner
-                  fixtures={displayedFixtures}
+                  fixtures={paginatedFixtures}
                   allFixturesCount={displayedFixtures.length}
                   currentLeagueLabel={currentLeagueLabel}
                   currentDateRangeLabel={currentDateRangeLabel}
@@ -1248,6 +1254,9 @@ function AppInner() {
                   onTriggerUpgrade={openUpgradeFor}
                   viewMode={viewMode}
                   onViewModeChange={setViewMode}
+                  visibleCount={visibleCount}
+                  totalCount={displayedFixtures.length}
+                  onLoadMore={() => setVisibleCount((prev) => prev + 24)}
                 />
               )}
             </div>
