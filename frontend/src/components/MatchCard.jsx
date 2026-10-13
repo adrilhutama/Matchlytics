@@ -247,7 +247,7 @@ export default function MatchCard({
 
   return (
     <article
-      className={`match-card ${isValue ? 'match-card--value' : hasMultiMarketEV ? 'match-card--multi' : ''} p-4 sm:p-4 animate-slide-up transition-all ${isHighValue ? 'high-value-accent' : ''}`}
+      className={`match-card ${isValue ? 'match-card--value' : hasMultiMarketEV ? 'match-card--multi' : ''} p-3 sm:p-4 animate-slide-up transition-all ${isHighValue ? 'high-value-accent' : ''}`}
       style={style}
       aria-label={`${home_team_name} vs ${away_team_name}, ${dateStr}`}
     >
