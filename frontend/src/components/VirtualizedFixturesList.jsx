@@ -3,8 +3,8 @@
 // Only renders visible items (typically 5-10) instead of all 400+.
 // Zero em dash characters (R-02 compliance).
 
-import { FixedSizeList as List } from 'react-window'
-import AutoSizer from 'react-virtualized-auto-sizer'
+import { List } from 'react-window'
+import { AutoSizer } from 'react-virtualized-auto-sizer'
 import MatchCard from './MatchCard'
 import MatchCardSkeleton from './MatchCardSkeleton'
 

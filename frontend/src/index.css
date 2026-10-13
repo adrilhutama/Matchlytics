@@ -310,6 +310,16 @@
     background: radial-gradient(ellipse at center, rgba(16, 185, 129, 0.1) 0%, transparent 70%);
   }
 
+  /* Workspace transition animation */
+  .workspace-enter {
+    animation: workspace-slide-in 0.25s ease-out forwards;
+  }
+
+  @keyframes workspace-slide-in {
+    from { opacity: 0; transform: translateY(8px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+
   /* Staggered animation delays */
   .stagger-1 { animation-delay: 0.1s; }
   .stagger-2 { animation-delay: 0.2s; }

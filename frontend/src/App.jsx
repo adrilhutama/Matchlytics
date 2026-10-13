@@ -17,6 +17,7 @@ import MatchCard from './components/MatchCard'
 import CompactTableView from './components/CompactTableView'
 import TableView from './components/TableView'
 import TerminalScanner from './components/TerminalScanner'
+const VirtualizedFixturesList = React.lazy(() => import('./components/VirtualizedFixturesList'))
 const ScoreMatrixModal = React.lazy(() => import('./components/ScoreMatrixModal'))
 const KellyCalculatorModal = React.lazy(() => import('./components/KellyCalculatorModal'))
 const PerformanceModal = React.lazy(() => import('./components/PerformanceModal'))
@@ -149,7 +150,7 @@ function AppInner() {
   const [isAdminView,         setIsAdminView]         = useState(false)
   const [isCommandPaletteOpen, setIsCommandPaletteOpen] = useState(false)
   const [selectedLabFixture,  setSelectedLabFixture]  = useState(null)
-  const [visibleCount,        setVisibleCount]        = useState(24)
+  const [workspaceKey,        setWorkspaceKey]        = useState(0)
 
   // Portfolio journal state (persisted in localStorage)
   const [portfolioPositions, setPortfolioPositions] = useState(() => {
@@ -322,9 +323,8 @@ function AppInner() {
     }
   }, [])
 
-  // Reset pagination visible count on filter changes
+  // Reset pagination on filter changes (kept for future use if needed)
   useEffect(() => {
-    setVisibleCount(24)
   }, [activeLeague, dateRange, searchQuery, valueOnly, showWatchlistOnly])
 
   // Auto-select initial fixture for Quant Lab prioritizing highest +EV match
@@ -490,6 +490,7 @@ function AppInner() {
       setSelectedLabFixture(sortedByValue[0] || valid[0] || null)
     }
     setActiveWorkspace(ws)
+    setWorkspaceKey((k) => k + 1)
     window.scrollTo({ top: 0, behavior: 'smooth' })
   }, [canAccessQuantFeatures, selectedLabFixture, fixtures, openUpgradeFor])
 
@@ -766,10 +767,7 @@ function AppInner() {
     return sortFixtures(result, sortOption)
   }, [fixtures, activeLeague, showWatchlistOnly, watchlist, valueOnly, selectedMarket, dateRange, searchQuery, sortOption])
 
-  // Slice-based pagination for smooth 60 FPS rendering
-  const paginatedFixtures = useMemo(() => {
-    return displayedFixtures.slice(0, visibleCount)
-  }, [displayedFixtures, visibleCount])
+  // Slice-based pagination removed - VirtualizedFixturesList handles all items efficiently
 
   const handleClearFilters = useCallback(() => {
     setActiveLeague('all')
@@ -1165,7 +1163,7 @@ function AppInner() {
         <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 w-full py-3 min-w-0 pb-28 md:pb-8" id="main-content">
           {/* Workspace 1: Terminal / Scanner */}
           {activeWorkspace === 'terminal' && (
-            <div className="space-y-4">
+            <div key={workspaceKey} className="workspace-enter space-y-4">
               {/* Sticky glassmorphism Filter Bar */}
               <div className="sticky top-14 sm:top-16 z-30 backdrop-blur-md bg-pitch-950/90 border-b border-pitch-800 -mx-4 sm:-mx-6 lg:-mx-8 px-3 sm:px-6 lg:px-8 py-2 sm:py-3 transition-all">
                 <div className="max-w-7xl mx-auto">
@@ -1218,7 +1216,7 @@ function AppInner() {
                 />
               ) : (
                 <TerminalScanner
-                  fixtures={paginatedFixtures}
+                  fixtures={displayedFixtures}
                   allFixturesCount={displayedFixtures.length}
                   currentLeagueLabel={currentLeagueLabel}
                   currentDateRangeLabel={currentDateRangeLabel}
@@ -1238,9 +1236,6 @@ function AppInner() {
                   onTriggerUpgrade={openUpgradeFor}
                   viewMode={viewMode}
                   onViewModeChange={setViewMode}
-                  visibleCount={visibleCount}
-                  totalCount={displayedFixtures.length}
-                  onLoadMore={() => setVisibleCount((prev) => prev + 24)}
                 />
               )}
             </div>
