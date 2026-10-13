@@ -80,22 +80,24 @@ export default function TerminalScanner({
 
       {/* Presentation Mode: Virtualized Grid Cards (handles 400+ fixtures efficiently) */}
       {viewMode === 'cards' && (
-        <Suspense fallback={<LoadingState />}>
-          <VirtualizedFixturesList
-            fixtures={(fixtures || []).filter(Boolean)}
-            watchlist={watchlist}
-            onToggleWatchlist={onToggleWatchlist}
-            onOpenMatrix={onOpenMatrix}
-            onOpenQuantModal={onOpenQuantModal}
-            onSelectForLab={onSelectForLab}
-            onLogPosition={onLogPosition}
-            slipLegs={slipLegs}
-            onToggleSlip={onToggleSlip}
-            standingsMap={standingsMap}
-            quantLocked={quantLocked}
-            onTriggerUpgrade={onTriggerUpgrade}
-          />
-        </Suspense>
+        <div className="sm:hidden h-[calc(100dvh-280px)] min-h-[400px]">
+          <Suspense fallback={<LoadingState />}>
+            <VirtualizedFixturesList
+              fixtures={(fixtures || []).filter(Boolean)}
+              watchlist={watchlist}
+              onToggleWatchlist={onToggleWatchlist}
+              onOpenMatrix={onOpenMatrix}
+              onOpenQuantModal={onOpenQuantModal}
+              onSelectForLab={onSelectForLab}
+              onLogPosition={onLogPosition}
+              slipLegs={slipLegs}
+              onToggleSlip={onToggleSlip}
+              standingsMap={standingsMap}
+              quantLocked={quantLocked}
+              onTriggerUpgrade={onTriggerUpgrade}
+            />
+          </Suspense>
+        </div>
       )}
     </section>
   )
