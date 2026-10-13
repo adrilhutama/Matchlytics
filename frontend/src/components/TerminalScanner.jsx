@@ -80,7 +80,7 @@ export default function TerminalScanner({
 
       {/* Presentation Mode: Virtualized Grid Cards (handles 400+ fixtures efficiently) */}
       {viewMode === 'cards' && (
-        <div className="sm:hidden h-[calc(100dvh-280px)] min-h-[400px]">
+        <div className="sm:hidden h-[500px] overflow-y-auto">
           <Suspense fallback={<LoadingState />}>
             <VirtualizedFixturesList
               fixtures={(fixtures || []).filter(Boolean)}
