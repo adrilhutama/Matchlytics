@@ -282,18 +282,6 @@ export default function FilterBar({
           role="navigation"
           aria-label="Filter by league"
         >
-          <button
-            type="button"
-            onClick={() => onLeagueChange('all')}
-            aria-pressed={activeLeague === 'all'}
-            className={`flex-shrink-0 px-2.5 py-1 text-[11px] font-semibold rounded-lg border transition-all ${
-              activeLeague === 'all'
-                ? 'bg-amber-500 text-pitch-950 border-amber-500'
-                : 'bg-pitch-900 text-slate-400 border-pitch-700 hover:text-slate-200'
-            }`}
-          >
-            ALL
-          </button>
           {leagues.map((league) => {
             const isActive = activeLeague === league.id
             return (
