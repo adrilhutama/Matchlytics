@@ -126,6 +126,18 @@ export function AuthProvider({ children }) {
     })
   }, [])
 
+  const signInWithOAuth = useCallback(async (provider) => {
+    const redirectUrl = typeof window !== 'undefined' && window.location.hostname.includes('localhost')
+      ? `${window.location.origin}/?view=app`
+      : 'https://app.imortifex.me/'
+    return supabase.auth.signInWithOAuth({
+      provider,
+      options: {
+        redirectTo: redirectUrl,
+      },
+    })
+  }, [])
+
   const signOut = useCallback(async () => {
     const { error: outErr } = await supabase.auth.signOut()
     if (outErr) console.warn('Sign out failed:', outErr.message)
@@ -192,10 +204,11 @@ export function AuthProvider({ children }) {
       signIn,
       signUp,
       requestMagicLink,
+      signInWithOAuth,
       signOut,
       refreshProfile,
     }),
-    [session, user, profile, loading, hasActiveSubscription, tier, isSubscribed, isFree, isPro, isAnnual, canAccessWeekly, canAccessMonthly, canAccessQuantFeatures, effectiveStatus, subscriptionRemaining, isExpired, signIn, signUp, requestMagicLink, signOut, refreshProfile]
+    [session, user, profile, loading, hasActiveSubscription, tier, isSubscribed, isFree, isPro, isAnnual, canAccessWeekly, canAccessMonthly, canAccessQuantFeatures, effectiveStatus, subscriptionRemaining, isExpired, signIn, signUp, requestMagicLink, signInWithOAuth, signOut, refreshProfile]
   )
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>
@@ -225,6 +238,7 @@ export function useAuth() {
     signIn: async () => ({ data: null, error: new Error('Auth provider missing.') }),
     signUp: async () => ({ data: null, error: new Error('Auth provider missing.') }),
     requestMagicLink: async () => ({ data: null, error: new Error('Auth provider missing.') }),
+    signInWithOAuth: async () => ({ data: null, error: new Error('Auth provider missing.') }),
     signOut: async () => {},
     refreshProfile: () => {},
   }
