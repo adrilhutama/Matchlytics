@@ -1,13 +1,15 @@
 // ---- TerminalScanner.jsx ----
 // Institutional Terminal Scanner workspace:
 // - Default presentation mode: Master Table View (TableView.jsx)
-// - Optional toggle to Grid Cards mode (VirtualizedFixturesList.jsx for 400+ performance)
+// - Desktop Grid: VirtualizedFixturesList for 400+ fixtures
+// - Mobile Grid: regular scrollable card grid (AutoSizer unreliable on mobile)
 // - Dense, real-time institutional feed metadata
 // - Fluid container with safe mobile padding (pb-28)
-// - Zero em dash characters used (R-02 compliance)
+// - Zero em dash characters used (R-02 compliance).
 
-import { useState, lazy, Suspense } from 'react'
+import { lazy, Suspense } from 'react'
 import TableView from './TableView'
+import MatchCard from './MatchCard'
 const VirtualizedFixturesList = lazy(() => import('./VirtualizedFixturesList'))
 import LoadingState from './LoadingState'
 
@@ -31,8 +33,9 @@ export default function TerminalScanner({
   quantLocked = false,
   onTriggerUpgrade,
   viewMode = 'table',
-  onViewModeChange,
 }) {
+  const validFixtures = (fixtures || []).filter(Boolean)
+
   return (
     <section aria-label="Terminal Scanner Feed" className="space-y-4">
       {/* Feed Metadata Status Bar */}
@@ -48,7 +51,6 @@ export default function TerminalScanner({
             : null}
           {dateRange !== 'all' ? <span className="text-slate-500">({currentDateRangeLabel})</span> : null}
         </p>
-
         <div className="flex items-center gap-3">
           <span className="inline-flex items-center gap-1.5 text-[11px] text-emerald-400 font-mono">
             <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" aria-hidden="true" />
@@ -63,7 +65,7 @@ export default function TerminalScanner({
       {/* Presentation Mode: Default Master Table */}
       {viewMode === 'table' && (
         <TableView
-          fixtures={(fixtures || []).filter(Boolean)}
+          fixtures={validFixtures}
           watchlist={watchlist}
           onToggleWatchlist={onToggleWatchlist}
           onOpenMatrix={onOpenMatrix}
@@ -78,12 +80,12 @@ export default function TerminalScanner({
         />
       )}
 
-      {/* Presentation Mode: Virtualized Grid Cards (handles 400+ fixtures efficiently) */}
+      {/* Desktop: Virtualized Grid Cards (handles 400+ fixtures efficiently) */}
       {viewMode === 'cards' && (
-        <div className="sm:hidden h-[500px] overflow-y-auto">
+        <div className="hidden sm:block">
           <Suspense fallback={<LoadingState />}>
             <VirtualizedFixturesList
-              fixtures={(fixtures || []).filter(Boolean)}
+              fixtures={validFixtures}
               watchlist={watchlist}
               onToggleWatchlist={onToggleWatchlist}
               onOpenMatrix={onOpenMatrix}
@@ -97,6 +99,30 @@ export default function TerminalScanner({
               onTriggerUpgrade={onTriggerUpgrade}
             />
           </Suspense>
+        </div>
+      )}
+
+      {/* Mobile: Simple Scrollable Card Grid (no AutoSizer needed) */}
+      {viewMode === 'cards' && (
+        <div className="sm:hidden space-y-3 pb-4">
+          {validFixtures.map((fixture, idx) => (
+            <MatchCard
+              key={fixture.id}
+              fixture={fixture}
+              isPinned={watchlist?.includes(fixture.id)}
+              onToggleWatchlist={onToggleWatchlist}
+              onOpenMatrix={onOpenMatrix}
+              onOpenQuantModal={onOpenQuantModal}
+              onSelectForLab={onSelectForLab}
+              onLogPosition={onLogPosition}
+              slipPicks={(slipLegs || []).filter((l) => l?.fixtureId === fixture.id).map((l) => l.pick)}
+              onToggleSlip={onToggleSlip}
+              standingsMap={standingsMap}
+              quantLocked={quantLocked}
+              onTriggerUpgrade={onTriggerUpgrade}
+              style={{ animationDelay: `${Math.min(idx * 30, 300)}ms` }}
+            />
+          ))}
         </div>
       )}
     </section>
