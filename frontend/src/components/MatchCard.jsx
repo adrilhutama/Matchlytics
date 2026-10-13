@@ -32,12 +32,12 @@ function TeamLogo({ src, name }) {
           alt={`${name} crest`}
           width={32}
           height={32}
-          className="w-full h-full object-contain drop-shadow"
+          className="w-full h-full object-contain drop-shadow team-logo"
           loading="lazy"
           onError={(e) => { e.currentTarget.style.display = 'none' }}
         />
       ) : (
-        <div className="w-6 h-6 sm:w-7 sm:h-7 rounded-full bg-pitch-700 flex items-center justify-center text-xs font-bold text-slate-300">
+        <div className="w-6 h-6 sm:w-7 sm:h-7 rounded-full bg-pitch-700 flex items-center justify-center text-xs font-bold text-slate-300 team-logo">
           {name?.[0] ?? '?'}
         </div>
       )}
@@ -440,7 +440,7 @@ export default function MatchCard({
                   leagueName: league_name,
                   matchDate: match_date,
                 })}
-                className={`relative p-2.5 rounded-xl border transition-all text-center ${
+                className={`relative p-2.5 rounded-xl border transition-all text-center hover:scale-105 active:scale-95 ${
                   value_pick === 'HOME'
                     ? 'border-amber-500/60 bg-amber-500/15 shadow-lg shadow-amber-500/20'
                     : 'border-pitch-700 bg-pitch-900/80 hover:border-sky-500/40 hover:bg-sky-500/10'
@@ -475,7 +475,7 @@ export default function MatchCard({
                   leagueName: league_name,
                   matchDate: match_date,
                 })}
-                className={`relative p-2.5 rounded-xl border transition-all text-center ${
+                className={`relative p-2.5 rounded-xl border transition-all text-center hover:scale-105 active:scale-95 ${
                   value_pick === 'DRAW'
                     ? 'border-amber-500/60 bg-amber-500/15 shadow-lg shadow-amber-500/20'
                     : 'border-pitch-700 bg-pitch-900/80 hover:border-slate-500/40 hover:bg-slate-500/10'
@@ -510,7 +510,7 @@ export default function MatchCard({
                   leagueName: league_name,
                   matchDate: match_date,
                 })}
-                className={`relative p-2.5 rounded-xl border transition-all text-center ${
+                className={`relative p-2.5 rounded-xl border transition-all text-center hover:scale-105 active:scale-95 ${
                   value_pick === 'AWAY'
                     ? 'border-amber-500/60 bg-amber-500/15 shadow-lg shadow-amber-500/20'
                     : 'border-pitch-700 bg-pitch-900/80 hover:border-rose-500/40 hover:bg-rose-500/10'
