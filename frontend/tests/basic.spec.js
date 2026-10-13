@@ -11,7 +11,7 @@ test.describe('Landing Page', () => {
   test('renders main content after hydration', async ({ page }) => {
     await page.goto('/')
     // Wait for React to hydrate and render the SPA
-    await page.waitForSelector('text=MATCHLYTICS', { timeout: 15000 })
+    await page.waitForSelector('text=Matchlytics', { timeout: 15000 })
     // Should see landing page elements
     const bodyText = await page.locator('body').textContent()
     expect(bodyText).toContain('Matchlytics')
@@ -19,7 +19,7 @@ test.describe('Landing Page', () => {
 
   test('shows CTA buttons', async ({ page }) => {
     await page.goto('/')
-    await page.waitForSelector('text=MATCHLYTICS', { timeout: 15000 })
+    await page.waitForSelector('text=Matchlytics', { timeout: 15000 })
     await page.waitForTimeout(2000)
     // Launch Terminal is an <a> tag, View Pricing is a <button>
     const launchLink = page.getByRole('link', { name: 'Launch Terminal' })
@@ -30,7 +30,7 @@ test.describe('Landing Page', () => {
 
   test('shows pricing tiers', async ({ page }) => {
     await page.goto('/')
-    await page.waitForSelector('text=MATCHLYTICS', { timeout: 15000 })
+    await page.waitForSelector('text=Matchlytics', { timeout: 15000 })
     const starter = page.getByRole('heading', { name: 'Starter' })
     const pro = page.getByRole('heading', { name: 'Pro Pass' })
     const season = page.getByRole('heading', { name: 'Season Pass' })
@@ -41,7 +41,7 @@ test.describe('Landing Page', () => {
 
   test('navigates to dashboard via Launch Terminal on localhost', async ({ page }) => {
     await page.goto('/')
-    await page.waitForSelector('text=MATCHLYTICS', { timeout: 15000 })
+    await page.waitForSelector('text=Matchlytics', { timeout: 15000 })
     await page.waitForTimeout(2000)
     const launchLink = page.getByRole('link', { name: 'Launch Terminal' })
     await launchLink.click()
@@ -54,7 +54,7 @@ test.describe('Landing Page', () => {
 
   test('navigation links are present', async ({ page }) => {
     await page.goto('/')
-    await page.waitForSelector('text=MATCHLYTICS', { timeout: 15000 })
+    await page.waitForSelector('text=Matchlytics', { timeout: 15000 })
     await page.waitForTimeout(2000)
     // Use exact text matching to avoid strict mode violation
     const methodology = page.getByRole('link', { name: 'Methodology', exact: true })
@@ -67,7 +67,7 @@ test.describe('Landing Page', () => {
 test.describe('Em Dash Compliance (R-02)', () => {
   test('no em dashes in visible UI text', async ({ page }) => {
     await page.goto('/')
-    await page.waitForSelector('text=MATCHLYTICS', { timeout: 15000 })
+    await page.waitForSelector('text=Matchlytics', { timeout: 15000 })
     const bodyText = await page.locator('body').textContent()
     // Check for em dash (—) and en dash used as em dash (–)
     const emDashCount = (bodyText.match(/—/g) || []).length
@@ -88,14 +88,14 @@ test.describe('Build Integrity', () => {
       }
     })
     await page.goto('/')
-    await page.waitForSelector('text=MATCHLYTICS', { timeout: 15000 })
+    await page.waitForSelector('text=Matchlytics', { timeout: 15000 })
     await page.waitForTimeout(2000)
     expect(errors).toHaveLength(0)
   })
 
   test('all links have valid hrefs or onClick', async ({ page }) => {
     await page.goto('/')
-    await page.waitForSelector('text=MATCHLYTICS', { timeout: 15000 })
+    await page.waitForSelector('text=Matchlytics', { timeout: 15000 })
     const links = await page.locator('a[href]').all()
     for (const link of links.slice(0, 10)) {
       const href = await link.getAttribute('href')
@@ -128,7 +128,7 @@ test.describe('Responsive Layout', () => {
   test('mobile layout renders correctly', async ({ page }) => {
     await page.setViewportSize({ width: 375, height: 812 })
     await page.goto('/')
-    await page.waitForSelector('text=MATCHLYTICS', { timeout: 15000 })
+    await page.waitForSelector('text=Matchlytics', { timeout: 15000 })
     // Should still show content on mobile
     const bodyText = await page.locator('body').textContent()
     expect(bodyText).toContain('Matchlytics')
@@ -137,7 +137,7 @@ test.describe('Responsive Layout', () => {
   test('desktop layout renders correctly', async ({ page }) => {
     await page.setViewportSize({ width: 1280, height: 800 })
     await page.goto('/')
-    await page.waitForSelector('text=MATCHLYTICS', { timeout: 15000 })
+    await page.waitForSelector('text=Matchlytics', { timeout: 15000 })
     const bodyText = await page.locator('body').textContent()
     expect(bodyText).toContain('Matchlytics')
   })

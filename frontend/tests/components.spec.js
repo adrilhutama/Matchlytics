@@ -4,7 +4,7 @@ import { test, expect } from '@playwright/test'
 test.describe('Landing Page Interactions', () => {
   test.beforeEach(async ({ page }) => {
     await page.goto('/')
-    await page.waitForSelector('text=MATCHLYTICS', { timeout: 15000 })
+    await page.waitForSelector('text=Matchlytics', { timeout: 15000 })
   })
 
   test('scroll to pricing works', async ({ page }) => {
@@ -26,7 +26,7 @@ test.describe('Landing Page Interactions', () => {
 test.describe('Component Render Tests', () => {
   test('landing page has proper ARIA landmarks', async ({ page }) => {
     await page.goto('/')
-    await page.waitForSelector('text=MATCHLYTICS', { timeout: 15000 })
+    await page.waitForSelector('text=Matchlytics', { timeout: 15000 })
     // Check for main landmark
     const main = page.locator('main')
     // Header should exist
@@ -36,7 +36,7 @@ test.describe('Component Render Tests', () => {
 
   test('CTA buttons have proper roles', async ({ page }) => {
     await page.goto('/')
-    await page.waitForSelector('text=MATCHLYTICS', { timeout: 15000 })
+    await page.waitForSelector('text=Matchlytics', { timeout: 15000 })
     const buttons = page.locator('button')
     const buttonCount = await buttons.count()
     expect(buttonCount).toBeGreaterThan(0)
@@ -53,7 +53,7 @@ test.describe('Component Render Tests', () => {
 test.describe('Keyboard Navigation', () => {
   test('tab navigation cycles through interactive elements', async ({ page }) => {
     await page.goto('/')
-    await page.waitForSelector('text=MATCHLYTICS', { timeout: 15000 })
+    await page.waitForSelector('text=Matchlytics', { timeout: 15000 })
     // Tab through several elements
     for (let i = 0; i < 5; i++) {
       await page.keyboard.press('Tab')
@@ -68,7 +68,7 @@ test.describe('Keyboard Navigation', () => {
 test.describe('Accessibility Checks', () => {
   test('images have alt text or aria-hidden', async ({ page }) => {
     await page.goto('/')
-    await page.waitForSelector('text=MATCHLYTICS', { timeout: 15000 })
+    await page.waitForSelector('text=Matchlytics', { timeout: 15000 })
     const images = await page.locator('img').all()
     for (const img of images) {
       const alt = await img.getAttribute('alt')
@@ -80,7 +80,7 @@ test.describe('Accessibility Checks', () => {
 
   test('all buttons have accessible names', async ({ page }) => {
     await page.goto('/')
-    await page.waitForSelector('text=MATCHLYTICS', { timeout: 15000 })
+    await page.waitForSelector('text=Matchlytics', { timeout: 15000 })
     const buttons = await page.locator('button').all()
     for (const btn of buttons.slice(0, 15)) {
       const text = await btn.textContent()
@@ -101,14 +101,14 @@ test.describe('SPA Hydration', () => {
       }
     })
     await page.goto('/')
-    await page.waitForSelector('text=MATCHLYTICS', { timeout: 15000 })
+    await page.waitForSelector('text=Matchlytics', { timeout: 15000 })
     await page.waitForTimeout(1000)
     expect(errors).toHaveLength(0)
   })
 
   test('network requests complete', async ({ page }) => {
     await page.goto('/')
-    await page.waitForSelector('text=MATCHLYTICS', { timeout: 15000 })
+    await page.waitForSelector('text=Matchlytics', { timeout: 15000 })
     // Wait for initial network to settle
     await page.waitForTimeout(2000)
     // Should have loaded resources

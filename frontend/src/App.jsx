@@ -17,10 +17,10 @@ import MatchCard from './components/MatchCard'
 import CompactTableView from './components/CompactTableView'
 import TableView from './components/TableView'
 import TerminalScanner from './components/TerminalScanner'
-import ScoreMatrixModal from './components/ScoreMatrixModal'
-import KellyCalculatorModal from './components/KellyCalculatorModal'
+const ScoreMatrixModal = React.lazy(() => import('./components/ScoreMatrixModal'))
+const KellyCalculatorModal = React.lazy(() => import('./components/KellyCalculatorModal'))
+const PerformanceModal = React.lazy(() => import('./components/PerformanceModal'))
 import ParlaySlipDrawer from './components/ParlaySlipDrawer'
-import PerformanceModal from './components/PerformanceModal'
 import LoadingState from './components/LoadingState'
 import EmptyState from './components/EmptyState'
 import ErrorState from './components/ErrorState'
@@ -35,7 +35,7 @@ import SubscriptionModal from './components/SubscriptionModal'
 import SubscriptionBanner from './components/SubscriptionBanner'
 import WorkspaceNav from './components/WorkspaceNav'
 import CommandPalette from './components/CommandPalette'
-import QuantLab from './components/QuantLab'
+const QuantLab = React.lazy(() => import('./components/QuantLab'))
 const PortfolioTracker = React.lazy(() => import('./components/PortfolioTracker'))
 const ModelLedger = React.lazy(() => import('./components/ModelLedger'))
 const AdminDashboard = React.lazy(() => import('./components/AdminDashboard'))
@@ -879,22 +879,26 @@ function AppInner() {
   // Modals and shared overlays
   const sharedOverlays = (
     <>
-      <ScoreMatrixModal
-        fixture={selectedMatrixFixture}
-        isOpen={Boolean(selectedMatrixFixture)}
-        onClose={() => setSelectedMatrixFixture(null)}
-        standingsMap={standingsMap}
-      />
+      <React.Suspense fallback={null}>
+        <ScoreMatrixModal
+          fixture={selectedMatrixFixture}
+          isOpen={Boolean(selectedMatrixFixture)}
+          onClose={() => setSelectedMatrixFixture(null)}
+          standingsMap={standingsMap}
+        />
+      </React.Suspense>
 
-      <KellyCalculatorModal
-        fixture={selectedQuantFixture}
-        isOpen={Boolean(selectedQuantFixture)}
-        onClose={() => setSelectedQuantFixture(null)}
-        onAddToSlip={toggleSlipGated}
-        isInSlip={parlaySlip.some(
-          (l) => l.fixtureId === selectedQuantFixture?.id
-        )}
-      />
+      <React.Suspense fallback={null}>
+        <KellyCalculatorModal
+          fixture={selectedQuantFixture}
+          isOpen={Boolean(selectedQuantFixture)}
+          onClose={() => setSelectedQuantFixture(null)}
+          onAddToSlip={toggleSlipGated}
+          isInSlip={parlaySlip.some(
+            (l) => l.fixtureId === selectedQuantFixture?.id
+          )}
+        />
+      </React.Suspense>
 
       <ParlaySlipDrawer
         legs={parlaySlip}
@@ -906,11 +910,13 @@ function AppInner() {
         userBankroll={bankrollAmount}
       />
 
-      <PerformanceModal
-        isOpen={isBacktestOpen}
-        onClose={() => setIsBacktestOpen(false)}
-        fixtures={(settledFixtures || []).filter(Boolean)}
-      />
+      <React.Suspense fallback={null}>
+        <PerformanceModal
+          isOpen={isBacktestOpen}
+          onClose={() => setIsBacktestOpen(false)}
+          fixtures={(settledFixtures || []).filter(Boolean)}
+        />
+      </React.Suspense>
 
       <CommandPalette
         isOpen={isCommandPaletteOpen}
@@ -1242,18 +1248,20 @@ function AppInner() {
 
           {/* Workspace 2: Quant Lab (Single Match Deep-Dive) */}
           {activeWorkspace === 'quant_lab' && (
-            <QuantLab
-              fixture={selectedLabFixture}
-              selectedFixture={selectedLabFixture}
-              allFixtures={fixtures}
-              fixtures={fixtures}
-              onSelectFixture={setSelectedLabFixture}
-              standingsMap={standingsMap}
-              onLogPosition={handleLogPosition}
-              userBankroll={bankrollAmount}
-              bankrollAmount={bankrollAmount}
-              onBackToScanner={handleBackToScanner}
-            />
+            <React.Suspense fallback={<LoadingState />}>
+              <QuantLab
+                fixture={selectedLabFixture}
+                selectedFixture={selectedLabFixture}
+                allFixtures={fixtures}
+                fixtures={fixtures}
+                onSelectFixture={setSelectedLabFixture}
+                standingsMap={standingsMap}
+                onLogPosition={handleLogPosition}
+                userBankroll={bankrollAmount}
+                bankrollAmount={bankrollAmount}
+                onBackToScanner={handleBackToScanner}
+              />
+            </React.Suspense>
           )}
 
           {/* Workspace 3: Bankroll & Bet Tracker */}
