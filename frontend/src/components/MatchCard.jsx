@@ -275,9 +275,9 @@ export default function MatchCard({
             </div>
 
             {/* Market feed indicator & EV badges - wrapped for mobile */}
-            <div className="flex items-center gap-2 flex-wrap">
+            <div className="flex items-center gap-1.5 flex-wrap">
               <span
-                className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md text-[10px] font-mono font-semibold flex-shrink-0 ${
+                className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md text-[9px] sm:text-[10px] font-mono font-semibold flex-shrink-0 ${
                   hasRealOdds
                     ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/40'
                     : 'bg-pitch-900 text-slate-500 border border-pitch-700'
@@ -289,10 +289,10 @@ export default function MatchCard({
 
               {/* Multi-Market EV Badges in Header */}
               {(totalsEdge || spreadsEdge) && (
-                <div className="flex items-center gap-1.5 flex-wrap">
+                <div className="flex items-center gap-1 flex-wrap">
                   {totalsEdge && (
                     <span
-                      className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md text-[10px] font-mono font-bold bg-amber-500/20 text-amber-400 border border-amber-500/40"
+                      className="inline-flex items-center gap-0.5 px-1 py-0.5 rounded-md text-[9px] sm:text-[10px] font-mono font-bold bg-amber-500/20 text-amber-400 border border-amber-500/40"
                       title="Identified +EV Edge in Totals market"
                     >
                       O/U +{totalsEdge.ev}%
@@ -300,7 +300,7 @@ export default function MatchCard({
                   )}
                   {spreadsEdge && (
                     <span
-                      className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md text-[10px] font-mono font-bold bg-sky-500/20 text-sky-400 border border-sky-500/40"
+                      className="inline-flex items-center gap-0.5 px-1 py-0.5 rounded-md text-[9px] sm:text-[10px] font-mono font-bold bg-sky-500/20 text-sky-400 border border-sky-500/40"
                       title="Identified +EV Edge in Asian Handicap market"
                     >
                       AH +{spreadsEdge.ev}%
@@ -312,27 +312,27 @@ export default function MatchCard({
               {/* Best EV Opportunity Badge (multi-market fallback when no H2H pick) */}
               {hasMultiMarketEV && !isValue && bestPickEV && (
                 <span
-                  className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md text-[10px] font-mono font-bold border flex-shrink-0 ${
+                  className={`inline-flex items-center gap-0.5 px-1 py-0.5 rounded-md text-[9px] sm:text-[10px] font-mono font-bold border flex-shrink-0 ${
                     bestPickMarket === 'totals'
                       ? 'bg-emerald-500/20 text-emerald-400 border-emerald-500/40'
                       : 'bg-sky-500/20 text-sky-400 border-sky-500/40'
                   }`}
                   title={`Best EV: ${bestPickSelection} (${bestPickMarket}) at ${Number(bestPickOdds).toFixed(2)} @ ${Number(bestPickModelProb).toFixed(0)}% model`}
                 >
-                  ★ [{bestPickMarket === 'totals' ? 'TOTALS' : 'AH'}] {bestPickSelection} +{Number(bestPickEV).toFixed(1)}%
+                  ★ [{bestPickMarket === 'totals' ? 'T' : 'AH'}] +{Number(bestPickEV).toFixed(1)}%
                 </span>
               )}
             </div>
           </div>
 
           {/* Right Header: Timing & Pin Button */}
-          <div className="flex items-center gap-2 flex-shrink-0 ml-2">
+          <div className="flex items-center gap-1.5 flex-shrink-0 ml-1 sm:ml-2">
             <div className="text-right">
-              <span className="inline-block px-2 py-1 rounded-lg bg-gradient-to-r from-amber-500/20 to-amber-600/10 border border-amber-500/30 text-[11px] font-bold text-amber-400 tabular-nums">
+              <span className="inline-block px-1.5 py-0.5 sm:px-2 sm:py-1 rounded-lg bg-gradient-to-r from-amber-500/20 to-amber-600/10 border border-amber-500/30 text-[10px] sm:text-[11px] font-bold text-amber-400 tabular-nums">
                 {relativeBadge}
               </span>
               {timeStr && (
-                <p className="text-[10px] text-slate-500 font-mono mt-0.5">{timeStr}</p>
+                <p className="text-[9px] sm:text-[10px] text-slate-500 font-mono mt-0.5">{timeStr}</p>
               )}
             </div>
 
@@ -386,11 +386,11 @@ export default function MatchCard({
           </div>
 
           {/* Centre: predicted score + metadata */}
-          <div className="flex flex-col items-center gap-1 flex-shrink-0 px-2">
+          <div className="flex flex-col items-center gap-1 flex-shrink-0 px-1 sm:px-2">
             {predicted_score ? (
               <div className="text-center">
                 <p className="text-[9px] text-slate-500 font-mono uppercase tracking-widest">PRED</p>
-                <p className="text-2xl sm:text-3xl font-black text-white tabular-nums tracking-tight leading-none">
+                <p className="text-xl sm:text-2xl md:text-3xl font-black text-white tabular-nums tracking-tight leading-none">
                   {predicted_score}
                 </p>
               </div>
