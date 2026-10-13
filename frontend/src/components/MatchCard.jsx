@@ -4,7 +4,7 @@
 // - Expandable deep-dive: O/U 2.5 vs BTTS, Zero-Vig consensus comparison, Quant Lab deep-dive, and Position Logger
 // - Institutional sanitation: Zero third-party vendor names or scraping references
 
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useRef } from 'react'
 import ProbabilityBar from './ProbabilityBar'
 import OddsComparison from './OddsComparison'
 import ValueBadge from './ValueBadge'
@@ -76,6 +76,8 @@ export default function MatchCard({
 
   const [isExpanded, setIsExpanded] = useState(false)
   const [activeMarketTab, setActiveMarketTab] = useState('h2h')
+  const [isTransitioning, setIsTransitioning] = useState(false)
+  const contentRef = useRef(null)
   const triggerUpgrade = quantLocked ? onTriggerUpgrade : null
 
   const {
@@ -126,6 +128,10 @@ export default function MatchCard({
   const isValuePickInSlip = value_pick ? slipPicks.includes(value_pick) : false
   const hasRealOdds = isRealMarketOdds(fixture)
   const { relativeBadge, timeStr, dateStr } = formatLocalizedMatchDate(match_date)
+
+  // High-value detection (EV > 10%)
+  const isHighValue = ((isValue && ev_percentage != null && Number(ev_percentage) > 10) ||
+    (hasMultiMarketEV && bestPickEV != null && Number(bestPickEV) > 10))
 
   // Determine active odds and model prob for value pick
   const { valueOdds, valueProb, valueLabel } = useMemo(() => {
@@ -241,7 +247,7 @@ export default function MatchCard({
 
   return (
     <article
-      className={`match-card ${isValue ? 'match-card--value' : ''} p-3.5 sm:p-4 animate-slide-up flex flex-col justify-between transition-all`}
+      className={`match-card ${isValue ? 'match-card--value' : hasMultiMarketEV ? 'match-card--multi' : ''} p-3.5 sm:p-4 animate-slide-up flex flex-col justify-between transition-all ${isHighValue ? 'high-value-accent' : ''}`}
       style={style}
       aria-label={`${home_team_name} vs ${away_team_name}, ${dateStr}`}
     >
@@ -580,8 +586,11 @@ export default function MatchCard({
         )}
 
         {/* ---- Expandable Deep-Dive Section (Progressive Disclosure) ---- */}
-        {isExpanded && (
-          <div className="pt-2 border-t border-pitch-800/80 space-y-3 animate-fade-in">
+        <div
+          className={`expandable-content ${isExpanded ? 'expanded' : ''}`}
+          ref={contentRef}
+        >
+          <div className="pt-2 border-t border-pitch-800/80 space-y-3">
             {/* Dual Gauge O/U 2.5 and BTTS */}
             {(prob_over_25 != null || prob_btts_yes != null || lambda_home != null) && (
               <div>
@@ -854,7 +863,7 @@ export default function MatchCard({
               </button>
             </div>
           </div>
-        )}
+        </div>
       </div>
 
       {/* ---- Progressive Disclosure Toggle Footer ---- */}
