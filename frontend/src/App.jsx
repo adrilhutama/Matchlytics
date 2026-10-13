@@ -723,11 +723,6 @@ function AppInner() {
     }
   }, [fetchFixtures, fetchSettledFixtures])
 
-  // Slice-based pagination for smooth initial load
-  const paginatedFixtures = useMemo(() => {
-    return displayedFixtures.slice(0, visibleCount)
-  }, [displayedFixtures, visibleCount])
-
   // Client-side filtering & sorting
   const displayedFixtures = useMemo(() => {
     let result = (fixtures || []).filter(Boolean)
@@ -783,7 +778,10 @@ function AppInner() {
     return sortFixtures(result, sortOption)
   }, [fixtures, activeLeague, showWatchlistOnly, watchlist, valueOnly, selectedMarket, dateRange, searchQuery, sortOption])
 
-  // Slice-based pagination removed - VirtualizedFixturesList handles all items efficiently
+  // Slice-based pagination for mobile - load 24 at a time
+  const paginatedFixtures = useMemo(() => {
+    return displayedFixtures.slice(0, visibleCount)
+  }, [displayedFixtures, visibleCount])
 
   const handleClearFilters = useCallback(() => {
     setActiveLeague('all')
