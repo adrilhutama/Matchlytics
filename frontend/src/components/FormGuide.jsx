@@ -17,7 +17,7 @@ export default function FormGuide({ form, size = 'md' }) {
   if (chars.length === 0) return null
 
   const sizeClasses = size === 'sm'
-    ? 'w-4 h-4 text-[9px]'
+    ? 'w-4 h-4 text-[10px]'
     : 'w-4 h-4 text-[10px]'
 
   return (
