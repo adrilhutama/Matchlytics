@@ -188,7 +188,17 @@ function AppInner() {
   }, [])
   const [searchQuery,         setSearchQuery]         = useState('')
   const [sortOption,          setSortOption]          = useState('kickoff_asc')
-  const [viewMode,            setViewMode]            = useState('table')
+  const [viewMode,            setViewMode]            = useState(() =>
+    typeof window !== 'undefined' && window.matchMedia('(max-width: 767px)').matches ? 'cards' : 'table'
+  )
+
+  // Auto-switch viewMode based on viewport width
+  useEffect(() => {
+    const mq = window.matchMedia('(max-width: 767px)')
+    const handler = (e) => setViewMode(e.matches ? 'cards' : 'table')
+    mq.addEventListener('change', handler)
+    return () => mq.removeEventListener('change', handler)
+  }, [])
 
   const [showUpgradeModal,    setShowUpgradeModal]    = useState(false)
 
