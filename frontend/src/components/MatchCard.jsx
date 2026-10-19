@@ -4,7 +4,7 @@
 // - Expandable deep-dive: O/U 2.5 vs BTTS, Zero-Vig consensus comparison, Quant Lab deep-dive, and Position Logger
 // - Institutional sanitation: Zero third-party vendor names or scraping references
 
-import { useState, useMemo, useRef } from 'react'
+import { useState, useMemo, useRef, useEffect } from 'react'
 import ProbabilityBar from './ProbabilityBar'
 import OddsComparison from './OddsComparison'
 import ValueBadge from './ValueBadge'
@@ -79,6 +79,21 @@ export default function MatchCard({
   const [isTransitioning, setIsTransitioning] = useState(false)
   const contentRef = useRef(null)
   const triggerUpgrade = quantLocked ? onTriggerUpgrade : null
+
+  // Auto-collapse expanded card when user scrolls past its midpoint (mobile UX)
+  useEffect(() => {
+    if (!isExpanded || typeof window === 'undefined') return
+    const handleScroll = () => {
+      const rect = contentRef.current?.getBoundingClientRect()
+      if (!rect) return
+      // Collapse when card's bottom passes viewport midpoint
+      if (rect.bottom < window.innerHeight * 0.5) {
+        setIsExpanded(false)
+      }
+    }
+    window.addEventListener('scroll', handleScroll, { passive: true })
+    return () => window.removeEventListener('scroll', handleScroll)
+  }, [isExpanded])
 
   const {
     league_name,    league_logo,
@@ -330,11 +345,8 @@ export default function MatchCard({
           <div className="flex items-center gap-1.5 flex-shrink-0 ml-1 sm:ml-2">
             <div className="text-right">
               <span className="inline-block px-1.5 py-0.5 sm:px-2 sm:py-1 rounded-lg bg-gradient-to-r from-amber-500/20 to-amber-600/10 border border-amber-500/30 text-[10px] sm:text-[11px] font-bold text-amber-400 tabular-nums">
-                {relativeBadge}
+                {relativeBadge}{timeStr ? ` · ${timeStr}` : ''}
               </span>
-              {timeStr && (
-                <p className="text-[9px] sm:text-[10px] text-slate-500 font-mono mt-0.5">{timeStr}</p>
-              )}
             </div>
 
             {/* Star Watchlist Toggle */}
@@ -342,7 +354,7 @@ export default function MatchCard({
               type="button"
               onClick={() => onToggleWatchlist(fixture.id)}
               aria-label={isPinned ? `Unpin ${home_team_name} vs ${away_team_name} from watchlist` : `Pin ${home_team_name} vs ${away_team_name} to watchlist`}
-              className={`min-w-[44px] min-h-[44px] w-11 h-11 flex items-center justify-center rounded-xl transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500 active:scale-95 touch-manipulation ${
+              className={`min-w-[48px] min-h-[48px] w-12 h-12 flex items-center justify-center rounded-xl transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500 active:scale-95 touch-manipulation ${
                 isPinned
                   ? 'bg-amber-500/20 text-amber-400 border border-amber-500/40'
                   : 'bg-pitch-900/80 text-slate-500 hover:text-amber-400 border border-pitch-700 hover:border-amber-500/30'
