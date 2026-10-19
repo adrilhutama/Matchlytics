@@ -852,7 +852,7 @@ export default function MatchCard({
                   className="min-h-[48px] py-3 px-3 rounded-xl bg-pitch-950 hover:bg-pitch-800 border border-pitch-700 text-slate-200 flex items-center justify-center gap-1.5 transition-colors active:scale-98 touch-manipulation text-sm"
                   title="Log position into Portfolio Tracker"
                 >
-                  <span className="text-base">⊞</span>
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg>
                   <span>Log Position</span>
                 </button>
               )}

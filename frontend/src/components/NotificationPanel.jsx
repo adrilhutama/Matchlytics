@@ -6,11 +6,11 @@ import { supabase } from '../lib/supabase'
 import { useAuth } from '../context/AuthContext'
 
 const TYPE_CONFIG = {
-  bet_settled: { label: 'Bet Settled', icon: '⚽', color: 'text-emerald-400' },
-  odds_drop: { label: 'Odds Moved', icon: '⬇️', color: 'text-rose-400' },
-  subscription_renewal: { label: 'Subscription Renewed', icon: '✅', color: 'text-sky-400' },
-  subscription_expiring: { label: 'Subscription Expiring', icon: '⏰', color: 'text-amber-400' },
-  watchlist_trigger: { label: 'Watchlist Trigger', icon: '✨', color: 'text-violet-400' },
+  bet_settled: { label: 'Bet Settled', icon: <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="M12 2a14.5 14.5 0 0 0 0 20 14.5 14.5 0 0 0 0-20"/><path d="M2 12h20"/></svg>, color: 'text-emerald-400' },
+  odds_drop: { label: 'Odds Moved', icon: <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><polyline points="7 17 12 12 17 17"/><polyline points="7 12 12 17 17 12"/></svg>, color: 'text-rose-400' },
+  subscription_renewal: { label: 'Subscription Renewed', icon: <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><polyline points="20 6 9 17 4 12"/></svg>, color: 'text-sky-400' },
+  subscription_expiring: { label: 'Subscription Expiring', icon: <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>, color: 'text-amber-400' },
+  watchlist_trigger: { label: 'Watchlist Trigger', icon: <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>, color: 'text-violet-400' },
 }
 
 function formatRelativeTime(isoString) {
@@ -162,13 +162,13 @@ export default function NotificationPanel({ onClose }) {
             </div>
           ) : !hasAny ? (
             <div className="py-16 text-center">
-              <p className="text-3xl mb-2">🔔</p>
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" className="mb-2 text-slate-400"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
               <p className="text-sm text-slate-500 font-mono">No notifications yet.</p>
             </div>
           ) : (
             <div className="divide-y divide-pitch-800/60">
               {notifications.map((notif) => {
-                const cfg = TYPE_CONFIG[notif.type] || { label: notif.type, icon: '🔔', color: 'text-slate-400' }
+                const cfg = TYPE_CONFIG[notif.type] || { label: notif.type, icon: <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>, color: 'text-slate-400' }
                 const payload = notif.payload || {}
                 return (
                   <div

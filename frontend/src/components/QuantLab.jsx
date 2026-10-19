@@ -977,7 +977,7 @@ function QuantLabWorkspace({
                         : 'bg-pitch-900 hover:bg-pitch-800 text-slate-400 border border-pitch-800'
                     }`}
                   >
-                    <span>⊞ Log to Portfolio</span>
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" className="inline mr-1"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg>Log to Portfolio
                   </button>
                 </div>
               </div>

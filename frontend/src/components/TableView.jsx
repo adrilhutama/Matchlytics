@@ -828,7 +828,7 @@ export function TableRow({
                       className="min-h-[44px] py-2 px-3 rounded-xl bg-pitch-900 hover:bg-pitch-800 border border-pitch-700 text-slate-200 text-xs font-mono flex items-center gap-1.5 transition-colors active:scale-95 touch-manipulation"
                       title="Log position into Portfolio Tracker"
                     >
-                      <span>⊞</span>
+                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg>
                       <span>Log Position</span>
                     </button>
                   )}
