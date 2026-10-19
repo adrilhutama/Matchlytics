@@ -270,7 +270,7 @@ export default function FilterBar({
                 : 'bg-pitch-900 text-slate-400 border-pitch-700 hover:text-slate-200'
             }`}
           >
-            <span>★</span>
+            <svg width="11" height="11" viewBox="0 0 24 24" fill="currentColor" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><polygon points="12,2 15.09,8.26 22,9.27 17,14.14 18.18,21.02 12,17.77 5.82,21.02 7,14.14 2,9.27 8.91,8.26"/></svg>
             <span>Watchlist</span>
             {watchlistCount > 0 && (
               <span className="px-1.5 py-0.5 rounded-full text-[10px] font-mono font-bold bg-pitch-950 text-amber-300">{watchlistCount}</span>

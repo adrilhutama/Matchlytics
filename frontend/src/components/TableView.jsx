@@ -479,7 +479,7 @@ export function TableRow({
               </span>
               {totalsEdge && (
                 <span className="text-[9px] text-amber-400 font-mono mt-0.5 font-bold">
-                  ★ {totalsEdge.label}
+                  {'[+EV] ' + totalsEdge.label}
                 </span>
               )}
             </div>
@@ -508,7 +508,7 @@ export function TableRow({
           ) : value_pick && ev_percentage ? (
             <div className="inline-flex flex-col items-center gap-0.5">
               <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-mono font-bold bg-amber-500/20 text-amber-300 border border-amber-500/40">
-                <span>★</span>
+                <span>[+EV]</span>
                 <span>{value_pick} (+{Number(ev_percentage).toFixed(1)}%)</span>
               </span>
               {recKellyPct != null && (
@@ -524,18 +524,18 @@ export function TableRow({
                   ? 'bg-emerald-500/15 text-emerald-300 border-emerald-500/30'
                   : 'bg-sky-500/15 text-sky-300 border-sky-500/30'
               }`}>
-                <span>★</span>
+                <span>[+EV]</span>
                 <span>[{bestPickMarket === 'totals' ? 'TOTALS' : 'AH'}] {bestPickSelection}</span>
                 <span className="text-[9px]">+{Number(bestPickEV).toFixed(1)}%</span>
               </span>
             </div>
           ) : totalsEdge ? (
             <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-mono font-bold bg-amber-500/15 text-amber-300 border border-amber-500/30">
-              ★ {totalsEdge.label} (+{totalsEdge.ev}%)
+              [+EV] {totalsEdge.label} (+{totalsEdge.ev}%)
             </span>
           ) : spreadsEdge ? (
             <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-mono font-bold bg-sky-500/15 text-sky-300 border border-sky-500/30">
-              ★ {spreadsEdge.label} (+{spreadsEdge.ev}%)
+              [+EV] {spreadsEdge.label} (+{spreadsEdge.ev}%)
             </span>
           ) : (
             <span className="text-slate-600 font-mono">-</span>

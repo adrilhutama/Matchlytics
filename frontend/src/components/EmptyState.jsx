@@ -16,7 +16,7 @@ export default function EmptyState({
 
   if (isWatchlist) {
     title = 'Your Watchlist is empty'
-    hint = 'Click the star icon (⭐) on any match card to bookmark it for quick access here.'
+    hint = 'Click the star icon on any match card to bookmark it for quick access here.'
   } else if (searchQuery) {
     title = `No matches found for "${searchQuery}"`
     hint = 'Check the team or league spelling, or clear the search query to view all available fixtures.'

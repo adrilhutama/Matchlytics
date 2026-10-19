@@ -320,7 +320,7 @@ function QuantLabWorkspace({
                 const awayName = f.away_team?.short_name || f.away_team?.name || f.away_team_name || "Away"
                 const compCode = f.competition_code || f.competition?.code || f.league || ""
                 const isVal = Boolean(f.value_pick)
-                const evTag = isVal ? ` ★ [+EV ${(f.ev_percentage || 0).toFixed(1)}%]` : ''
+                const evTag = isVal ? ` [+EV ${(f.ev_percentage || 0).toFixed(1)}%]` : ''
                 return (
                   <option key={f.id} value={f.id}>
                     {homeName} vs {awayName}{evTag}{compCode ? ` (${compCode})` : ''}

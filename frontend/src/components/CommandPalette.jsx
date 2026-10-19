@@ -152,7 +152,7 @@ export default function CommandPalette({
           category: 'Fixtures',
           title: `${home} vs ${away}`,
           subtitle: `${f?.league_name || 'League'} : Kickoff ${f?.match_date ? new Date(f.match_date).toLocaleDateString(undefined, { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : 'TBD'}${f?.value_pick ? ` : +EV ${f.value_pick} (+${f?.ev_percentage}%)` : ''}`,
-          icon: f?.value_pick ? '★' : '⚽',
+          icon: f?.value_pick ? 'EV' : '⚽',
           isVal: Boolean(f?.value_pick),
           action: () => {
             onSelectFixture(f)

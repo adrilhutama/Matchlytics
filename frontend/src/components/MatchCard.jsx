@@ -616,7 +616,7 @@ export default function MatchCard({
               <button
                 type="button"
                 onClick={() => setActiveMarketTab('h2h')}
-                className={`flex-1 py-2 px-2 rounded-lg text-xs font-semibold transition-all flex items-center justify-center gap-1.5 touch-manipulation min-h-[44px] ${
+                className={`flex-1 py-2 px-2 rounded-lg text-xs font-semibold transition-all flex items-center justify-center gap-1.5 touch-manipulation min-h-[48px] ${
                   activeMarketTab === 'h2h'
                     ? 'bg-pitch-800 text-amber-400 font-bold shadow-sm border border-pitch-700'
                     : 'text-slate-400 hover:text-slate-200'
@@ -630,7 +630,7 @@ export default function MatchCard({
               <button
                 type="button"
                 onClick={() => setActiveMarketTab('totals')}
-                className={`flex-1 py-2 px-2 rounded-lg text-xs font-semibold transition-all flex items-center justify-center gap-1.5 touch-manipulation min-h-[44px] ${
+                className={`flex-1 py-2 px-2 rounded-lg text-xs font-semibold transition-all flex items-center justify-center gap-1.5 touch-manipulation min-h-[48px] ${
                   activeMarketTab === 'totals'
                     ? 'bg-pitch-800 text-amber-400 font-bold shadow-sm border border-pitch-700'
                     : 'text-slate-400 hover:text-slate-200'
@@ -644,7 +644,7 @@ export default function MatchCard({
               <button
                 type="button"
                 onClick={() => setActiveMarketTab('spreads')}
-                className={`flex-1 py-2 px-2 rounded-lg text-xs font-semibold transition-all flex items-center justify-center gap-1.5 touch-manipulation min-h-[44px] ${
+                className={`flex-1 py-2 px-2 rounded-lg text-xs font-semibold transition-all flex items-center justify-center gap-1.5 touch-manipulation min-h-[48px] ${
                   activeMarketTab === 'spreads'
                     ? 'bg-pitch-800 text-amber-400 font-bold shadow-sm border border-pitch-700'
                     : 'text-slate-400 hover:text-slate-200'
