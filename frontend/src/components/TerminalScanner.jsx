@@ -10,6 +10,7 @@
 import { lazy, Suspense } from 'react'
 import TableView from './TableView'
 import MatchCard from './MatchCard'
+import MatchCardSkeleton from './MatchCardSkeleton'
 const VirtualizedFixturesList = lazy(() => import('./VirtualizedFixturesList'))
 import LoadingState from './LoadingState'
 
@@ -108,24 +109,28 @@ export default function TerminalScanner({
       {/* Mobile: Simple Scrollable Card Grid (no AutoSizer needed) */}
       {viewMode === 'cards' && (
         <div className="sm:hidden space-y-4 pb-4">
-          {validFixtures.slice(0, visibleCount).map((fixture, idx) => (
-            <MatchCard
-              key={fixture.id}
-              fixture={fixture}
-              isPinned={watchlist?.includes(fixture.id)}
-              onToggleWatchlist={onToggleWatchlist}
-              onOpenMatrix={onOpenMatrix}
-              onOpenQuantModal={onOpenQuantModal}
-              onSelectForLab={onSelectForLab}
-              onLogPosition={onLogPosition}
-              slipPicks={(slipLegs || []).filter((l) => l?.fixtureId === fixture.id).map((l) => l.pick)}
-              onToggleSlip={onToggleSlip}
-              standingsMap={standingsMap}
-              quantLocked={quantLocked}
-              onTriggerUpgrade={onTriggerUpgrade}
-              style={{ animationDelay: `${Math.min(idx * 30, 300)}ms` }}
-            />
-          ))}
+          {loading ? (
+            <MatchCardSkeleton count={3} />
+          ) : (
+            validFixtures.slice(0, visibleCount).map((fixture, idx) => (
+              <MatchCard
+                key={fixture.id}
+                fixture={fixture}
+                isPinned={watchlist?.includes(fixture.id)}
+                onToggleWatchlist={onToggleWatchlist}
+                onOpenMatrix={onOpenMatrix}
+                onOpenQuantModal={onOpenQuantModal}
+                onSelectForLab={onSelectForLab}
+                onLogPosition={onLogPosition}
+                slipPicks={(slipLegs || []).filter((l) => l?.fixtureId === fixture.id).map((l) => l.pick)}
+                onToggleSlip={onToggleSlip}
+                standingsMap={standingsMap}
+                quantLocked={quantLocked}
+                onTriggerUpgrade={onTriggerUpgrade}
+                style={{ animationDelay: `${Math.min(idx * 30, 300)}ms` }}
+              />
+            ))
+          )}
 
           {/* Load More Button */}
           {visibleCount < totalCount && (

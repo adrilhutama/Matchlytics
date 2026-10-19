@@ -152,6 +152,11 @@ export default function FilterBar({
           )}
         </button>
 
+        {/* Date Range Indicator (mobile only) */}
+        <span className="text-[11px] font-mono text-slate-400 tabular-nums px-1 hidden sm:inline">
+          {DATE_RANGES.find((r) => r.id === dateRange)?.shortLabel ?? ''}
+        </span>
+
         {/* Fixture Count */}
         <span className="text-[11px] font-mono text-slate-500 tabular-nums">
           {activeFixtureCount}
