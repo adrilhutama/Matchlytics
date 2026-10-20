@@ -37,6 +37,7 @@ export default function TerminalScanner({
   visibleCount = 24,
   totalCount = 0,
   onLoadMore,
+  loading = false,
 }) {
   const validFixtures = (fixtures || []).filter(Boolean)
 
